@@ -46,6 +46,48 @@ def test_command_parse_with_separator() -> None:
 
 
 @pytest.mark.asyncio
+async def test_custom_command_prefix_applies_live() -> None:
+    """Web 配置把前缀改为 # 后，解析即时生效且旧前缀失效。"""
+    registry = CommandRegistry()
+    registry.set_command_start(["#"])
+    registry.set_security(SecurityPolicy())
+    permission_manager.upsert_principal("1", role="superadmin", scopes={"*"})
+
+    async def handler(event, args, context) -> None:
+        await event.reply("ok")
+
+    registry.register("ping", handler, permission="bot.command", plugin_name="test")
+    event = make_event("#ping")
+    assert await registry.handle_message(event) is True
+    assert event.replies == ["ok"]
+
+    event_old = make_event("/ping")
+    assert await registry.handle_message(event_old) is False
+    assert event_old.replies == []
+    await get_bus().stop(clear=True)
+    reset_bus()
+
+
+@pytest.mark.asyncio
+async def test_unknown_command_hint_uses_active_prefix() -> None:
+    """未知命令提示跟随当前前缀（不再硬编码 /）。"""
+    registry = CommandRegistry()
+    registry.set_command_start(["#"])
+    registry.set_security(SecurityPolicy())
+
+    async def handler(event, args, context) -> None:
+        await event.reply("ok")
+
+    registry.register("ping", handler, permission="bot.command", plugin_name="test")
+    event = make_event("#pin")
+    assert await registry.handle_message(event) is False
+    assert event.replies and "未找到命令 #pin" in event.replies[0]
+    assert "#ping" in event.replies[0]
+    await get_bus().stop(clear=True)
+    reset_bus()
+
+
+@pytest.mark.asyncio
 async def test_command_registry_runs_handler() -> None:
     registry = CommandRegistry()
     registry.set_command_start(["/"])

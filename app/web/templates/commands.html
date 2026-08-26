@@ -49,6 +49,7 @@
         <tr>
           <th>命令</th>
           <th>别名</th>
+          <th>用法 / 示例</th>
           <th>说明</th>
           <th>权限</th>
           <th>冷却</th>
@@ -66,6 +67,15 @@
           {% for alias in row.aliases %}<span class="badge">{{ alias }}</span>{% endfor %}
           {% else %}<span class="muted">—</span>{% endif %}
         </td>
+        <td>
+          {% if row.usage %}<span class="mono">{{ command_prefix }}{{ row.usage[1:] if row.usage.startswith('/') else row.usage }}</span>{% endif %}
+          {% if row.examples %}
+          <div class="muted" style="font-size:12px">
+            {% for example in row.examples %}{{ command_prefix }}{{ example[1:] if example.startswith('/') else example }}{% if not loop.last %} ｜ {% endif %}{% endfor %}
+          </div>
+          {% endif %}
+          {% if not row.usage and not row.examples %}<span class="muted">—</span>{% endif %}
+        </td>
         <td>{{ row.description or '（未填写说明）' }}</td>
         <td title="{{ row.permission_desc }}">
           <span class="mono">{{ row.permission }}</span>
@@ -80,7 +90,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="empty">没有匹配的命令</td></tr>
+      <tr><td colspan="9" class="empty">没有匹配的命令</td></tr>
       {% endfor %}
       </tbody>
     </table>

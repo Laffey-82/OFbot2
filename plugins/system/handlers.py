@@ -30,6 +30,36 @@ def _whitelist():
     return _ctx.services.get("whitelist")
 
 
+def _prefix() -> str:
+    """当前生效的命令前缀（首个），供帮助与用法文案使用。"""
+    if _ctx is not None and _ctx.commands is not None:
+        prefixes = getattr(_ctx.commands, "command_start", None)
+        if prefixes:
+            return str(prefixes[0])
+    return "/"
+
+
+def _render_usage(usage: str) -> str:
+    """把 usage 中的默认 "/" 前缀替换为实际生效前缀。"""
+    if not usage:
+        return ""
+    prefix = _prefix()
+    if usage.startswith("/"):
+        return prefix + usage[1:]
+    return usage
+
+
+def _render_examples(examples: list) -> list[str]:
+    prefix = _prefix()
+    rendered = []
+    for example in examples:
+        text = str(example)
+        if text.startswith("/"):
+            text = prefix + text[1:]
+        rendered.append(text)
+    return rendered
+
+
 def _visible_commands(commands: list, command_ctx) -> list:
     """按当前监听环境过滤：该环境未开启的功能命令不展示。"""
     if _ctx is None or _ctx.scope_policy is None or command_ctx is None:
@@ -64,15 +94,17 @@ async def help_command(
             None,
         )
         if target is None:
-            await event.reply(f"未找到命令 {query}，发送 /help 查看全部命令")
+            await event.reply(
+                f"未找到命令 {query}，发送 {_prefix()}help 查看全部命令"
+            )
             return
-        lines = [f"/{target.name}：{target.description or '（无说明）'}"]
+        lines = [f"{_prefix()}{target.name}：{target.description or '（无说明）'}"]
         if target.aliases:
             lines.append("别名：" + " / ".join(sorted(target.aliases)))
         if target.usage:
-            lines.append(f"用法：{target.usage}")
+            lines.append(f"用法：{_render_usage(target.usage)}")
         if target.examples:
-            lines.append("示例：" + " ｜ ".join(target.examples))
+            lines.append("示例：" + " ｜ ".join(_render_examples(target.examples)))
         if target.permission:
             lines.append(f"权限：{target.permission}")
         if target.cooldown:
@@ -86,12 +118,14 @@ async def help_command(
     for command in commands:
         by_plugin.setdefault(command.plugin_name or "未归属", []).append(command)
     total = len(commands)
-    lines = [f"OFbot 2 命令帮助（共 {total} 条），发送 /help <命令> 查看详情"]
+    lines = [
+        f"OFbot 2 命令帮助（共 {total} 条），发送 {_prefix()}help <命令> 查看详情"
+    ]
     for plugin in sorted(by_plugin):
         items = by_plugin[plugin]
         for command in items[:8]:
             suffix = f"：{command.description}" if command.description else ""
-            lines.append(f"/{command.name}{suffix}")
+            lines.append(f"{_prefix()}{command.name}{suffix}")
         if len(items) > 8:
             lines.append(f"…{plugin} 共 {len(items)} 条")
     text = "\n".join(lines)
@@ -144,7 +178,7 @@ async def whitelist_command(
         return
     parts = args.extract_plain_text().strip().split()
     if not parts:
-        await event.reply("用法：/whitelist add|del|list [群号]")
+        await event.reply(f"用法：{_prefix()}whitelist add|del|list [群号]")
         return
     action = parts[0].lower()
     if action == "list":
@@ -165,7 +199,7 @@ async def whitelist_command(
             f"已删除群 {parts[1]}" if removed else f"群 {parts[1]} 不在白名单"
         )
         return
-    await event.reply("用法：/whitelist add|del|list [群号]")
+    await event.reply(f"用法：{_prefix()}whitelist add|del|list [群号]")
 
 
 async def plugins_command(
@@ -379,5 +413,7 @@ async def task_command(
         return
 
     await event.reply(
-        "用法：/task list ｜ /task run <id> ｜ /task enable|disable|remove <id> ｜ /task add interval|cron <名称> <群号> <参数> <消息>"
+        f"用法：{_prefix()}task list ｜ {_prefix()}task run <id> ｜ "
+        f"{_prefix()}task enable|disable|remove <id> ｜ "
+        f"{_prefix()}task add interval|cron <名称> <群号> <参数> <消息>"
     )

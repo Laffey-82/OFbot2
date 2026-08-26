@@ -224,15 +224,16 @@ class CommandRegistry:
         command = self._commands.get(command_name)
         if command is None:
             if self.unknown_command_hint:
+                prefix = (self.command_start or ["/"])[0]
                 suggestions = self.suggest(command_name)
                 if suggestions:
-                    hint = "、".join(f"/{name}" for name in suggestions)
+                    hint = "、".join(f"{prefix}{name}" for name in suggestions)
                     await event.reply(
-                        f"未找到命令 /{command_name}，是否想用 {hint}？发送 /help 查看全部命令"
+                        f"未找到命令 {prefix}{command_name}，是否想用 {hint}？发送 {prefix}help 查看全部命令"
                     )
                 else:
                     await event.reply(
-                        f"未找到命令 /{command_name}，发送 /help 查看全部命令"
+                        f"未找到命令 {prefix}{command_name}，发送 {prefix}help 查看全部命令"
                     )
             return False
 

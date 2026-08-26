@@ -134,6 +134,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                     "permission_desc": perm.description if perm else "",
                     "cooldown": command.cooldown,
                     "rate_limit": command.rate_limit or "",
+                    "usage": command.usage,
+                    "examples": command.examples,
                     "plugin": command.plugin_name or "未归属",
                 }
             )
@@ -191,6 +193,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                     "permission_desc": perm.description if perm else "",
                     "cooldown": command.cooldown,
                     "rate_limit": command.rate_limit or "",
+                    "usage": command.usage,
+                    "examples": " ｜ ".join(command.examples),
                     "plugin": command.plugin_name or "未归属",
                 }
             )
@@ -215,6 +219,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             "permission_desc",
             "cooldown",
             "rate_limit",
+            "usage",
+            "examples",
             "plugin",
         ]
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)

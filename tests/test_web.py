@@ -208,7 +208,7 @@ async def test_web_login_and_dashboard() -> None:
                 "/config",
                 data={
                     "csrf_token": match.group(1),
-                    "command_start": "/",
+                    "command_start": "#,!",
                     "log_level": "DEBUG",
                     "nickname": "BotA,BotB",
                     "superusers": "100,200",
@@ -223,6 +223,10 @@ async def test_web_login_and_dashboard() -> None:
                 follow_redirects=False,
             )
             assert response.status_code == 303
+            from app.core.commands import command_registry
+
+            assert settings.basic.command_start == ["#", "!"]
+            assert command_registry.command_start == ["#", "!"]
             assert settings.basic.nickname == ["BotA", "BotB"]
             assert settings.basic.superusers == ["100", "200"]
             assert settings.web.webhook_history_retention == 100

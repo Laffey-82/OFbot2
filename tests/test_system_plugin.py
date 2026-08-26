@@ -12,6 +12,7 @@ from app.core.commands import CommandRegistry
 from app.core.permissions import PermissionManager
 from app.core.plugin import PluginManager
 from app.core.scheduler import SchedulerService
+from app.core.security import SecurityPolicy
 from app.core.subscriptions import EventSubscriptionRegistry
 from app.core.whitelist import GroupWhitelistService
 
@@ -86,6 +87,58 @@ async def test_help_lists_commands_dynamically() -> None:
     await handler(event2, Message("whitelist"), None)
     assert event2.replies and "白名单管理" in event2.replies[0]
     assert "权限：system.status" in event2.replies[0]
+
+    await manager.unload_plugin("system")
+    scheduler.shutdown()
+    try:
+        await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
+    except Exception:
+        pass
+    reset_bus()
+
+
+@pytest.mark.asyncio
+async def test_help_text_follows_custom_prefix() -> None:
+    """非默认前缀下，帮助与用法文案应跟随实际前缀（无硬编码 /）。"""
+    from app.core.messages import Message
+
+    commands = CommandRegistry()
+    commands.set_command_start(["#"])
+    commands.set_security(SecurityPolicy())
+    permissions = PermissionManager()
+    subscriptions = EventSubscriptionRegistry()
+    scheduler = SchedulerService()
+    manager = PluginManager(
+        Path(__file__).resolve().parents[1] / "plugins",
+        commands=commands,
+        db=None,
+        scheduler=scheduler,
+        cache=TTLCache(),
+        bot=BotClient(),
+        permissions=permissions,
+        services={"whitelist": GroupWhitelistService([])},
+        subscriptions=subscriptions,
+    )
+    manager.load_enabled({"system": True}, {"system": {"groups": []}})
+
+    class FakeEvent:
+        def __init__(self) -> None:
+            self.replies: list[str] = []
+
+        async def reply(self, content: str) -> None:
+            self.replies.append(content)
+
+    handler = commands._commands["help"].handler
+    event = FakeEvent()
+    await handler(event, Message("whitelist"), None)
+    assert event.replies
+    assert "#whitelist" in event.replies[0]
+    assert "用法：#whitelist" in event.replies[0]
+
+    event2 = FakeEvent()
+    await handler(event2, Message(""), None)
+    assert event2.replies
+    assert "发送 #help" in event2.replies[0]
 
     await manager.unload_plugin("system")
     scheduler.shutdown()
