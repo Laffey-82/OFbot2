@@ -37,6 +37,32 @@ _TEXT_SUFFIXES = {
 }
 
 
+def _normalized_text(data: bytes) -> bytes:
+    return data.replace(b"\r\n", b"\n")
+
+
+def _expected_entries(plugin_dir: Path) -> dict[str, bytes]:
+    entries: dict[str, bytes] = {}
+    for file_path in sorted(plugin_dir.rglob("*")):
+        if file_path.is_dir():
+            continue
+        if any(
+            part in {"__pycache__", ".pytest_cache", ".git"}
+            for part in file_path.parts
+        ):
+            continue
+        data = file_path.read_bytes()
+        if file_path.suffix.lower() in _TEXT_SUFFIXES:
+            data = _normalized_text(data)
+        entries[file_path.relative_to(plugin_dir).as_posix()] = data
+    return entries
+
+
+def _archive_entries(zip_path: Path) -> dict[str, bytes]:
+    with zipfile.ZipFile(zip_path) as archive:
+        return {name: archive.read(name) for name in archive.namelist()}
+
+
 def discover_plugins() -> list[tuple[str, Path]]:
     plugins: list[tuple[str, Path]] = []
     if not SOURCES_DIR.exists():
@@ -149,6 +175,21 @@ def check_consistency(owner: str, repo: str, branch: str) -> int:
             errors.append(
                 f"packages 与源码不一致：期望 {expected}，实际 {actual}"
             )
+        for _, plugin_dir in plugins:
+            name = plugin_dir.name
+            zip_path = PACKAGES_DIR / f"{name}.zip"
+            if not zip_path.exists():
+                continue
+            expected_entries = _expected_entries(plugin_dir)
+            archive_entries = {
+                arcname.split("/", 1)[-1]: data
+                for arcname, data in _archive_entries(zip_path).items()
+                if "/" in arcname
+            }
+            if archive_entries != expected_entries:
+                errors.append(
+                    f"{name}.zip 内容与源码不一致（请重新运行 build_packages.py）"
+                )
         if REGISTRY_PATH.exists():
             try:
                 registry = json.loads(

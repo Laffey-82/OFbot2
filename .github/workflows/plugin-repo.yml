@@ -18,7 +18,5 @@ jobs:
         run: pip install ruff
       - name: Lint
         run: ruff check plugin-repo/tools
-      - name: Build and verify committed artifacts
-        run: |
-          python plugin-repo/tools/build_packages.py
-          git diff --exit-code -- plugin-repo
+      - name: Verify committed artifacts
+        run: python plugin-repo/tools/build_packages.py --check
