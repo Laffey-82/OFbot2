@@ -1,0 +1,14 @@
+{
+  "name": "qrcode",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "生成二维码图片",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["qrcode.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

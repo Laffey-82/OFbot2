@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}告警规则 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>告警规则</h1>
+    <div class="sub">事件 → 通知群，用于监控运行状态</div>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}
+<div class="alert error">{{ request.query_params.get("error") }}</div>
+{% endif %}
+
+<form method="get" action="/alerts" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-bottom:10px">
+  <label class="muted" for="stats-days" style="font-size:12.5px">统计范围</label>
+  <select id="stats-days" name="stats_days" onchange="this.form.submit()" style="width:auto">
+    <option value="7" {% if stats_days == 7 %}selected{% endif %}>近 7 天</option>
+    <option value="30" {% if stats_days == 30 %}selected{% endif %}>近 30 天</option>
+    <option value="90" {% if stats_days == 90 %}selected{% endif %}>近 90 天</option>
+    <option value="0" {% if stats_days == 0 %}selected{% endif %}>全部</option>
+  </select>
+</form>
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value">{{ total_alerts }}</div>
+    <div class="stat-label">告警总数</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ today_alerts }}</div>
+    <div class="stat-label">今日告警</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{% if top_rules %}{{ top_rules[0].name }}{% else %}—{% endif %}</div>
+    <div class="stat-label">高频规则{% if top_rules %}（{{ top_rules[0].count }} 次）{% endif %}</div>
+    {% if top_rules|length > 1 %}
+    <div class="stat-label" style="font-size:12px">
+      {% for item in top_rules[1:] %}<span class="badge">{{ item.name }} ×{{ item.count }}</span> {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <div class="card">
+    <div class="stat-value">{% if top_events %}{{ top_events[0].name }}{% else %}—{% endif %}</div>
+    <div class="stat-label">高频事件{% if top_events %}（{{ top_events[0].count }} 次）{% endif %}</div>
+    {% if top_events|length > 1 %}
+    <div class="stat-label" style="font-size:12px">
+      {% for item in top_events[1:] %}<span class="badge">{{ item.name }} ×{{ item.count }}</span> {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>示例规则</h2>
+    <span class="muted" style="font-size:12.5px">点击预填下方表单，确认后提交</span>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button type="button" class="small secondary" data-alert-preset='{"name":"任务失败通知","event":"task.failed","keyword":""}'>任务失败</button>
+    <button type="button" class="small secondary" data-alert-preset='{"name":"适配器断开通知","event":"adapter_disconnected","keyword":""}'>适配器断开</button>
+    <button type="button" class="small secondary" data-alert-preset='{"name":"CPU 高负载通知","event":"metric.cpu_high","keyword":""}'>CPU 高负载</button>
+    <button type="button" class="small secondary" data-alert-preset='{"name":"内存高负载通知","event":"metric.memory_high","keyword":""}'>内存高负载</button>
+    <button type="button" class="small secondary" data-alert-preset='{"name":"AI 失败通知","event":"ai.failed","keyword":""}'>AI 失败</button>
+    <button type="button" class="small secondary" data-alert-preset='{"name":"任务自动停用通知","event":"task.auto_disabled","keyword":""}'>任务自动停用</button>
+    <button type="button" class="small secondary" data-alert-preset='{"name":"流程自动停用通知","event":"workflow.auto_disabled","keyword":""}'>流程自动停用</button>
+    <button type="button" class="small secondary" data-alert-preset='{"name":"任务自动恢复通知","event":"task.auto_reenabled","keyword":""}'>任务自动恢复</button>
+    <button type="button" class="small secondary" data-alert-preset='{"name":"流程自动恢复通知","event":"workflow.auto_reenabled","keyword":""}'>流程自动恢复</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>添加规则</h2></div>
+  <form method="post" action="/alerts/add" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="rule-name">规则名称</label>
+        <input id="rule-name" name="name" placeholder="例如：任务失败通知" required>
+      </div>
+      <div class="form-row">
+        <label for="rule-event">事件</label>
+        <input id="rule-event" name="event" placeholder="*" value="*" list="event-options">
+        <datalist id="event-options">
+          <option value="*">全部事件</option>
+          <option value="task.failed">任务失败</option>
+          <option value="task.succeeded">任务成功</option>
+          <option value="adapter_disconnected">适配器断开</option>
+          <option value="adapter_connected">适配器连接</option>
+          <option value="plugin.failed">插件加载失败</option>
+          <option value="plugin.loaded">插件加载成功</option>
+          <option value="webhook.received">Webhook 收到</option>
+          <option value="workflow.failed">流程运行失败</option>
+          <option value="ai.failed">AI 调用失败</option>
+          <option value="metric.cpu_high">CPU 超过阈值</option>
+          <option value="metric.memory_high">内存超过阈值</option>
+          <option value="task.auto_disabled">任务自动停用</option>
+          <option value="workflow.auto_disabled">流程自动停用</option>
+          <option value="task.auto_reenabled">任务自动恢复</option>
+          <option value="workflow.auto_reenabled">流程自动恢复</option>
+        </datalist>
+        <span class="hint">* 表示全部事件，如 task.failed</span>
+      </div>
+      <div class="form-row">
+        <label for="rule-target">通知群号（可选）</label>
+        <input id="rule-target" name="target_group" placeholder="群号">
+        <span class="hint">多个群号用逗号或空格分隔</span>
+      </div>
+      <div class="form-row">
+        <label for="rule-private">私聊 QQ（可选）</label>
+        <input id="rule-private" name="target_private" placeholder="QQ 号">
+        <span class="hint">多个 QQ 用逗号或空格分隔</span>
+      </div>
+      <div class="form-row">
+        <label for="rule-keyword">详情关键字（可选）</label>
+        <input id="rule-keyword" name="keyword" placeholder="例如：数据库连接失败">
+        <span class="hint">多个关键字用逗号分隔，任一匹配即触发</span>
+      </div>
+      <div class="form-row">
+        <label for="rule-interval">通知去抖间隔（秒，0 = 使用全局）</label>
+        <input id="rule-interval" name="min_interval_seconds" type="number" min="0" value="0">
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">添加规则</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>规则列表</h2>
+    <div class="search-box">
+      <input data-table-filter="rules-table" placeholder="搜索规则…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="rules-table">
+      <thead><tr><th>名称</th><th>事件</th><th>关键字</th><th>通知群</th><th>私聊</th><th>启用</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for rule in rules %}
+      <tr data-row>
+        <td>{{ rule.name }}</td>
+        <td class="mono">{{ rule.event }}</td>
+        <td>{{ rule.keyword or '—' }}</td>
+        <td>{{ rule.target_group or '—' }}</td>
+        <td>{{ rule.target_private or '—' }}</td>
+        <td><span class="badge {{ 'success' if rule.enabled else 'warning' }}">{{ '启用' if rule.enabled else '禁用' }}</span></td>
+        <td>
+          <div class="actions">
+            <button type="button" class="small secondary" data-edit-alert="{{ rule.name }}" data-event="{{ rule.event }}" data-target="{{ rule.target_group }}" data-private="{{ rule.target_private }}" data-keyword="{{ rule.keyword }}" data-interval="{{ rule.min_interval_seconds }}">编辑</button>
+            <form method="post" action="/alerts/toggle" class="js-ajax">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="name" value="{{ rule.name }}">
+              <button class="small secondary">{{ '禁用' if rule.enabled else '启用' }}</button>
+            </form>
+            <form method="post" action="/alerts/{{ rule.name }}/test" class="js-ajax">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small secondary" title="向该规则的通知目标发送一条测试消息">测试</button>
+            </form>
+            <form method="post" action="/alerts/remove" class="js-ajax">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="name" value="{{ rule.name }}">
+              <button class="small danger" data-confirm="确定删除告警规则 {{ rule.name }}？">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">暂无告警规则</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/alerts">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="filter-alert-rule">规则</label>
+        <input id="filter-alert-rule" name="rule" value="{{ filter_rule }}" placeholder="例如：任务失败通知">
+      </div>
+      <div class="form-row">
+        <label for="filter-alert-event">事件</label>
+        <input id="filter-alert-event" name="event" value="{{ filter_event }}" placeholder="例如：task.failed">
+      </div>
+      <div class="form-row">
+        <label for="filter-alert-start">开始日期</label>
+        <input id="filter-alert-start" type="date" name="start" value="{{ filter_start }}">
+      </div>
+      <div class="form-row">
+        <label for="filter-alert-end">结束日期</label>
+        <input id="filter-alert-end" type="date" name="end" value="{{ filter_end }}">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit">应用筛选</button>
+      <a class="btn secondary" href="/alerts">清除</a>
+      <button type="button" class="secondary" id="alert-export-btn">导出 CSV</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>告警历史（共 {{ total_events }} 条）</h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <form method="post" action="/alerts/history/clear" id="alerts-clear-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="start" id="alerts-clear-start">
+        <input type="hidden" name="end" id="alerts-clear-end">
+        <button type="submit" class="small danger" data-confirm="确定清除当前日期范围内的告警历史？该操作不可恢复。">清除历史</button>
+      </form>
+      <span class="muted" style="font-size:12.5px">自动保留 {{ alert_history_retention_days }} 天{% if alert_min_interval_seconds %} · 通知去抖 {{ alert_min_interval_seconds }} 秒{% endif %}</span>
+      <div class="search-box">
+        <input data-table-filter="alert-events-table" placeholder="搜索历史…">
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="alert-events-table">
+      <thead><tr><th>规则</th><th>事件</th><th>详情</th><th>时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for event in events %}
+      <tr data-row>
+        <td>{{ event.rule_name }}</td>
+        <td class="mono">{{ event.event }}</td>
+        <td>{{ event.detail }}</td>
+        <td>{{ event.created_at }}</td>
+        <td>{% if event.run_link %}<a class="btn small secondary" href="{{ event.run_link }}">运行详情</a>{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">暂无告警事件</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  <a class="btn small secondary {{ 'disabled' if page <= 1 }}" href="/alerts?page={{ page - 1 }}&rule={{ filter_rule }}&event={{ filter_event }}&start={{ filter_start }}&end={{ filter_end }}">上一页</a>
+  <span class="muted">第 {{ page }} / {{ total_pages }} 页</span>
+  <a class="btn small secondary {{ 'disabled' if page >= total_pages }}" href="/alerts?page={{ page + 1 }}&rule={{ filter_rule }}&event={{ filter_event }}&start={{ filter_start }}&end={{ filter_end }}">下一页</a>
+</div>
+{% endif %}
+
+<dialog id="alert-edit-dialog" class="dialog">
+  <form method="post" id="alert-edit-form">
+    <div class="dialog-head">
+      <h2>编辑告警规则</h2>
+      <button type="button" class="dialog-close" data-close-dialog aria-label="关闭">&times;</button>
+    </div>
+    <div class="form-row">
+      <label>规则名称</label>
+      <input id="alert-edit-name" disabled>
+    </div>
+    <div class="form-row">
+      <label for="alert-edit-event">事件</label>
+      <input id="alert-edit-event" name="event" list="event-options">
+    </div>
+    <div class="form-row">
+      <label for="alert-edit-target">通知群号（可选）</label>
+      <input id="alert-edit-target" name="target_group">
+      <span class="hint">多个群号用逗号或空格分隔</span>
+    </div>
+    <div class="form-row">
+      <label for="alert-edit-private">私聊 QQ（可选）</label>
+      <input id="alert-edit-private" name="target_private">
+      <span class="hint">多个 QQ 用逗号或空格分隔</span>
+    </div>
+    <div class="form-row">
+      <label for="alert-edit-keyword">详情关键字（可选）</label>
+      <input id="alert-edit-keyword" name="keyword">
+    </div>
+    <div class="form-row">
+      <label for="alert-edit-interval">通知去抖间隔（秒，0 = 使用全局）</label>
+      <input id="alert-edit-interval" name="min_interval_seconds" type="number" min="0" value="0">
+    </div>
+    <div class="form-actions">
+      <button type="submit">保存</button>
+      <button type="button" class="secondary" data-close-dialog>取消</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  const alertDialog = document.getElementById("alert-edit-dialog");
+  const alertForm = document.getElementById("alert-edit-form");
+  let alertTarget = "";
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-dialog]")) {
+      alertDialog.close();
+      return;
+    }
+    const btn = event.target.closest("[data-edit-alert]");
+    if (!btn) return;
+    alertTarget = btn.dataset.editAlert;
+    document.getElementById("alert-edit-name").value = alertTarget;
+    document.getElementById("alert-edit-event").value = btn.dataset.event || "*";
+    document.getElementById("alert-edit-target").value = btn.dataset.target || "";
+    document.getElementById("alert-edit-private").value = btn.dataset.private || "";
+    document.getElementById("alert-edit-keyword").value = btn.dataset.keyword || "";
+    document.getElementById("alert-edit-interval").value =
+      btn.dataset.interval || "0";
+    alertDialog.showModal();
+  });
+  alertForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const body = new FormData(alertForm);
+    body.append("csrf_token", "{{ csrf_token }}");
+    const submitBtn = event.target.querySelector("button[type='submit']");
+    submitBtn.disabled = true;
+    const original = submitBtn.textContent;
+    submitBtn.textContent = "保存中…";
+    fetch("/alerts/" + alertTarget + "/edit", { method: "POST", body })
+      .then((response) => {
+        if (response.redirected) window.location.href = response.url;
+        else window.location.reload();
+      })
+      .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = original;
+      });
+  });
+  document.querySelectorAll("[data-alert-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = JSON.parse(button.dataset.alertPreset);
+      document.getElementById("rule-name").value = preset.name;
+      document.getElementById("rule-event").value = preset.event;
+      document.getElementById("rule-keyword").value = preset.keyword || "";
+      document.getElementById("rule-name").focus();
+      toast("已预填规则，确认后点击「添加规则」提交", "success");
+    });
+  });
+  document.addEventListener("DOMContentLoaded", () => {
+    initExportButton("alert-export-btn", "/alerts/export", {
+      rule: "filter-alert-rule",
+      event: "filter-alert-event",
+      start: "filter-alert-start",
+      end: "filter-alert-end"
+    });
+  });
+  const alertsClearForm = document.getElementById("alerts-clear-form");
+  if (alertsClearForm) {
+    alertsClearForm.addEventListener("submit", () => {
+      document.getElementById("alerts-clear-start").value =
+        document.getElementById("filter-alert-start").value;
+      document.getElementById("alerts-clear-end").value =
+        document.getElementById("filter-alert-end").value;
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  ofbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ofbot_2
+    restart: unless-stopped
+    ports:
+      - "8000:8000"  # Web管理界面端口
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./plugins:/app/plugins
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - ofbot_network
+
+  # 可选：添加Napcat服务（如果需要在Docker中运行Napcat）
+  # napcat:
+  #   image: napcat/napcat:latest
+  #   container_name: napcat
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9090:9090"  # Napcat反向WS端口
+  #   volumes:
+  #     - ./napcat_config:/app/config
+  #   networks:
+  #     - ofbot_network
+
+networks:
+  ofbot_network:
+    driver: bridge

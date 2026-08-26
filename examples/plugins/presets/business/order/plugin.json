@@ -1,0 +1,14 @@
+{
+  "name": "order",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "简化订单管理",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["order.use", "order.manage"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

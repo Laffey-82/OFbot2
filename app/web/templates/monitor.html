@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+{% block title %}监控 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>系统监控</h1>
+    <div class="sub">CPU、内存、任务等运行时指标，每 3 秒自动采样</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/metrics" target="_blank" rel="noopener">Prometheus 指标</a>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value" id="metric-cpu">{{ metrics.cpu_percent }}%</div>
+    <div class="stat-label">CPU 使用率</div>
+    <div class="stat-label"><span class="badge warning" id="metric-cpu-warn" hidden>超过阈值 {{ cpu_threshold }}%</span></div>
+  </div>
+  <div class="card">
+    <div class="stat-value" id="metric-memory">{{ metrics.memory_percent }}%</div>
+    <div class="stat-label">内存使用率</div>
+    <div class="stat-label"><span class="badge warning" id="metric-memory-warn" hidden>超过阈值 {{ memory_threshold }}%</span></div>
+  </div>
+  <div class="card">
+    <div class="stat-value" id="metric-tasks">{{ metrics.active_tasks }}</div>
+    <div class="stat-label">活跃任务</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ humanize_uptime(metrics.uptime_seconds) }}</div>
+    <div class="stat-label">运行时长</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>监控阈值</h2>
+    <span class="muted" style="font-size:12.5px">CPU / 内存超过阈值时触发 <code>metric.cpu_high</code> / <code>metric.memory_high</code> 告警事件，可在「告警规则」页配置通知</span>
+  </div>
+  <form method="post" action="/monitor/thresholds" class="js-ajax" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-row" style="margin-bottom:0">
+      <label for="cpu-threshold">CPU 阈值（%）</label>
+      <input id="cpu-threshold" name="cpu_threshold" type="number" min="1" max="100" value="{{ cpu_threshold }}">
+    </div>
+    <div class="form-row" style="margin-bottom:0">
+      <label for="memory-threshold">内存阈值（%）</label>
+      <input id="memory-threshold" name="memory_threshold" type="number" min="1" max="100" value="{{ memory_threshold }}">
+    </div>
+    <button type="submit" class="secondary">保存阈值</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>实时曲线</h2>
+    <div class="legend">
+      <span class="legend-item cpu">CPU</span>
+      <span class="legend-item memory">内存</span>
+      <span class="legend-item tasks">活跃任务</span>
+      <span class="legend-item commands">命令/分钟</span>
+      <span class="legend-item failure">任务失败率</span>
+      <span class="legend-item threads">线程数</span>
+      <span class="legend-item processes">进程数</span>
+    </div>
+  </div>
+  <canvas id="metrics-chart" height="280" style="width:100%"></canvas>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>历史趋势</h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <select id="history-range" style="width:auto">
+        <option value="1">近 1 小时</option>
+        <option value="6" selected>近 6 小时</option>
+        <option value="24">近 24 小时</option>
+        <option value="168">近 7 天</option>
+      </select>
+      <button type="button" class="small secondary" id="history-export-btn">导出 CSV</button>
+    </div>
+  </div>
+  <div id="history-stats" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+  <canvas id="history-chart" height="220" style="width:100%"></canvas>
+  <div id="history-empty" class="empty" style="display:none">暂无历史采样数据（每 30 秒自动采样，保留 7 天）</div>
+</div>
+
+<script>
+  (function () {
+    const canvas = document.getElementById("metrics-chart");
+    const ctx = canvas.getContext("2d");
+    const maxPoints = 60;
+    const series = {
+      cpu: { color: "#2563eb", points: [] },
+      memory: { color: "#16a34a", points: [] },
+      tasks: { color: "#d97706", points: [] },
+      commands: { color: "#7c3aed", points: [] },
+      failure: { color: "#dc2626", points: [] },
+      threads: { color: "#0891b2", points: [] },
+      processes: { color: "#db2777", points: [] }
+    };
+    const cpuThreshold = {{ cpu_threshold }};
+    const memoryThreshold = {{ memory_threshold }};
+    let lastCounters = null;
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(320, rect.width) * dpr;
+      canvas.height = 280 * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    function draw() {
+      const width = canvas.width / (window.devicePixelRatio || 1);
+      const height = 280;
+      ctx.clearRect(0, 0, width, height);
+      const pad = 28;
+      const plotW = width - pad * 2;
+      const plotH = height - pad * 2;
+      const tasksMax = Math.max(10, ...series.tasks.points.map((p) => p.y));
+      const commandsMax = Math.max(10, ...series.commands.points.map((p) => p.y));
+      const threadsMax = Math.max(1, ...series.threads.points.map((p) => p.y));
+      const processesMax = Math.max(1, ...series.processes.points.map((p) => p.y));
+
+      ctx.strokeStyle = "rgba(128,128,128,.18)";
+      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--muted") || "#6b7280";
+      ctx.font = "11px sans-serif";
+      ctx.lineWidth = 1;
+      const drawThreshold = (percent, color, label) => {
+        const y = pad + plotH - (plotH * percent) / 100;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(pad + plotW, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = color;
+        ctx.font = "bold 11px sans-serif";
+        ctx.fillText(label, pad + plotW - ctx.measureText(label).width - 4, y - 4);
+        ctx.restore();
+      };
+      drawThreshold(cpuThreshold, "#dc2626", "CPU 阈值 " + cpuThreshold + "%");
+      drawThreshold(memoryThreshold, "#d97706", "内存阈值 " + memoryThreshold + "%");
+      for (let i = 0; i <= 4; i++) {
+        const y = pad + (plotH * i) / 4;
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(pad + plotW, y);
+        ctx.stroke();
+        ctx.fillText(String(Math.round(100 - (100 * i) / 4)) + "%", 2, y + 4);
+      }
+
+      const drawSeries = (key, scaleMax) => {
+        const pts = series[key].points;
+        if (pts.length < 2) return;
+        ctx.strokeStyle = series[key].color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        pts.forEach((p, idx) => {
+          const x = pad + (plotW * idx) / (maxPoints - 1);
+          const y = pad + plotH - (plotH * p.y) / scaleMax;
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      };
+      drawSeries("cpu", 100);
+      drawSeries("memory", 100);
+      drawSeries("tasks", tasksMax);
+      drawSeries("commands", commandsMax);
+      drawSeries("failure", 100);
+      drawSeries("threads", threadsMax);
+      drawSeries("processes", processesMax);
+    }
+
+    function push(name, value) {
+      const pts = series[name].points;
+      pts.push({ y: value });
+      if (pts.length > maxPoints) pts.shift();
+    }
+
+    async function sample() {
+      try {
+        const response = await fetch("/api/v1/status");
+        const data = await response.json();
+        const m = data.metrics || {};
+        const cpu = Number(m.cpu_percent || 0);
+        const memory = Number(m.memory_percent || 0);
+        const tasks = Number(m.active_tasks || 0);
+        const commandsTotal = Number(m.commands_total || 0);
+        const failedTotal = Number(m.tasks_failed_total || 0);
+        const completedTotal = Number(m.tasks_completed_total || 0);
+        const threads = Number(m.thread_count || 0);
+        const processes = Number(m.process_count || 0);
+        push("cpu", cpu);
+        push("memory", memory);
+        push("tasks", tasks);
+        let commandsPerMin = 0;
+        if (lastCounters !== null) {
+          const delta = commandsTotal - lastCounters.commands;
+          commandsPerMin = Math.max(0, delta * 20); // 3 秒采样 × 20 = 每分钟
+        }
+        const totalRuns = failedTotal + completedTotal;
+        const failureRate = totalRuns > 0 ? (failedTotal / totalRuns) * 100 : 0;
+        push("commands", commandsPerMin);
+        push("failure", failureRate);
+        push("threads", threads);
+        push("processes", processes);
+        lastCounters = { commands: commandsTotal };
+        document.getElementById("metric-cpu").textContent = cpu.toFixed(1) + "%";
+        document.getElementById("metric-memory").textContent = memory.toFixed(1) + "%";
+        document.getElementById("metric-tasks").textContent = tasks;
+        document.getElementById("metric-cpu-warn").hidden = cpu < cpuThreshold;
+        document.getElementById("metric-memory-warn").hidden = memory < memoryThreshold;
+        draw();
+      } catch (err) {
+        document.getElementById("metric-cpu").textContent = "—";
+      }
+    }
+
+    sample();
+    setInterval(sample, 3000);
+  })();
+</script>
+
+<script>
+  (function () {
+    const canvas = document.getElementById("history-chart");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const rangeSelect = document.getElementById("history-range");
+    const empty = document.getElementById("history-empty");
+    const statsEl = document.getElementById("history-stats");
+    const cpuThreshold = {{ cpu_threshold }};
+    const memoryThreshold = {{ memory_threshold }};
+    let points = [];
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(320, rect.width) * dpr;
+      canvas.height = 220 * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    function draw() {
+      const width = canvas.width / (window.devicePixelRatio || 1);
+      const height = 220;
+      ctx.clearRect(0, 0, width, height);
+      if (points.length < 2) {
+        canvas.style.display = "none";
+        empty.style.display = "";
+        return;
+      }
+      canvas.style.display = "";
+      empty.style.display = "none";
+      const pad = 30;
+      const plotW = width - pad * 2;
+      const plotH = height - pad * 2;
+      const drawThreshold = (percent, color, label) => {
+        const y = pad + plotH - (plotH * percent) / 100;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(pad + plotW, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = color;
+        ctx.font = "bold 10px sans-serif";
+        ctx.fillText(label, pad + 4, y - 3);
+        ctx.restore();
+      };
+      drawThreshold(cpuThreshold, "#dc2626", "CPU 阈值 " + cpuThreshold + "%");
+      drawThreshold(memoryThreshold, "#d97706", "内存阈值 " + memoryThreshold + "%");
+      ctx.font = "10px sans-serif";
+      ctx.fillStyle =
+        getComputedStyle(document.body).getPropertyValue("--muted") || "#6b7280";
+      for (let i = 0; i <= 4; i++) {
+        const y = pad + (plotH * i) / 4;
+        ctx.strokeStyle = "rgba(128,128,128,.15)";
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(pad + plotW, y);
+        ctx.stroke();
+        ctx.fillText(String(Math.round(100 - (100 * i) / 4)) + "%", 4, y + 4);
+      }
+      const maxPoints = 300;
+      let data = points;
+      if (data.length > maxPoints) {
+        const step = Math.ceil(data.length / maxPoints);
+        data = data.filter((_, index) => index % step === 0);
+      }
+      const drawSeries = (key, color) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        data.forEach((point, index) => {
+          const x = pad + (plotW * index) / (data.length - 1);
+          const y = pad + plotH - (plotH * point[key]) / 100;
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      };
+      drawSeries("cpu", "#2563eb");
+      drawSeries("memory", "#16a34a");
+      ctx.font = "11px sans-serif";
+      ctx.fillStyle = "#2563eb";
+      ctx.fillText("CPU", pad + 4, 14);
+      ctx.fillStyle = "#16a34a";
+      ctx.fillText("内存", pad + 44, 14);
+      const muted =
+        getComputedStyle(document.body).getPropertyValue("--muted") || "#6b7280";
+      ctx.fillStyle = muted;
+      const fmt = (value) =>
+        new Date(value).toLocaleString("zh-CN", {
+          month: "numeric",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+      if (points[0].ts) ctx.fillText(fmt(points[0].ts), pad, height - 6);
+      if (points[points.length - 1].ts) {
+        const last = fmt(points[points.length - 1].ts);
+        ctx.fillText(last, pad + plotW - ctx.measureText(last).width, height - 6);
+      }
+    }
+
+    async function loadHistory() {
+      const hours = rangeSelect.value;
+      try {
+        const response = await fetch("/api/v1/metrics/history?hours=" + hours);
+        const data = await response.json();
+        points = data.points || [];
+        if (points.length) {
+          const cpuVals = points.map((point) => Number(point.cpu) || 0);
+          const memVals = points.map((point) => Number(point.memory) || 0);
+          const average = (values) =>
+            values.length
+              ? values.reduce((sum, value) => sum + value, 0) / values.length
+              : 0;
+          const maxCpu = Math.max(...cpuVals);
+          const maxMem = Math.max(...memVals);
+          const cpuPeakIndex = cpuVals.indexOf(maxCpu);
+          const memPeakIndex = memVals.indexOf(maxMem);
+          const fmtPeak = (index) =>
+            points[index] && points[index].ts
+              ? new Date(points[index].ts).toLocaleString("zh-CN", {
+                  month: "numeric",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit"
+                })
+              : "—";
+          statsEl.innerHTML =
+            `<span class="badge info">CPU 平均 ${average(cpuVals).toFixed(1)}%</span>` +
+            `<span class="badge info" title="峰值时间">CPU 峰值 ${maxCpu.toFixed(1)}%（${fmtPeak(cpuPeakIndex)}）</span>` +
+            `<span class="badge info">内存平均 ${average(memVals).toFixed(1)}%</span>` +
+            `<span class="badge info" title="峰值时间">内存峰值 ${maxMem.toFixed(1)}%（${fmtPeak(memPeakIndex)}）</span>` +
+            `<span class="muted">${points.length} 个采样点</span>`;
+          statsEl.style.display = "";
+        } else {
+          statsEl.style.display = "none";
+        }
+        draw();
+      } catch (err) {
+        canvas.style.display = "none";
+        empty.style.display = "";
+        empty.textContent = "历史数据接口不可用";
+      }
+    }
+    rangeSelect.addEventListener("change", loadHistory);
+    document.getElementById("history-export-btn").addEventListener("click", () => {
+      window.location.href =
+        "/monitor/history/export?hours=" + rangeSelect.value;
+    });
+    window.__ofbot2RedrawCallbacks = window.__ofbot2RedrawCallbacks || [];
+    window.__ofbot2RedrawCallbacks.push(draw);
+    loadHistory();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}连接中心 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>连接中心</h1>
+    <div class="sub">协议适配器连接状态，多账号预留</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>适配器状态</h2>
+    <div style="display:flex;gap:10px;align-items:center">
+      <form method="post" action="/connections/test-all" class="js-ajax">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="small secondary">全部测试</button>
+      </form>
+      <form method="post" action="/connections/reconnect-all" class="js-ajax">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="small secondary" data-confirm="确定重连全部适配器？">全部重连</button>
+      </form>
+      <span class="muted" style="font-size:12.5px">每 10 秒自动刷新</span>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="connections-table">
+      <thead><tr><th>适配器</th><th>状态</th><th>Self ID</th><th>版本</th><th>收到</th><th>发送</th><th>重连</th><th>最后心跳</th><th>连接时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for name, status in adapters.items() %}
+      <tr data-row>
+        <td><span class="badge info">{{ name }}</span></td>
+        <td>
+          {% if status == "connected" %}<span class="badge success">已连接</span>
+          {% elif status == "connecting" %}<span class="badge warning">连接中</span>
+          {% elif status == "error" %}<span class="badge danger">错误</span>
+          {% else %}<span class="badge">{{ status }}</span>{% endif %}
+        </td>
+        <td class="mono">{{ details.get(name, {}).get('self_id', '—') }}</td>
+        <td class="mono">{{ details.get(name, {}).get('version', '—') }}</td>
+        <td>{{ details.get(name, {}).get('received', 0) }}</td>
+        <td>{{ details.get(name, {}).get('sent', 0) }}</td>
+        <td>{{ details.get(name, {}).get('reconnects', 0) }}</td>
+        <td>
+          {{ details.get(name, {}).get('last_heartbeat', '—') }}
+          {% if details.get(name, {}).get('heartbeat_stale') %}<span class="badge danger">心跳过期</span>{% endif %}
+        </td>
+        <td>{{ details.get(name, {}).get('connected_at', '—') }}</td>
+        <td>
+          <form method="post" action="/connections/{{ name }}/reconnect" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small secondary" data-confirm="确定重连适配器 {{ name }}？">重连</button>
+          </form>
+          <form method="post" action="/connections/{{ name }}/test" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small secondary">测试连接</button>
+          </form>
+          <button type="button" class="small secondary" data-test-history="{{ name }}">测试记录</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" class="empty">未配置适配器，请检查 config.yaml</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>连接配置</h2>
+    <span class="badge warning">增删与启停即时生效</span>
+  </div>
+  {% if last_reconfigured %}<p class="muted" style="margin-top:0">上次热重载：{{ last_reconfigured }}</p>{% endif %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>协议</th><th>模式</th><th>地址</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for conn in connections %}
+      <tr data-row>
+        <td class="mono">{{ conn.id }}</td>
+        <td>
+          <span class="badge info">{{ conn.protocol }}</span>
+          {% if conn.protocol == 'onebot' %}<span class="badge">{{ conn.version }}</span>{% endif %}
+        </td>
+        <td class="mono">{{ conn.mode }}</td>
+        <td class="mono">{{ conn.host }}:{{ conn.port }}{{ conn.path }}</td>
+        <td>
+          {% if conn.enabled %}<span class="badge success">启用</span>
+          {% else %}<span class="badge">停用</span>{% endif %}
+        </td>
+        <td>
+          <form method="post" action="/connections/{{ conn.id }}/toggle" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small secondary">{{ '停用' if conn.enabled else '启用' }}</button>
+          </form>
+          <form method="post" action="/connections/{{ conn.id }}/delete" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small danger" data-confirm="删除连接 {{ conn.id }}？">删除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">暂无连接配置</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>新增连接</h2></div>
+  <form method="post" action="/connections/add" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-row">
+      <label>连接 ID（唯一，如 napcat_main）</label>
+      <input name="conn_id" placeholder="napcat_main" required>
+    </div>
+    <div class="form-row">
+      <label>协议</label>
+      <select name="protocol">
+        <option value="onebot">OneBot（NapCat / LLOneBot / Lagrange / OpenShamrock）</option>
+        <option value="red">Red（Chronocat 旧版，兼容保留）</option>
+        <option value="satori">Satori（Chronocat 新版 / Lagrange.Satori）</option>
+        <option value="mirai">Mirai HTTP（mirai-api-http）</option>
+        <option value="qq_official">QQ 官方机器人（受限：群内仅 @ 消息）</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>版本（OneBot）</label>
+      <select name="version">
+        <option value="v11">v11</option>
+        <option value="v12">v12</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>模式</label>
+      <select name="mode">
+        <option value="reverse_ws">反向 WebSocket（推荐）</option>
+        <option value="forward_ws">正向 WebSocket</option>
+        <option value="http">HTTP / Webhook</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>主机</label>
+      <input name="host" value="127.0.0.1">
+    </div>
+    <div class="form-row">
+      <label>端口</label>
+      <input name="port" type="number" value="8080">
+    </div>
+    <div class="form-row">
+      <label>路径</label>
+      <input name="path" placeholder="留空自动（如 /onebot/v11/ws）">
+    </div>
+    <div class="form-row">
+      <label>Access Token / VerifyKey</label>
+      <input name="access_token" type="password" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>Token（Red / Satori / 官方）</label>
+      <input name="token" type="password" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>API Base（可选）</label>
+      <input name="api_base" placeholder="如 http://127.0.0.1:16530">
+    </div>
+    <div class="form-row">
+      <label>App ID（官方机器人）</label>
+      <input name="app_id">
+    </div>
+    <div class="form-row">
+      <label>Secret（官方机器人）</label>
+      <input name="secret" type="password" autocomplete="off">
+    </div>
+    <div class="form-actions"><button type="submit">新增连接</button></div>
+  </form>
+  <p class="muted" style="font-size:12.5px;margin-top:8px">
+    详细接入步骤与各方案能力对比见
+    <a href="/docs/view/connections">《连接方案指南》</a>。
+  </p>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>发送测试消息</h2></div>
+  <form method="post" action="/connections/send-test" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="send-type">目标类型</label>
+        <select id="send-type" name="target_type">
+          <option value="group">群聊</option>
+          <option value="private">私聊</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="send-group">群号 / QQ 号</label>
+        <textarea id="send-group" name="group_id" rows="4" placeholder="每行一个目标，支持逗号分隔，最多 50 个" required></textarea>
+        <div class="muted" style="font-size:12px;margin-top:4px">每行一个目标；批量发送会逐个执行并汇总结果。</div>
+      </div>
+      <div class="form-row">
+        <label for="send-message">消息内容</label>
+        <input id="send-message" name="message" placeholder="测试消息内容" required>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">发送</button></div>
+  </form>
+</div>
+
+<dialog id="test-history-dialog" class="dialog">
+  <div class="dialog-head">
+    <h2>测试记录 <span class="mono" id="test-history-name"></span></h2>
+    <button type="button" class="dialog-close" data-close-dialog aria-label="关闭">&times;</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>结果</th><th>详情</th></tr></thead>
+      <tbody id="test-history-body"></tbody>
+    </table>
+  </div>
+  <div class="form-actions" style="margin-top:12px">
+    <button type="button" class="secondary" data-close-dialog>关闭</button>
+  </div>
+</dialog>
+
+<script>
+  const testHistory = {{ test_history | tojson }};
+  const historyDialog = document.getElementById("test-history-dialog");
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-dialog]")) {
+      historyDialog.close();
+      return;
+    }
+    const btn = event.target.closest("[data-test-history]");
+    if (!btn) return;
+    const name = btn.dataset.testHistory;
+    const entries = testHistory[name] || [];
+    document.getElementById("test-history-name").textContent = name;
+    const body = document.getElementById("test-history-body");
+    body.innerHTML = entries.length
+      ? entries
+          .map(
+            (entry) =>
+              `<tr><td>${entry.time}</td>` +
+              `<td><span class="badge ${entry.ok ? "success" : "danger"}">${entry.ok ? "成功" : "失败"}</span></td>` +
+              `<td class="mono cell-truncate" title="${entry.detail}">${entry.detail}</td></tr>`
+          )
+          .join("")
+      : '<tr><td colspan="3" class="empty">暂无测试记录</td></tr>';
+    historyDialog.showModal();
+  });
+</script>
+{% endblock %}

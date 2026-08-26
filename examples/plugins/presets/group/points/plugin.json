@@ -1,0 +1,14 @@
+{
+  "name": "points",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "群积分查询与发放",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["points.use", "points.award"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

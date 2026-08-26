@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}AI - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>AI 能力</h1>
+    <div class="sub">统一 AI 服务，命令 / 流程 / 自动回复均可调用</div>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">操作失败，请检查配置。</div>{% endif %}
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value">{{ active }}</div>
+    <div class="stat-label">当前活跃 Provider</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ providers | length }}</div>
+    <div class="stat-label">已注册 Provider</div>
+  </div>
+</div>
+
+<div class="alert info">
+  未配置 API Key 时使用 Mock Provider，返回友好提示，不影响框架核心运行。已注册 Provider：{{ providers | join(', ') or 'mock' }}。
+</div>
+
+{% set cards = [
+  ("openai", "OpenAI 兼容", "OpenAI / DeepSeek / Qwen / Moonshot 等，修改 Base URL 即可"),
+  ("anthropic", "Anthropic", "Claude 系列模型"),
+  ("gemini", "Gemini", "Google Gemini 系列模型"),
+  ("ollama", "Ollama", "本地模型服务，无需 API Key")
+] %}
+
+<div class="ai-grid">
+  {% for key, title, hint in cards %}
+  {% set cfg = configs.get(key, {}) %}
+  <div class="card">
+    <div class="card-head">
+      <h2>{{ title }}</h2>
+      {% if key in providers %}
+        {% if key == active %}<span class="badge success">活跃</span>
+        {% else %}<span class="badge">已注册</span>{% endif %}
+      {% else %}
+        <span class="badge warning">未配置</span>
+      {% endif %}
+    </div>
+    <p class="muted" style="margin-top:0">{{ hint }}</p>
+    <form method="post" action="/ai/config" class="js-ajax">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="provider" value="{{ key }}">
+      <div class="form-row">
+        <label for="ai-{{ key }}-key">API Key</label>
+        <input id="ai-{{ key }}-key" type="password" name="api_key" value="{{ cfg.api_key }}" autocomplete="off" {% if key != "ollama" %}placeholder="sk-..."{% endif %}>
+      </div>
+      <div class="form-row">
+        <label for="ai-{{ key }}-base">Base URL</label>
+        <input id="ai-{{ key }}-base" name="base_url" value="{{ cfg.base_url }}">
+      </div>
+      <div class="form-row">
+        <label for="ai-{{ key }}-model">模型</label>
+        <input id="ai-{{ key }}-model" name="model" value="{{ cfg.model }}">
+      </div>
+      <div class="form-actions">
+        <button type="submit">保存并启用</button>
+        <button type="button" class="secondary" data-ai-test="{{ key }}" data-csrf="{{ csrf_token }}">测试连接</button>
+        {% if key in providers and key != active %}
+        <button type="button" class="ghost" data-ai-activate="{{ key }}" data-csrf="{{ csrf_token }}">设为活跃</button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+  document.addEventListener("click", async (event) => {
+    const testBtn = event.target.closest("[data-ai-test]");
+    const activateBtn = event.target.closest("[data-ai-activate]");
+    if (testBtn) {
+      const body = new FormData();
+      body.append("csrf_token", testBtn.dataset.csrf);
+      body.append("provider", testBtn.dataset.aiTest);
+      testBtn.disabled = true;
+      const original = testBtn.textContent;
+      testBtn.textContent = "测试中…";
+      try {
+        const response = await fetch("/ai/test", { method: "POST", body });
+        const data = await response.json();
+        if (data.ok) toast("连接成功：" + (data.reply || "").slice(0, 60), "success");
+        else toast("连接失败：" + (data.detail || "").slice(0, 80), "error");
+      } catch (err) {
+        toast("网络错误", "error");
+      } finally {
+        testBtn.disabled = false;
+        testBtn.textContent = original;
+      }
+      return;
+    }
+    if (activateBtn) {
+      const body = new FormData();
+      body.append("csrf_token", activateBtn.dataset.csrf);
+      body.append("provider", activateBtn.dataset.aiActivate);
+      const response = await fetch("/ai/activate", { method: "POST", body });
+      if (response.redirected) window.location.href = response.url;
+      else window.location.reload();
+    }
+  });
+</script>
+{% endblock %}

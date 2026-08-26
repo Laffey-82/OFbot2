@@ -1,0 +1,51 @@
+[project]
+name = "ofbot2"
+version = "3.1.0"
+description = "Extensible plugin-based bot framework with QQNT Red and OneBot adapters"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.129.0",
+    "uvicorn[standard]>=0.30.0",
+    "jinja2>=3.1.0",
+    "pydantic>=2.7.0",
+    "PyYAML>=6.0.0",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "aiosqlite>=0.20.0",
+    "APScheduler>=3.10.0",
+    "bubus>=1.5.0",
+    "websockets>=12.0",
+    "httpx>=0.27.0",
+    "python-multipart>=0.0.9",
+    "openpyxl>=3.1.0",
+    "python-docx>=1.1.0",
+    "qrcode>=7.4.0",
+]
+
+[project.scripts]
+ofbot2 = "app.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",
+    "ruff>=0.16.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+norecursedirs = ["_backup", ".pytest_cache", "__pycache__"]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+ignore = [
+    "B008",
+    "BLE001",
+    "S110",
+    "SIM102",
+    "DTZ005",
+    "DTZ006",
+]

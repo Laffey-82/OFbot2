@@ -1,0 +1,20 @@
+{
+  "name": "anti_spam",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "简单防刷屏提醒",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "limit": {"type": "integer", "default": 5},
+      "window": {"type": "number", "default": 10}
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

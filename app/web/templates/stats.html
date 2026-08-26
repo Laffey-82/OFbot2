@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}命令统计 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>命令统计</h1>
+    <div class="sub">命令调用排行与用户 / 群活跃度</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/stats" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <label for="stats-days" style="font-size:13px">时间范围</label>
+    <select id="stats-days" name="days" style="width:auto">
+      <option value="0" {% if days == 0 %}selected{% endif %}>全部</option>
+      <option value="1" {% if days == 1 %}selected{% endif %}>今日</option>
+      <option value="7" {% if days == 7 %}selected{% endif %}>近 7 天</option>
+      <option value="30" {% if days == 30 %}selected{% endif %}>近 30 天</option>
+    </select>
+    <button type="submit" class="small">应用</button>
+    <a class="btn small secondary" href="/stats/export?days={{ days }}">导出 CSV</a>
+  </form>
+</div>
+
+{% if filter_user %}
+<div class="alert info">正在查看 QQ <span class="mono">{{ filter_user }}</span> 的命令统计 <a href="/stats?days={{ days }}">清除筛选</a></div>
+{% endif %}
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value">{{ total_commands }}</div>
+    <div class="stat-label">命令总调用</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ failed_commands }}</div>
+    <div class="stat-label">失败次数</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">
+      {% if total_commands %}{{ ((total_commands - failed_commands) * 100 // total_commands) }}%{% else %}—{% endif %}
+    </div>
+    <div class="stat-label">成功率</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>成功率</h2></div>
+  <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+    <canvas id="stats-donut" width="160" height="160"></canvas>
+    <div class="legend">
+      <span class="legend-item donut-ok">成功</span>
+      <span class="legend-item donut-fail">失败</span>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const total = Number({{ total_commands }});
+      const failed = Number({{ failed_commands }});
+      const canvas = document.getElementById("stats-donut");
+      if (!total) {
+        canvas.style.display = "none";
+        return;
+      }
+      const ok = total - failed;
+      const ctx = canvas.getContext("2d");
+      const cx = 80, cy = 80, r = 60;
+      const okAngle = (ok / total) * Math.PI * 2;
+      function drawDonut() {
+        ctx.clearRect(0, 0, 160, 160);
+        ctx.lineWidth = 18;
+        ctx.lineCap = "butt";
+        ctx.strokeStyle = "#16a34a";
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + okAngle);
+        ctx.stroke();
+        ctx.strokeStyle = "#dc2626";
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, -Math.PI / 2 + okAngle, Math.PI * 1.5);
+        ctx.stroke();
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--text") || "#1f2933";
+        ctx.font = "bold 22px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(Math.round((ok / total) * 100) + "%", cx, cy);
+      }
+      drawDonut();
+      window.__ofbot2RedrawCallbacks = window.__ofbot2RedrawCallbacks || [];
+      window.__ofbot2RedrawCallbacks.push(drawDonut);
+    })();
+  </script>
+</div>
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="card-head">
+      <h2>命令排行 TOP 20</h2>
+      <div class="search-box">
+        <input data-table-filter="top-commands-table" placeholder="搜索命令…">
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="top-commands-table" class="js-paginate">
+        <thead><tr><th>#</th><th>命令</th><th>调用次数</th></tr></thead>
+        <tbody>
+        {% for row in top_commands %}
+        <tr data-row><td>{{ loop.index }}</td><td class="mono"><a href="/stats?command={{ row.command_name | urlencode }}">{{ row.command_name }}</a> <a class="small ghost" href="/commands?q={{ row.command_name | urlencode }}" title="查看命令详情">详情</a></td><td>{{ row.cnt }}</td></tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">暂无命令调用</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <h2>用户排行 TOP 20</h2>
+      <div class="search-box">
+        <input data-table-filter="top-users-table" placeholder="搜索用户…">
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="top-users-table" class="js-paginate">
+        <thead><tr><th>#</th><th>用户</th><th>调用次数</th></tr></thead>
+        <tbody>
+        {% for row in top_users %}
+        <tr data-row><td>{{ loop.index }}</td><td class="mono">{{ row.user_id }}</td><td>{{ row.cnt }}</td></tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">暂无用户数据</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <h2>群排行 TOP 20</h2>
+      <div class="search-box">
+        <input data-table-filter="top-groups-table" placeholder="搜索群…">
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="top-groups-table" class="js-paginate">
+        <thead><tr><th>#</th><th>群号</th><th>调用次数</th></tr></thead>
+        <tbody>
+        {% for row in top_groups %}
+        <tr data-row><td>{{ loop.index }}</td><td class="mono">{{ row.group_id }}</td><td>{{ row.cnt }}</td></tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">暂无群数据</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

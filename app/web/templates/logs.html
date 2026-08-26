@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}日志 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>运行日志</h1>
+    <div class="sub">查看 logs/ 目录下的运行日志（尾部 {{ lines }} 行）· 进程级日志自动保留 {{ log_retention_days }} 天 / 最多 {{ log_max_files }} 个</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/logs">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="log-file">日志文件</label>
+        <select id="log-file" name="file">
+          {% for item in files %}
+          <option value="{{ item.name }}" {% if item.name == selected %}selected{% endif %}>{{ item.name }}（{{ humanize_bytes(item.size) }}，{{ item.modified }}）</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="log-lines">显示行数</label>
+        <select id="log-lines" name="lines">
+          {% for count in [100, 200, 500, 1000, 2000] %}
+          <option value="{{ count }}" {% if lines == count %}selected{% endif %}>{{ count }} 行</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit">查看</button>
+      <button type="button" class="secondary" id="log-refresh-btn">刷新</button>
+      <label class="switch-inline">
+        <input type="checkbox" id="log-autorefresh"> 自动刷新（5 秒）
+      </label>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="mono">{{ selected or '无日志文件' }}</h2>
+    <span class="muted" style="font-size:12.5px">共 {{ content.splitlines() | length }} 行已加载</span>
+  </div>
+  {% if content %}
+  <pre class="log-view">{{ content }}</pre>
+  {% else %}
+  <div class="empty">该日志为空或不可读</div>
+  {% endif %}
+</div>
+
+<script>
+  const logAutorefresh = document.getElementById("log-autorefresh");
+  let logTimer = null;
+  function scheduleLogRefresh() {
+    if (logTimer) clearInterval(logTimer);
+    if (logAutorefresh.checked) {
+      logTimer = setInterval(() => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("_t", Date.now());
+        window.location.href = url.toString();
+      }, 5000);
+    }
+  }
+  document.getElementById("log-refresh-btn").addEventListener("click", () => {
+    window.location.reload();
+  });
+  logAutorefresh.addEventListener("change", scheduleLogRefresh);
+  scheduleLogRefresh();
+</script>
+{% endblock %}

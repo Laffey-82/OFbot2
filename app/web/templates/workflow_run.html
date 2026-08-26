@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}流程运行详情 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>流程运行详情</h1>
+    <div class="sub">运行 #{{ run.id }} · {{ workflow.name if workflow else '已删除流程' }}</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/workflows">返回流程列表</a>
+    {% if run.status == "failed" %}
+    <a class="btn secondary" href="/alerts?event=workflow.failed">查看失败告警</a>
+    {% endif %}
+    {% if run.status == "failed" and workflow %}
+    <form method="post" action="/workflows/{{ workflow.id }}/run" class="js-ajax">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">重试流程</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value">
+      {% if run.status == "succeeded" %}<span class="badge success">成功</span>
+      {% elif run.status == "failed" %}<span class="badge danger">失败</span>
+      {% elif run.status == "skipped" %}<span class="badge info">跳过</span>
+      {% else %}<span class="badge warning">{{ run.status }}</span>{% endif %}
+    </div>
+    <div class="stat-label">状态</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ run.created_at }}</div>
+    <div class="stat-label">运行时间</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ run.result.get('steps', []) | length }}</div>
+    <div class="stat-label">执行步骤</div>
+  </div>
+</div>
+
+{% if run.result.get("error") %}
+<div class="alert error">运行失败：<span class="mono">{{ run.result.error }}</span></div>
+{% endif %}
+
+{% if run.status == "skipped" %}
+<div class="alert info">条件未匹配，流程跳过执行：<span class="mono">{{ run.result.get('reason', '') }}</span></div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>步骤输出</h2></div>
+  {% set steps = run.result.get('steps', []) %}
+  {% if steps %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>动作</th><th>输出</th></tr></thead>
+      <tbody>
+      {% for step in steps %}
+      <tr data-row>
+        <td>{{ loop.index }}</td>
+        <td><span class="badge info">{{ step.action }}</span></td>
+        <td class="mono">{{ step.output }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">该运行未产生步骤输出</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>完整结果</h2></div>
+  <pre class="code-block">{{ run.result | tojson(2) }}</pre>
+</div>
+{% endblock %}

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}命令详情 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="mono">{{ command }}</h1>
+    <div class="sub">命令调用详情</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/stats">返回统计</a>
+    <a class="btn secondary" href="/stats/export?command={{ command | urlencode }}&days=30">导出按日</a>
+    {% if day %}<a class="btn secondary" href="/stats/export?command={{ command | urlencode }}&day={{ day }}">导出按小时</a>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/stats" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <input type="hidden" name="command" value="{{ command }}">
+    <label for="detail-days" style="font-size:13px">时间范围</label>
+    <select id="detail-days" name="days" style="width:auto">
+      <option value="0" {% if days == 0 %}selected{% endif %}>全部</option>
+      <option value="1" {% if days == 1 %}selected{% endif %}>今日</option>
+      <option value="7" {% if days == 7 %}selected{% endif %}>近 7 天</option>
+      <option value="30" {% if days == 30 %}selected{% endif %}>近 30 天</option>
+    </select>
+    <button type="submit" class="small">应用</button>
+  </form>
+</div>
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value">{{ total }}</div>
+    <div class="stat-label">总调用</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ failed }}</div>
+    <div class="stat-label">失败次数</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">
+      {% if total %}{{ ((total - failed) * 100 // total) }}%{% else %}—{% endif %}
+    </div>
+    <div class="stat-label">成功率</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>按日趋势（近 30 天）</h2></div>
+  <canvas id="detail-trend" height="200" style="width:100%"></canvas>
+  <script>
+    (function () {
+      const data = {{ command_trend | tojson }};
+      const canvas = document.getElementById("detail-trend");
+      if (!data.length) {
+        canvas.style.display = "none";
+        return;
+      }
+      const ctx = canvas.getContext("2d");
+      function draw() {
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(320, canvas.clientWidth);
+        canvas.width = width * dpr;
+        canvas.height = 200 * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const pad = 30;
+        const plotW = width - pad * 2;
+        const plotH = 200 - pad * 2;
+        const maxCount = Math.max(1, ...data.map((item) => item.count));
+        const step = plotW / data.length;
+        const barWidth = Math.min(30, step * 0.65);
+        ctx.font = "10px sans-serif";
+        data.forEach((item, index) => {
+          const x = pad + step * index + (step - barWidth) / 2;
+          const h = (item.count / maxCount) * plotH;
+          const y = pad + plotH - h;
+          ctx.fillStyle = "#2563eb";
+          ctx.fillRect(x, y, barWidth, h);
+          ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--muted") || "#6b7280";
+          ctx.fillText(String(item.count), x + barWidth / 2 - 5, y - 3);
+          if (index % 3 === 0) {
+            ctx.save();
+            ctx.translate(x + barWidth / 2, pad + plotH + 8);
+            ctx.rotate(-Math.PI / 4);
+            ctx.fillText(item.date.slice(5), 0, 0);
+            ctx.restore();
+          }
+        });
+      }
+      draw();
+      window.__ofbot2RedrawCallbacks = window.__ofbot2RedrawCallbacks || [];
+      window.__ofbot2RedrawCallbacks.push(draw);
+    })();
+  </script>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>按小时下钻</h2>
+    <form method="get" action="/stats" style="display:flex;gap:8px;align-items:center">
+      <input type="hidden" name="command" value="{{ command }}">
+      <input type="date" name="day" value="{{ day }}">
+      <button type="submit" class="small">查看</button>
+    </form>
+  </div>
+  <canvas id="hourly-chart" height="180" style="width:100%"></canvas>
+  <div id="hourly-empty" class="empty" style="display:none">选择日期后展示每小时调用数</div>
+  <script>
+    (function () {
+      const hourly = {{ hourly | tojson }};
+      const canvas = document.getElementById("hourly-chart");
+      if (!hourly.length) {
+        canvas.style.display = "none";
+        document.getElementById("hourly-empty").style.display = "";
+        return;
+      }
+      const ctx = canvas.getContext("2d");
+      function drawHourly() {
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(320, canvas.clientWidth);
+        canvas.width = width * dpr;
+        canvas.height = 180 * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const pad = 30;
+        const plotW = width - pad * 2;
+        const plotH = 180 - pad * 2;
+        const maxCount = Math.max(1, ...hourly.map((item) => item.count));
+        const step = plotW / 24;
+        const barWidth = Math.min(20, step * 0.7);
+        ctx.font = "10px sans-serif";
+        for (let hour = 0; hour < 24; hour++) {
+          const entry = hourly.find((item) => item.hour === hour);
+          const count = entry ? entry.count : 0;
+          const x = pad + step * hour + (step - barWidth) / 2;
+          const h = (count / maxCount) * plotH;
+          const y = pad + plotH - h;
+          ctx.fillStyle = "#7c3aed";
+          ctx.fillRect(x, y, barWidth, h);
+          ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--muted") || "#6b7280";
+          if (hour % 4 === 0) ctx.fillText(String(hour).padStart(2, "0"), x + barWidth / 2 - 6, pad + plotH + 12);
+          if (count > 0) ctx.fillText(String(count), x + barWidth / 2 - 5, y - 3);
+        }
+      }
+      drawHourly();
+      window.__ofbot2RedrawCallbacks = window.__ofbot2RedrawCallbacks || [];
+      window.__ofbot2RedrawCallbacks.push(drawHourly);
+    })();
+  </script>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>最近 100 次调用</h2>
+    <div class="search-box">
+      <input data-table-filter="recent-table" placeholder="搜索调用…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="recent-table" class="js-paginate">
+      <thead><tr><th>时间</th><th>用户</th><th>群</th><th>结果</th></tr></thead>
+      <tbody>
+      {% for item in recent %}
+      <tr data-row>
+        <td>{{ item.timestamp }}</td>
+        <td class="mono">{{ item.user_id }}</td>
+        <td class="mono">{{ item.group_id or '—' }}</td>
+        <td><span class="badge {{ 'success' if item.success else 'danger' }}">{{ '成功' if item.success else '失败' }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="empty">暂无调用记录</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

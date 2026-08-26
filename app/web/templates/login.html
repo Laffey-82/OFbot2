@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}登录 - OFbot 2{% endblock %}
+{% block content %}
+<button type="button" id="theme-toggle" class="login-theme-toggle" title="切换深浅色主题">主题</button>
+<div class="login-shell">
+  <div class="card login-card">
+    <div class="login-logo">
+      <img src="/static/favicon.svg" alt="OFbot 2">
+      <h1>OFbot 2</h1>
+      <p>插件化 QQ 机器人管理后台</p>
+    </div>
+    {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+    <form method="post" action="/login">
+      <div class="form-row">
+        <label for="username">用户名</label>
+        <input id="username" name="username" autocomplete="username" required autofocus>
+      </div>
+      <div class="form-row">
+        <label for="password">密码</label>
+        <input id="password" type="password" name="password" autocomplete="current-password" required>
+      </div>
+      <div class="form-actions">
+        <button type="submit" style="width:100%;justify-content:center">登录</button>
+      </div>
+    </form>
+    <p class="muted" style="margin-top:14px;text-align:center;font-size:12.5px">
+      默认账户 admin / admin，首次登录后请立即修改密码
+      {% if session_ttl_hours %}<br>会话有效期约 {{ session_ttl_hours | round(1) }} 小时，超时需重新登录{% endif %}
+    </p>
+  </div>
+</div>
+{% endblock %}

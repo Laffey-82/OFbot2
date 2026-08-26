@@ -1,0 +1,53 @@
+basic:
+  command_start:
+    - /
+  command_sep:
+    - .
+  nickname:
+    - OFbot_2
+  superusers:
+    - "100"
+  log_level: INFO
+transport:
+  protocol: red
+  red:
+    enabled: true
+    host: 127.0.0.1
+    port: 16530
+    token: test-token
+    api_base: http://127.0.0.1:16531
+    reconnect_interval: 3.0
+  onebot:
+    enabled: false
+database:
+  url: sqlite+aiosqlite:///data/fake_bot.db
+web:
+  host: 127.0.0.1
+  port: 8010
+  secret: ''
+  session_ttl_seconds: 28800
+  api_keys: []
+scheduler:
+  timezone: Asia/Shanghai
+  max_instances: 1
+  coalesce: true
+security:
+  max_message_length: 2000
+  max_arg_length: 500
+  default_cooldown_seconds: 1.0
+  rate_limit_default: 20/minute
+  sensitive_words: []
+  blocked_users: []
+  audit_retention_days: 90
+  login_failure_delay_seconds: 0.5
+  max_login_attempts: 5
+  login_lock_seconds: 300
+plugins:
+  template: true
+  system: true
+plugin_configs:
+  template:
+    greeting: 你好
+  system:
+    groups:
+      - "200"

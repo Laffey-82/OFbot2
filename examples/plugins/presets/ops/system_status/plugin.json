@@ -1,0 +1,14 @@
+{
+  "name": "system_status",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "系统状态命令",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["system_status.view"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

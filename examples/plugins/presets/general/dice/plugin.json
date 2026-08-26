@@ -1,0 +1,19 @@
+{
+  "name": "dice",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "掷骰子命令",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["dice.roll"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "max": {"type": "integer", "default": 100}
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Webhook 历史 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="mono">{{ name }}</h1>
+    <div class="sub">Webhook 触发历史（共 {{ total }} 条）</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/webhooks">返回 Webhook</a>
+    <a class="btn secondary" href="/webhooks/{{ name }}/history/export?start={{ start }}&end={{ end }}">导出 JSON</a>
+    <a class="btn secondary" href="/webhooks/{{ name }}/history/export?page={{ page }}&start={{ start }}&end={{ end }}">导出当前页</a>
+    <form method="post" action="/webhooks/{{ name }}/history/clear" class="js-ajax">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="start" value="{{ start }}">
+      <input type="hidden" name="end" value="{{ end }}">
+      <button class="danger" data-confirm="确定清空 {{ name }} 的触发历史{{ '（按当前日期范围）' if start or end else '' }}？该操作不可恢复。">清空历史{% if start or end %}（按日期）{% endif %}</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/webhooks/{{ name }}/history" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <input type="date" name="start" value="{{ start }}">
+    <span class="muted">至</span>
+    <input type="date" name="end" value="{{ end }}">
+    <select name="page_size" style="width:auto">
+      <option value="10" {% if page_size == 10 %}selected{% endif %}>10 条/页</option>
+      <option value="20" {% if page_size == 20 %}selected{% endif %}>20 条/页</option>
+      <option value="50" {% if page_size == 50 %}selected{% endif %}>50 条/页</option>
+    </select>
+    <button type="submit" class="small">筛选</button>
+    <a class="btn small secondary" href="/webhooks/{{ name }}/history">清除</a>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>触发记录</h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <form method="post" id="history-bulk-form" action="/webhooks/{{ name }}/history/bulk-delete">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="start" value="{{ start }}">
+        <input type="hidden" name="end" value="{{ end }}">
+        <input type="hidden" name="scope" value="selected">
+        <button type="submit" class="small danger" data-confirm="确定删除选中的记录？">删除选中</button>
+      </form>
+      <form method="post" action="/webhooks/{{ name }}/history/bulk-delete" class="js-ajax">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="start" value="{{ start }}">
+        <input type="hidden" name="end" value="{{ end }}">
+        <input type="hidden" name="scope" value="range">
+        <button type="submit" class="small danger" data-confirm="确定删除当前日期范围内{{ '（' + start + ' ~ ' + end + '）' if start or end else '（全部日期）' }}的全部触发记录？该操作不可恢复。">删除当前范围全部</button>
+      </form>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="history-table" class="js-paginate">
+      <thead><tr><th><input type="checkbox" id="history-select-all" aria-label="全选"></th><th>时间</th><th>载荷</th></tr></thead>
+      <tbody>
+      {% for event in events %}
+      <tr data-row>
+        <td><input type="checkbox" class="history-check" name="ids" value="{{ event.id }}" form="history-bulk-form"></td>
+        <td>{{ event.created_at }}</td>
+        <td>
+          <pre class="code-block">{{ event.payload | tojson(2) }}</pre>
+          <div class="actions" style="margin-top:6px">
+            <button type="button" class="small ghost" data-copy="{{ event.payload | tojson }}">复制载荷</button>
+            <form method="post" action="/webhooks/{{ name }}/history/{{ event.id }}/replay" class="js-ajax" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small secondary" title="用该载荷重新触发此 Webhook">重放</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="empty">暂无触发记录</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    <a class="btn small secondary {{ 'disabled' if page <= 1 }}" href="/webhooks/{{ name }}/history?page={{ page - 1 }}&start={{ start }}&end={{ end }}&page_size={{ page_size }}">上一页</a>
+    <span class="muted">第 {{ page }} / {{ total_pages }} 页</span>
+    <a class="btn small secondary {{ 'disabled' if page >= total_pages }}" href="/webhooks/{{ name }}/history?page={{ page + 1 }}&start={{ start }}&end={{ end }}&page_size={{ page_size }}">下一页</a>
+    <span class="muted">跳至</span>
+    <input id="history-page-input" type="number" min="1" max="{{ total_pages }}" value="{{ page }}" style="width:70px">
+    <button type="button" class="small secondary" id="history-page-go">GO</button>
+  </div>
+  {% endif %}
+</div>
+<script>
+  const pageGo = document.getElementById("history-page-go");
+  if (pageGo) {
+    pageGo.addEventListener("click", () => {
+      const value = document.getElementById("history-page-input").value;
+      if (value) {
+        window.location.href = "/webhooks/{{ name }}/history?page=" + value + "&start={{ start }}&end={{ end }}&page_size={{ page_size }}";
+      }
+    });
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    initSelectAll("history-select-all", "history-check");
+  });
+  const historyBulkForm = document.getElementById("history-bulk-form");
+  if (historyBulkForm) {
+    historyBulkForm.addEventListener("submit", (event) => {
+      if (!document.querySelectorAll(".history-check:checked").length) {
+        event.preventDefault();
+        toast("请先选择要删除的记录", "error");
+      }
+    });
+  }
+</script>
+{% endblock %}

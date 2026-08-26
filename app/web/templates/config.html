@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}配置 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>配置管理</h1>
+    <div class="sub">命令前缀与日志级别保存后立即生效；监听地址、数据库路径等修改需要重启</div>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">保存失败，请检查输入。</div>{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>基础配置</h2><span class="badge success">即时生效</span></div>
+  <form method="post" action="/config">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="cfg-command-start">命令前缀（逗号分隔）</label>
+        <input id="cfg-command-start" name="command_start" value="{{ config.basic.command_start | join(',') }}">
+        <span class="hint">例如：/,！,!</span>
+      </div>
+      <div class="form-row">
+        <label for="cfg-command-sep">命令参数分隔符（逗号分隔，如 . 支持 /ping.x）</label>
+        <input id="cfg-command-sep" name="command_sep" value="{{ config.basic.command_sep | join(',') }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-log-level">日志级别</label>
+        <select id="cfg-log-level" name="log_level">
+          {% for level in ["DEBUG","INFO","WARNING","ERROR","CRITICAL"] %}
+          <option value="{{ level }}" {% if config.basic.log_level == level %}selected{% endif %}>{{ level }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="cfg-nickname">昵称（逗号分隔）</label>
+        <input id="cfg-nickname" name="nickname" value="{{ config.basic.nickname | join(',') }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-superusers">超级管理员 QQ（逗号分隔）</label>
+        <input id="cfg-superusers" name="superusers" value="{{ config.basic.superusers | join(',') }}">
+        <span class="hint">保存后立即生效（权限）</span>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">保存配置</button></div>
+  </form>
+  <div class="card-foot">
+    完整配置位于项目根目录 <span class="mono">config.yaml</span>，修改后重启生效。
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>运维配置</h2><span class="badge success">即时生效</span></div>
+  <form method="post" action="/config" id="ops-config-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="command_start" value="{{ config.basic.command_start | join(',') }}">
+    <input type="hidden" name="log_level" value="{{ config.basic.log_level }}">
+    <input type="hidden" name="nickname" value="{{ config.basic.nickname | join(',') }}">
+    <input type="hidden" name="superusers" value="{{ config.basic.superusers | join(',') }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="cfg-wh-retention">Webhook 历史保留条数</label>
+        <input id="cfg-wh-retention" type="number" min="1" name="webhook_history_retention" value="{{ config.web.webhook_history_retention }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-wh-page">Webhook 历史分页大小</label>
+        <input id="cfg-wh-page" type="number" min="5" max="100" name="webhook_history_page_size" value="{{ config.web.webhook_history_page_size }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-wf-auto">流程连续失败自动停用阈值（0 = 关闭）</label>
+        <input id="cfg-wf-auto" type="number" min="0" max="50" name="auto_disable_workflows_after_failures" value="{{ config.web.auto_disable_workflows_after_failures }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-task-auto">任务连续失败自动停用阈值（0 = 关闭）</label>
+        <input id="cfg-task-auto" type="number" min="0" max="50" name="auto_disable_after_failures" value="{{ config.scheduler.auto_disable_after_failures }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-ej-retention">导出任务保留条数</label>
+        <input id="cfg-ej-retention" type="number" min="1" name="export_job_retention" value="{{ config.web.export_job_retention }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-ej-days">导出按日期保留（0 = 关闭）</label>
+        <input id="cfg-ej-days" type="number" min="0" name="export_job_retention_days" value="{{ config.web.export_job_retention_days }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-ej-retries">导出失败自动重试次数</label>
+        <input id="cfg-ej-retries" type="number" min="0" max="10" name="export_retries" value="{{ config.web.export_retries }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-audit-days">审计日志保留天数</label>
+        <input id="cfg-audit-days" type="number" min="1" name="audit_retention_days" value="{{ config.security.audit_retention_days }}">
+        <span class="hint">超过保留期的审计日志每小时自动清理</span>
+      </div>
+      <div class="form-row">
+        <label for="cfg-login-attempts">登录失败锁定阈值（0 = 关闭）</label>
+        <input id="cfg-login-attempts" type="number" min="0" max="50" name="max_login_attempts" value="{{ config.security.max_login_attempts }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-login-lock">登录锁定时间（秒）</label>
+        <input id="cfg-login-lock" type="number" min="0" name="login_lock_seconds" value="{{ config.security.login_lock_seconds }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-login-delay">登录失败延迟（秒，防爆破）</label>
+        <input id="cfg-login-delay" type="number" min="0" step="0.1" max="5" name="login_failure_delay_seconds" value="{{ config.security.login_failure_delay_seconds }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-heartbeat-stale">心跳过期告警阈值（秒）</label>
+        <input id="cfg-heartbeat-stale" type="number" min="1" name="heartbeat_stale_seconds" value="{{ config.security.heartbeat_stale_seconds }}">
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">保存运维配置</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>高级设置</h2><span class="badge warning">需重启生效</span></div>
+  <form method="post" action="/config" id="advanced-config-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="command_start" value="{{ config.basic.command_start | join(',') }}">
+    <input type="hidden" name="log_level" value="{{ config.basic.log_level }}">
+    <input type="hidden" name="nickname" value="{{ config.basic.nickname | join(',') }}">
+    <input type="hidden" name="superusers" value="{{ config.basic.superusers | join(',') }}">
+    <div class="alert info">以下配置在服务重启后生效：日志保留、会话有效期、调度器参数与安全策略。</div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="cfg-log-days">日志保留天数</label>
+        <input id="cfg-log-days" type="number" min="1" name="log_retention_days" value="{{ config.basic.log_retention_days }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-log-files">日志文件上限</label>
+        <input id="cfg-log-files" type="number" min="1" name="log_max_files" value="{{ config.basic.log_max_files }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-session-ttl">Web 会话有效期（秒，≥300）</label>
+        <input id="cfg-session-ttl" type="number" min="300" name="session_ttl_seconds" value="{{ config.web.session_ttl_seconds }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-scheduler-tz">调度器时区</label>
+        <input id="cfg-scheduler-tz" name="scheduler_timezone" value="{{ config.scheduler.timezone }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-scheduler-max">调度器最大并发实例</label>
+        <input id="cfg-scheduler-max" type="number" min="1" max="10" name="scheduler_max_instances" value="{{ config.scheduler.max_instances }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-scheduler-coalesce">调度器合并重叠任务（coalesce）</label>
+        <select id="cfg-scheduler-coalesce" name="scheduler_coalesce">
+          <option value="on" {% if config.scheduler.coalesce %}selected{% endif %}>启用</option>
+          <option value="off" {% if not config.scheduler.coalesce %}selected{% endif %}>关闭</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="cfg-max-msg">消息长度上限（字符）</label>
+        <input id="cfg-max-msg" type="number" min="1" name="max_message_length" value="{{ config.security.max_message_length }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-max-arg">命令参数长度上限</label>
+        <input id="cfg-max-arg" type="number" min="1" name="max_arg_length" value="{{ config.security.max_arg_length }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-cooldown">默认命令冷却（秒）</label>
+        <input id="cfg-cooldown" type="number" min="0" step="0.1" name="default_cooldown_seconds" value="{{ config.security.default_cooldown_seconds }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-rate-limit">默认限流（如 20/minute）</label>
+        <input id="cfg-rate-limit" name="rate_limit_default" value="{{ config.security.rate_limit_default }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-sensitive-words">敏感词（逗号分隔）</label>
+        <input id="cfg-sensitive-words" name="sensitive_words" value="{{ config.security.sensitive_words | join(',') }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-alert-days">告警历史保留天数</label>
+        <input id="cfg-alert-days" type="number" min="1" name="alert_history_retention_days" value="{{ config.web.alert_history_retention_days }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-alert-min">告警通知去抖间隔（秒，0 = 关闭）</label>
+        <input id="cfg-alert-min" type="number" min="0" name="alert_min_interval_seconds" value="{{ config.web.alert_min_interval_seconds }}">
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">保存高级设置</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>运行配置</h2>
+    <span class="badge warning">需重启生效</span>
+  </div>
+  <div class="config-grid">
+    <div class="config-item">
+      <div class="config-label">协议</div>
+      <div class="mono">{{ config.transport.protocol }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">Red / Chronocat</div>
+      <div class="mono">{{ '启用' if config.transport.red.enabled else '关闭' }} · {{ config.transport.red.host }}:{{ config.transport.red.port }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">OneBot</div>
+      <div class="mono">{{ '启用' if config.transport.onebot.enabled else '关闭' }} · {{ config.transport.onebot.mode }} · {{ config.transport.onebot.host }}:{{ config.transport.onebot.port }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">Web 监听</div>
+      <div class="mono">http://{{ config.web.host }}:{{ config.web.port }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">数据库</div>
+      <div class="mono">{{ config.database.url }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">调度器时区</div>
+      <div class="mono">{{ config.scheduler.timezone }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">自动备份</div>
+      <div class="mono">{{ '启用' if config.scheduler.auto_backup_enabled else '关闭' }} · 每 {{ config.scheduler.backup_interval_hours }} 小时</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">消息长度上限</div>
+      <div class="mono">{{ config.security.max_message_length }} 字符</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">默认限流</div>
+      <div class="mono">{{ config.security.rate_limit_default }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">心跳告警阈值</div>
+      <div class="mono">{{ config.security.heartbeat_stale_seconds }} 秒</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{
+  "name": "timestamp",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "时间戳与日期转换",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["timestamp.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

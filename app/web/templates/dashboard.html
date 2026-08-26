@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}仪表盘 - OFbot 2{% endblock %}
+{% block content %}
+{% if needs_setup %}
+<div class="alert warning" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+  <span>管理员仍在使用默认密码 admin/admin，建议立即修改并确认协议配置。</span>
+  <a class="btn" href="/setup">前往设置向导</a>
+</div>
+{% endif %}
+
+<div class="page-head">
+  <div>
+    <h1>仪表盘</h1>
+    <div class="sub">OFbot 2 运行总览</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/monitor">系统监控</a>
+    <a class="btn" href="/workflows">新建流程</a>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/scopes">{{ total_groups }}</a></div>
+    <div class="stat-label">群聊（监听环境）</div>
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/scopes">{{ scope_count }}</a></div>
+    <div class="stat-label">监听环境</div>
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/stats">{{ total_commands }}</a></div>
+    <div class="stat-label">命令调用</div>
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/stats">{{ today_commands }}</a></div>
+    <div class="stat-label">今日命令</div>
+    {% if yesterday_commands %}
+    {% set delta = ((today_commands - yesterday_commands) * 100 / yesterday_commands) | round(0) | int %}
+    <div class="stat-label"><span class="badge {{ 'success' if delta >= 0 else 'danger' }}">{{ '+' if delta >= 0 else '' }}{{ delta }}% 较昨日</span></div>
+    {% endif %}
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/tasks">{{ total_tasks }}</a></div>
+    <div class="stat-label">定时任务</div>
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/tasks">{{ running_tasks }}</a></div>
+    <div class="stat-label">运行中任务</div>
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/tasks">{{ failed_tasks }}</a></div>
+    <div class="stat-label">失败任务</div>
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/records">{{ total_records }}</a></div>
+    <div class="stat-label">通用记录</div>
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/workflows">{{ total_workflows }}</a></div>
+    <div class="stat-label">自动化流程</div>
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/executions?source=workflow&status=failed">{{ failed_runs }}</a></div>
+    <div class="stat-label">失败流程运行</div>
+    {% if failed_runs %}<div class="stat-label"><a class="btn small secondary" href="/executions?source=workflow&status=failed">去处理</a></div>{% endif %}
+  </div>
+  <div class="card">
+    <div class="stat-value"><a class="stat-link" href="/plugins">{{ plugins | length }}</a></div>
+    <div class="stat-label">已加载插件</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>协议适配器</h2>
+    <a class="btn small secondary" href="/connections">连接中心</a>
+  </div>
+  <a href="/connections" style="text-decoration:none;color:inherit"><div data-adapter-status>{% if adapters %}{{ adapters }}{% else %}未配置{% endif %}</div></a>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>插件状态</h2>
+    <a class="btn secondary small" href="/plugins">管理插件</a>
+  </div>
+  {% if plugins %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>插件</th><th>版本</th><th>状态</th></tr></thead>
+      <tbody>
+      {% for plugin in plugins %}
+      <tr data-row>
+        <td>{{ plugin.name }}</td>
+        <td class="mono">{{ plugin.version }}</td>
+        <td>
+          {% if plugin.state == "loaded" %}<span class="badge success">已加载</span>
+          {% elif plugin.state == "error" %}<span class="badge danger">错误</span>
+          {% else %}<span class="badge warning">{{ plugin.state }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">未加载插件</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>快速入口</h2></div>
+  <div class="quick-links">
+    <a class="btn secondary" href="/records">记录中心</a>
+    <a class="btn secondary" href="/state-machines">状态机</a>
+    <a class="btn secondary" href="/ai">AI 能力</a>
+    <a class="btn secondary" href="/tasks">定时任务</a>
+    <a class="btn secondary" href="/backups">数据备份</a>
+    <a class="btn secondary" href="/audit">审计日志</a>
+    <a class="btn secondary" href="/exports">导出中心</a>
+    <a class="btn secondary" href="/webhooks">Webhook</a>
+    <a class="btn secondary" href="/backups/compare">备份对比</a>
+    <a class="btn secondary" href="/plugins">插件</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>系统信息</h2></div>
+  <div class="config-grid">
+    <div class="config-item">
+      <div class="config-label">版本</div>
+      <div class="mono">{{ system_info.version }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">Python</div>
+      <div class="mono">{{ system_info.python }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">平台</div>
+      <div class="mono">{{ system_info.platform }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">数据库</div>
+      <div class="mono">{{ system_info.database }}</div>
+    </div>
+    <div class="config-item">
+      <div class="config-label">运行时长</div>
+      <div class="mono">{{ humanize_uptime(system_info.uptime) }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>命令趋势</h2>
+    <select id="trend-days" style="width:auto">
+      <option value="7">近 7 天</option>
+      <option value="14" selected>近 14 天</option>
+      <option value="30">近 30 天</option>
+    </select>
+  </div>
+  <canvas id="trend-chart" height="220" style="width:100%"></canvas>
+  <div id="trend-empty" class="empty" style="display:none">近 30 天暂无命令调用数据</div>
+  <script>
+    (function () {
+      const allData = {{ command_trend | tojson }};
+      const canvas = document.getElementById("trend-chart");
+      if (!allData.length) {
+        canvas.style.display = "none";
+        document.getElementById("trend-empty").style.display = "";
+        return;
+      }
+      const ctx = canvas.getContext("2d");
+      function drawTrend(days) {
+        const data = allData.slice(-days);
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(320, canvas.clientWidth);
+        canvas.width = width * dpr;
+        canvas.height = 220 * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, 220);
+        const pad = 34;
+        const plotW = width - pad * 2;
+        const plotH = 220 - pad * 2;
+        const maxCount = Math.max(1, ...data.map((item) => item.count));
+        const barWidth = Math.min(40, (plotW / data.length) * 0.7);
+        const step = plotW / data.length;
+        ctx.font = "10px sans-serif";
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--muted") || "#6b7280";
+        data.forEach((item, index) => {
+          const x = pad + step * index + (step - barWidth) / 2;
+          const h = (item.count / maxCount) * plotH;
+          const y = pad + plotH - h;
+          ctx.fillStyle = "#2563eb";
+          ctx.fillRect(x, y, barWidth, h);
+          ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--muted") || "#6b7280";
+          ctx.fillText(String(item.count), x + barWidth / 2 - 5, y - 4);
+          ctx.save();
+          ctx.translate(x + barWidth / 2, pad + plotH + 10);
+          ctx.rotate(-Math.PI / 4);
+          ctx.fillText(item.date.slice(5), 0, 0);
+          ctx.restore();
+        });
+      }
+      drawTrend(Number(document.getElementById("trend-days").value));
+      document.getElementById("trend-days").addEventListener("change", (event) => {
+        drawTrend(Number(event.target.value));
+      });
+      window.__ofbot2RedrawCallbacks = window.__ofbot2RedrawCallbacks || [];
+      window.__ofbot2RedrawCallbacks.push(() =>
+        drawTrend(Number(document.getElementById("trend-days").value))
+      );
+    })();
+  </script>
+</div>
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="card-head"><h2>最近审计</h2><a class="btn small secondary" href="/audit">全部</a></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>时间</th><th>动作</th><th>操作者</th><th>结果</th></tr></thead>
+        <tbody>
+        {% for log in recent_audit %}
+        <tr data-row>
+          <td>{{ log.timestamp.strftime('%m-%d %H:%M') if log.timestamp else '—' }}</td>
+          <td class="mono">{{ log.action }}</td>
+          <td>{{ log.actor }}</td>
+          <td><span class="badge {{ 'success' if log.success else 'danger' }}">{{ '成功' if log.success else '失败' }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">暂无审计记录</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>最近流程运行</h2><a class="btn small secondary" href="/workflows">全部</a></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>运行 ID</th><th>流程 ID</th><th>状态</th></tr></thead>
+        <tbody>
+        {% for run in recent_runs %}
+        <tr data-row>
+          <td><a href="/workflows/runs/{{ run.id }}">{{ run.id }}</a></td>
+          <td>{{ run.workflow_id }}</td>
+          <td><span class="badge {{ 'success' if run.status == 'succeeded' else ('danger' if run.status == 'failed' else 'warning') }}">{{ run.status }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">暂无流程运行</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>最近告警</h2><a class="btn small secondary" href="/alerts">全部</a></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>规则</th><th>事件</th><th>时间</th></tr></thead>
+        <tbody>
+        {% for alert in recent_alerts %}
+        <tr data-row>
+          <td>{{ alert.rule_name }}</td>
+          <td class="mono">{{ alert.event }}</td>
+          <td>{{ alert.created_at.strftime('%m-%d %H:%M') if alert.created_at else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">暂无告警</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>最近 Webhook 触发</h2><a class="btn small secondary" href="/webhooks">全部</a></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Webhook</th><th>时间</th></tr></thead>
+        <tbody>
+        {% for event in recent_webhooks %}
+        <tr data-row>
+          <td class="mono">{{ event.webhook_name }}</td>
+          <td>{{ event.created_at.strftime('%m-%d %H:%M') if event.created_at else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="empty">暂无触发</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

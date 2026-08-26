@@ -1,0 +1,19 @@
+{
+  "name": "welcome",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "新成员入群欢迎",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "text": {"type": "string", "default": "欢迎新成员！输入 /help 查看指令"}
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

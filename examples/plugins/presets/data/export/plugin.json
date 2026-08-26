@@ -1,0 +1,14 @@
+{
+  "name": "export",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "数据导出为 CSV/JSON",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["export.run"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

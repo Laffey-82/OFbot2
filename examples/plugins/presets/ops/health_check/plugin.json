@@ -1,0 +1,14 @@
+{
+  "name": "health_check",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "健康检查命令",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["health_check.view"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

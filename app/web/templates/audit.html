@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}审计 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>审计日志</h1>
+    <div class="sub">登录、配置、插件、任务等关键操作记录，可按条件筛选</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/audit">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="filter-actor">操作者</label>
+        <input id="filter-actor" name="actor" value="{{ filter_actor }}" placeholder="例如 admin">
+      </div>
+      <div class="form-row">
+        <label for="filter-action">动作</label>
+        <input id="filter-action" name="action" value="{{ filter_action }}" placeholder="例如 plugin.reloaded">
+      </div>
+      <div class="form-row">
+        <label for="filter-success">结果</label>
+        <select id="filter-success" name="success">
+          <option value="">全部</option>
+          <option value="1" {% if filter_success == '1' %}selected{% endif %}>成功</option>
+          <option value="0" {% if filter_success == '0' %}selected{% endif %}>失败</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="filter-start">开始日期</label>
+        <input id="filter-start" type="date" name="start" value="{{ filter_start }}">
+      </div>
+      <div class="form-row">
+        <label for="filter-end">结束日期</label>
+        <input id="filter-end" type="date" name="end" value="{{ filter_end }}">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit">应用筛选</button>
+      <a class="btn secondary" href="/audit">清除</a>
+      <button type="button" class="secondary" id="audit-export-btn">导出 CSV（最新 2000 条）</button>
+      <select id="audit-export-fmt" style="width:auto" aria-label="后台导出格式">
+        <option value="csv">CSV</option>
+        <option value="json">JSON</option>
+        <option value="excel">Excel</option>
+      </select>
+      <button type="button" class="secondary" id="audit-export-job-btn">后台导出全部</button>
+      {% if total_logs > 2000 %}
+      <span class="muted" style="align-self:center">当前筛选共 {{ total_logs }} 条，同步导出仅含最新 2000 条；「后台导出全部」不受此限制</span>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>审计记录（共 {{ total_logs }} 条）</h2>
+    <div class="search-box">
+      <input data-table-filter="audit-table" placeholder="搜索审计…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="audit-table" class="js-paginate">
+      <thead><tr><th>时间</th><th>动作</th><th>操作者</th><th>目标</th><th>结果</th></tr></thead>
+      <tbody>
+      {% for log in logs %}
+      <tr data-row>
+        <td>{{ log.timestamp }}</td>
+        <td class="mono">{{ log.action }}</td>
+        <td>{{ log.actor }}</td>
+        <td>{{ log.target }}</td>
+        <td><span class="badge {{ 'success' if log.success else 'danger' }}">{{ '成功' if log.success else '失败' }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">暂无审计记录</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if total_log_pages > 1 %}
+<div class="pagination">
+  <a class="btn small secondary {{ 'disabled' if page <= 1 }}" href="/audit?page={{ page - 1 }}&actor={{ filter_actor }}&action={{ filter_action }}&success={{ filter_success }}&start={{ filter_start }}&end={{ filter_end }}">上一页</a>
+  <span class="muted">第 {{ page }} / {{ total_log_pages }} 页</span>
+  <a class="btn small secondary {{ 'disabled' if page >= total_log_pages }}" href="/audit?page={{ page + 1 }}&actor={{ filter_actor }}&action={{ filter_action }}&success={{ filter_success }}&start={{ filter_start }}&end={{ filter_end }}">下一页</a>
+</div>
+{% endif %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    initExportButton("audit-export-btn", "/audit/export", {
+      actor: "filter-actor",
+      action: "filter-action",
+      success: "filter-success",
+      start: "filter-start",
+      end: "filter-end"
+    });
+  });
+  document
+    .getElementById("audit-export-job-btn")
+    .addEventListener("click", async () => {
+      const form = new FormData();
+      form.set("csrf_token", "{{ csrf_token }}");
+      form.set("fmt", document.getElementById("audit-export-fmt").value);
+      const actor = document.getElementById("filter-actor").value.trim();
+      const action = document.getElementById("filter-action").value.trim();
+      const success = document.getElementById("filter-success").value;
+      const start = document.getElementById("filter-start").value;
+      const end = document.getElementById("filter-end").value;
+      if (actor) form.set("actor", actor);
+      if (action) form.set("action", action);
+      if (success) form.set("success", success);
+      if (start) form.set("start", start);
+      if (end) form.set("end", end);
+      const button = document.getElementById("audit-export-job-btn");
+      button.disabled = true;
+      button.textContent = "创建任务…";
+      try {
+        const response = await fetch("/audit/export-job", {
+          method: "POST",
+          body: form,
+        });
+        if (response.redirected) {
+          window.location.href = response.url;
+          return;
+        }
+        toast("任务创建失败", "error");
+      } catch (err) {
+        toast("网络错误，请重试", "error");
+      } finally {
+        button.disabled = false;
+        button.textContent = "后台导出全部";
+      }
+    });
+</script>
+{% endblock %}

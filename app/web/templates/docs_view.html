@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ title }}</h1>
+    <div class="sub">渲染视图 · <a href="/docs/{{ title }}">查看纯文本</a></div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/docs/index">返回文档</a>
+  </div>
+</div>
+
+<div class="card docs-content">
+  {{ content | safe }}
+</div>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}备份 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>数据备份</h1>
+    <div class="sub">SQLite 数据库与配置文件备份 · 自动备份：<span class="badge {{ 'success' if auto_backup_enabled else 'warning' }}">{{ '启用（每 ' ~ backup_interval_hours ~ ' 小时）' if auto_backup_enabled else '关闭' }}</span>{% if last_auto_backup %} · 上次自动备份：{{ last_auto_backup }}{% endif %}</div>
+  </div>
+  <div class="page-actions">
+    <form method="post" action="/backups/auto-interval" class="js-ajax" style="display:flex;gap:6px;align-items:center">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="number" name="hours" min="1" max="168" value="{{ backup_interval_hours }}" style="width:90px" title="自动备份间隔（小时）">
+      <button type="submit" class="secondary">设间隔</button>
+    </form>
+    <form method="post" action="/backups/auto-toggle" class="js-ajax">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="secondary">{{ '关闭自动备份' if auto_backup_enabled else '启用自动备份' }}</button>
+    </form>
+    <form method="post" action="/backups/create" class="js-ajax">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">立即备份</button>
+    </form>
+    <a class="btn secondary" href="/backups/compare">对比备份</a>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">备份失败，请检查磁盘空间。</div>{% endif %}
+
+<div class="card">
+  <details>
+    <summary class="card-head" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+      <h2 style="margin:0">恢复指引（5 步）</h2>
+      <span class="badge info">建议恢复前先备份</span>
+    </summary>
+    <ol style="padding-left:20px;line-height:2">
+      <li><strong>系统自动创建回退点</strong>：点击「恢复」时，系统会先将当前 <code>config.yaml</code> 与数据库自动备份为回退点，恢复后随时可回到现在。</li>
+      <li><strong>选择目标备份</strong>：在下方备份列表中找到要恢复的备份，点击「恢复」。</li>
+      <li><strong>确认暂存文件</strong>：服务运行时部分文件可能被占用，系统会将它们「暂存」，稍后自动替换。</li>
+      <li><strong>重启服务生效</strong>：恢复完成后需重启 OFbot 2，新的数据库与配置才会加载。</li>
+      <li><strong>验证结果</strong>：重启后检查 <code>/health/live</code>、<code>/health/ready</code> 均为 200，并抽查关键数据是否正常。</li>
+    </ol>
+    <div class="alert warning" style="margin-top:8px">恢复会覆盖当前 <code>config.yaml</code> 与 <code>data/ofbot2.db</code>；系统会自动创建回退点，如需更稳妥可再手动「立即备份」一次。</div>
+  </details>
+</div>
+
+<div class="card">
+  <details>
+    <summary class="card-head" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+      <h2 style="margin:0">重启服务指引（Windows）</h2>
+      <span class="badge warning">恢复后必读</span>
+    </summary>
+    <ol style="padding-left:20px;line-height:2">
+      <li><strong>停止当前服务</strong>：关闭运行中的 <code>main.py</code> 窗口，或执行 <code>Get-NetTCPConnection -LocalPort 8080 | Stop-Process -Id $_.OwningProcess</code> 结束占用 8080 端口的进程。</li>
+      <li><strong>重新启动</strong>：在项目目录执行 <code>py main.py</code>（或运行 <code>start_bot.bat</code>）。</li>
+      <li><strong>验证健康</strong>：浏览器打开 <code>http://127.0.0.1:8080/health/ready</code>，返回 200 即正常。</li>
+      <li><strong>确认恢复结果</strong>：「连接中心」适配器恢复已连接，抽查关键数据是否与备份一致。</li>
+    </ol>
+    <div class="alert warning" style="margin-top:8px">若恢复时出现「已暂存待手动替换」，重启后系统会自动完成替换；如仍提示文件占用，请先彻底退出相关进程再重启。</div>
+  </details>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>备份列表</h2>
+    <div class="search-box">
+      <input data-table-filter="backups-table" placeholder="搜索备份…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="backups-table">
+      <thead><tr><th>名称</th><th>创建时间</th><th>大小</th><th>内容</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for item in backups %}
+      <tr data-row>
+        <td class="mono">{{ item.name }}</td>
+        <td>{{ item.created_at }}</td>
+        <td>{{ humanize_bytes(item.size) }}</td>
+        <td class="mono">
+          {% for file in item.files %}
+          <a href="/backups/{{ item.name }}/file?path={{ file }}">{{ file }}</a>{% if not loop.last %}, {% endif %}
+          {% else %}—{% endfor %}
+        </td>
+        <td>
+          <div class="actions">
+            <a class="btn small secondary" href="/backups/{{ item.name }}/download">下载</a>
+            <form method="post" action="/backups/{{ item.name }}/restore" class="js-ajax">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small" data-confirm="确定从备份 {{ item.name }} 恢复 config.yaml 与 ofbot2.db？请先确认当前数据已备份。">恢复</button>
+            </form>
+            <form method="post" action="/backups/{{ item.name }}/delete" class="js-ajax">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small danger" data-confirm="确定删除备份 {{ item.name }}？该操作不可恢复。">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">暂无备份</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

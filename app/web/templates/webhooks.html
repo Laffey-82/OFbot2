@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Webhook - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Webhook 管理</h1>
+    <div class="sub">外部系统通过 Webhook 触发自动化流程，可发送测试事件验证链路</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>注册 Webhook</h2></div>
+  <form method="post" action="/webhooks/add" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="webhook-name">Webhook 名称</label>
+        <input id="webhook-name" name="name" placeholder="例如：ci_finished" required>
+      </div>
+      <div class="form-row">
+        <label for="webhook-filter">事件过滤器（JSON，可选）</label>
+        <textarea id="webhook-filter" name="filter_json" rows="3" placeholder='{"event": "ci.finished"}'></textarea>
+        <span class="hint">载荷中所有列出的字段匹配后才触发流程，支持点号路径如 a.b.c</span>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">注册</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Webhook 列表</h2>
+    <div class="search-box">
+      <input data-table-filter="webhooks-table" placeholder="搜索 Webhook…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="webhooks-table">
+      <thead><tr><th>名称</th><th>接收地址</th><th>过滤器</th><th>最近触发</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for name in webhooks %}
+      <tr data-row>
+        <td><span class="badge info">{{ name }}</span></td>
+        <td class="mono">POST /webhook/{{ name }} <button type="button" class="small ghost" data-copy="/webhook/{{ name }}">复制</button></td>
+        <td>{% if filters.get(name) %}<span class="mono">{{ filters[name] | tojson }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{{ last_triggered.get(name, '—') }}</td>
+        <td>
+          <div class="actions">
+            <button type="button" class="small secondary" data-webhook-test="{{ name }}">发送测试事件</button>
+            {% if history.get(name) %}
+            <a class="btn small secondary" href="/webhooks/{{ name }}/history/export">导出历史</a>
+            <a class="btn small secondary" href="/webhooks/{{ name }}/history">查看全部</a>
+            {% endif %}
+            <details class="wh-history">
+              <summary class="small secondary" style="padding:4px 10px">历史 ({{ history.get(name, []) | length }})</summary>
+              <div class="wh-history-list">
+                {% for entry in history.get(name, []) %}
+                <div class="wh-history-item">
+                  <span class="mono">{{ entry.time }}</span>
+                  <pre class="code-block">{{ entry.payload | tojson(2) }}</pre>
+                </div>
+                {% else %}
+                <p class="muted">暂无触发记录</p>
+                {% endfor %}
+              </div>
+            </details>
+            <form method="post" action="/webhooks/remove" class="js-ajax">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="name" value="{{ name }}">
+              <button class="small danger" data-confirm="确定删除 Webhook {{ name }}？">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">暂无 Webhook</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<dialog id="webhook-test-dialog" class="dialog">
+  <form id="webhook-test-form">
+    <div class="dialog-head">
+      <h2>发送测试事件</h2>
+      <button type="button" class="dialog-close" data-close-dialog aria-label="关闭">&times;</button>
+    </div>
+    <div class="form-row">
+      <label>目标：<span class="mono" id="webhook-test-target"></span></label>
+    </div>
+    <div class="form-row">
+      <label for="webhook-test-payload">载荷（JSON）</label>
+      <textarea id="webhook-test-payload" rows="6" required>{"test": true, "message": "hello"}</textarea>
+    </div>
+    <div class="form-row">
+      <label for="webhook-test-preset">快速模板</label>
+      <select id="webhook-test-preset" style="width:auto">
+        <option value="">选择模板…</option>
+        <option value='{"event": "ci.finished", "repo": "my-app", "branch": "main", "status": "success"}'>CI 构建完成</option>
+        <option value='{"event": "alert.triggered", "level": "warning", "message": "CPU 使用率超过 90%"}'>告警触发</option>
+        <option value='{"event": "cron.ran", "job": "daily_report", "rows": 42}'>定时任务运行</option>
+        <option value='{"test": true, "message": "hello"}'>自定义默认</option>
+      </select>
+    </div>
+    <div class="form-actions">
+      <button type="submit">发送</button>
+      <button type="button" class="secondary" data-close-dialog>取消</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  const whHistory = {{ history | tojson }};
+  const whDialog = document.getElementById("webhook-test-dialog");
+  let whTarget = "";
+
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-dialog]")) {
+      whDialog.close();
+      return;
+    }
+    const btn = event.target.closest("[data-webhook-test]");
+    if (!btn) return;
+    whTarget = btn.dataset.webhookTest;
+    document.getElementById("webhook-test-target").textContent = "POST /webhook/" + whTarget;
+    const entries = whHistory[whTarget] || [];
+    if (entries.length) {
+      document.getElementById("webhook-test-payload").value = JSON.stringify(
+        entries[0].payload,
+        null,
+        2
+      );
+    } else {
+      document.getElementById("webhook-test-payload").value =
+        '{"test": true, "message": "hello"}';
+    }
+    whDialog.showModal();
+  });
+
+  document.getElementById("webhook-test-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    let payload;
+    try {
+      payload = JSON.parse(document.getElementById("webhook-test-payload").value);
+    } catch (e) {
+      toast("载荷 JSON 无效", "error");
+      return;
+    }
+    const submitBtn = event.target.querySelector("button[type='submit']");
+    submitBtn.disabled = true;
+    const original = submitBtn.textContent;
+    submitBtn.textContent = "发送中…";
+    try {
+      const response = await fetch("/webhook/" + whTarget, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        toast("测试事件已发送", "success");
+        whDialog.close();
+        setTimeout(() => window.location.reload(), 600);
+      } else {
+        toast("发送失败：" + response.status, "error");
+      }
+    } catch (err) {
+      toast("网络错误", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = original;
+    }
+  });
+  document.getElementById("webhook-test-preset").addEventListener("change", (event) => {
+    if (event.target.value) {
+      document.getElementById("webhook-test-payload").value = JSON.stringify(JSON.parse(event.target.value), null, 2);
+    }
+  });
+</script>
+{% endblock %}

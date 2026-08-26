@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}自愈中心 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>自愈中心</h1>
+    <div class="sub">自动停用与恢复的统一视图：当前状态、近 7 天事件与恢复率</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/executions">执行历史</a>
+    <a class="btn secondary" href="/alerts">告警历史</a>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value">{{ stats.disabled_tasks }}</div>
+    <div class="stat-label">自动停用任务</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ stats.disabled_workflows }}</div>
+    <div class="stat-label">自动停用流程</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ stats.disabled_events }}</div>
+    <div class="stat-label">近 7 天停用事件</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ stats.reenabled_events }}</div>
+    <div class="stat-label">近 7 天恢复事件</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ stats.recovery_rate }}%</div>
+    <div class="stat-label">恢复率（近 7 天）</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ stats.avg_downtime_text }}</div>
+    <div class="stat-label">平均停用时长（{{ stats.closed_cycles }} 个已恢复周期）</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>当前自动停用实体</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>类型</th><th>名称</th><th>停用原因</th><th>停用时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for task in disabled_tasks %}
+      <tr data-row>
+        <td><span class="badge">定时任务</span></td>
+        <td class="mono">{{ task.name }}（{{ task.task_id }}）</td>
+        <td>{{ task.params.get('auto_disabled_reason', '—') }}</td>
+        <td>{{ task.params.get('auto_disabled', '—') }}</td>
+        <td>
+          <form method="post" action="/tasks/{{ task.task_id }}/toggle" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small secondary">重新启用</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% for workflow in disabled_workflows %}
+      <tr data-row>
+        <td><span class="badge info">流程</span></td>
+        <td class="mono">{{ workflow.name }}（#{{ workflow.id }}）</td>
+        <td>{{ workflow.definition.get('auto_disabled', {}).get('reason', '—') }}</td>
+        <td>{{ workflow.definition.get('auto_disabled', {}).get('at', '—') }}</td>
+        <td>
+          <form method="post" action="/workflows/{{ workflow.id }}/enable" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small secondary">重新启用</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not disabled_tasks and not disabled_workflows %}
+      <tr><td colspan="5" class="empty">当前没有自动停用的实体</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>近 7 天自愈事件</h2>
+    <div class="search-box">
+      <input data-table-filter="self-heal-events" placeholder="搜索事件…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="self-heal-events">
+      <thead><tr><th>时间</th><th>事件</th><th>详情</th></tr></thead>
+      <tbody>
+      {% for event in events %}
+      <tr data-row>
+        <td>{{ event.created_at }}</td>
+        <td><span class="badge {{ 'success' if 'reenabled' in event.event else 'danger' }}">{{ event.event }}</span></td>
+        <td>{{ event.detail }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="empty">近 7 天暂无自愈事件</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}命令速查 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>命令速查</h1>
+    <div class="sub">框架与插件注册的全部机器人命令，共 {{ rows | length }} 条</div>
+  </div>
+  <div class="page-actions">
+    <button type="button" class="btn secondary" id="commands-export-btn">导出 CSV</button>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/commands">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="command-q">搜索</label>
+        <input id="command-q" name="q" value="{{ q }}" placeholder="命令名 / 别名 / 说明 / 权限">
+      </div>
+      <div class="form-row">
+        <label for="command-plugin">插件</label>
+        <select id="command-plugin" name="plugin">
+          <option value="">全部插件</option>
+          {% for name in plugin_names %}
+          <option value="{{ name }}" {% if plugin == name %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit">筛选</button>
+      <a class="btn secondary" href="/commands">清除</a>
+      <span class="muted" style="align-self:center">提示：消息中先输入命令前缀（如 {{ command_prefix }}），再输入命令名即可触发</span>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>已注册命令</h2>
+    <div class="search-box">
+      <input data-table-filter="commands-table" placeholder="本地过滤…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="commands-table" class="js-paginate">
+      <thead>
+        <tr>
+          <th>命令</th>
+          <th>别名</th>
+          <th>说明</th>
+          <th>权限</th>
+          <th>冷却</th>
+          <th>限流</th>
+          <th>插件</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+      <tr data-row>
+        <td><span class="mono badge info">{{ row.name }}</span></td>
+        <td>
+          {% if row.aliases %}
+          {% for alias in row.aliases %}<span class="badge">{{ alias }}</span>{% endfor %}
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td>{{ row.description or '（未填写说明）' }}</td>
+        <td title="{{ row.permission_desc }}">
+          <span class="mono">{{ row.permission }}</span>
+          {% if row.permission_desc %}<div class="muted" style="font-size:12px">{{ row.permission_desc }}</div>{% endif %}
+        </td>
+        <td>{{ row.cooldown or 0 }}s</td>
+        <td>{{ row.rate_limit or '默认' }}</td>
+        <td><span class="badge">{{ row.plugin }}</span></td>
+        <td>
+          <a class="small ghost" href="/stats?command={{ row.name | urlencode }}" title="查看统计趋势">统计</a>
+          <button type="button" class="small ghost" data-copy="{{ command_prefix }}{{ row.name }}">复制</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="empty">没有匹配的命令</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    initExportButton("commands-export-btn", "/commands/export", {
+      q: "command-q",
+      plugin: "command-plugin"
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}账户 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>修改密码</h1>
+    <div class="sub">定期更换密码可提高后台安全性</div>
+  </div>
+</div>
+
+{% if error %}
+<div class="alert error">
+  {% if error == "2" %}当前密码不正确。{% elif error == "1" %}修改失败，新密码至少 6 位。{% else %}{{ error }}{% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="max-width:460px">
+  <form method="post" action="/account">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-row">
+      <label for="current-password">当前密码</label>
+      <input id="current-password" type="password" name="current_password" autocomplete="current-password" required>
+    </div>
+    <div class="form-row">
+      <label for="new-password">新密码（至少 6 位）</label>
+      <input id="new-password" type="password" name="new_password" minlength="6" autocomplete="new-password" required>
+    </div>
+    <div class="form-actions"><button type="submit">保存</button></div>
+  </form>
+</div>
+
+<div class="card" style="max-width:460px">
+  <div class="card-head"><h2>后台快捷键</h2></div>
+  <table>
+    <tbody>
+      <tr><td><kbd>/</kbd></td><td>聚焦当前页搜索框</td></tr>
+      <tr><td><kbd>T</kbd></td><td>切换暗色 / 亮色主题</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>关闭弹窗 / 清除搜索</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% if user.can_manage_users %}
+<div class="card">
+  <div class="card-head"><h2>后台账户管理</h2></div>
+  <form method="post" action="/account/accounts/add" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-row">
+      <label for="acc-username">用户名（至少 3 位）</label>
+      <input id="acc-username" name="username" required>
+    </div>
+    <div class="form-row">
+      <label for="acc-password">密码（至少 6 位）</label>
+      <input id="acc-password" type="password" name="password" minlength="6" required>
+    </div>
+    <div class="form-row">
+      <label for="acc-level">权限级别</label>
+      <select id="acc-level" name="permission_level">
+        <option value="0">普通（仅查看）</option>
+        <option value="1">管理员（可管理）</option>
+        <option value="2">超级管理员</option>
+      </select>
+    </div>
+    <div class="form-actions"><button type="submit">添加账户</button></div>
+  </form>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>用户名</th><th>级别</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for account in accounts %}
+      <tr data-row>
+        <td>{{ account.username }}</td>
+        <td>{{ account.permission_level }}</td>
+        <td>
+          {% if account.username != user.username %}
+          <form method="post" action="/account/accounts/remove" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="account_id" value="{{ account.id }}">
+            <button class="small danger" data-confirm="确定删除账户 {{ account.username }}？">删除</button>
+          </form>
+          {% else %}
+          <span class="badge">当前账户</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="empty">暂无其他后台账户</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block title %}导出中心 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>导出中心</h1>
+    <div class="sub">从通用记录或审计日志生成导出文件，插件与流程也可生成</div>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">导出失败，请检查记录类型或格式。</div>{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>创建导出</h2></div>
+  <form method="post" action="/exports/create" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="export-type">记录类型</label>
+        <select id="export-type" name="record_type" required>
+          {% for type in types %}<option value="{{ type.name }}">{{ type.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="export-format">格式</label>
+        <select id="export-format" name="fmt">
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+          <option value="excel">Excel (xlsx)</option>
+          <option value="docx">Word (docx)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="export-retries">失败重试次数（-1 使用全局默认）</label>
+        <input id="export-retries" name="retries" type="number" value="-1" min="-1" max="10">
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">导出</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>导出任务</h2>
+    <div style="display:flex;gap:10px;align-items:center">
+      <select id="jobs-actor-filter" style="max-width:140px">
+        <option value="">全部创建者</option>
+        {% set actors = jobs | map(attribute='actor') | select | list | unique | list %}
+        {% for actor in actors %}<option value="{{ actor }}">{{ actor }}</option>{% endfor %}
+      </select>
+      <form method="post" action="/exports/jobs/retry-failed" class="js-ajax">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="small secondary">重试全部失败任务</button>
+      </form>
+      <form method="post" action="/exports/jobs/clear" class="js-ajax">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label class="switch-inline"><input type="checkbox" name="keep_failed" value="on"> 保留失败</label>
+        <button type="submit" class="small secondary">清除已完成任务</button>
+      </form>
+      <span class="muted" style="font-size:12.5px">每 2 秒自动刷新</span>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="export-jobs-table">
+      <thead><tr><th>ID</th><th>记录类型</th><th>格式</th><th>状态</th><th>创建者</th><th>消息</th><th>文件</th></tr></thead>
+      <tbody>
+      {% for job in jobs %}
+      <tr data-row data-actor="{{ job.actor or '' }}">
+        <td class="mono">{{ job.id }}</td>
+        <td>
+          {% if job.record_type == "audit" %}
+          <a href="/audit">audit</a>
+          {% elif job.record_type %}
+          <a href="/records?record_type={{ job.record_type | urlencode }}">{{ job.record_type }}</a>
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ job.fmt }}</td>
+        <td>
+          {% if job.status == 'done' %}<span class="badge success">完成</span>
+          {% elif job.status == 'failed' %}<span class="badge danger">失败</span>
+          {% elif job.status == 'running' %}<span class="badge warning">进行中</span>
+          {% else %}<span class="badge">排队中</span>{% endif %}
+        </td>
+        <td>{{ job.actor or '—' }}</td>
+        <td>{{ job.message }}</td>
+        <td>
+          {% if job.filename %}<a class="btn small secondary" href="/exports/{{ job.filename }}/download">下载</a>
+          {% elif job.status == 'failed' %}<button type="button" class="small" data-export-retry="{{ job.id }}" data-csrf="{{ csrf_token }}">重试</button>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">暂无导出任务</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>导出文件</h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <form method="post" action="/exports/bulk-download" id="exports-bulk-download-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="all_files" value="off">
+        <button type="submit" class="small secondary">打包下载选中</button>
+      </form>
+      <form method="post" action="/exports/bulk-delete" id="exports-bulk-delete-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="small danger" data-confirm="确定删除选中的导出文件？">批量删除选中</button>
+      </form>
+      <form method="post" action="/exports/bulk-download" class="js-ajax">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="all_files" value="on">
+        <button type="submit" class="small secondary">下载全部</button>
+      </form>
+      <div class="search-box">
+        <input data-table-filter="exports-table" placeholder="搜索文件…">
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="exports-table">
+      <thead><tr><th><input type="checkbox" id="exports-select-all" aria-label="全选"></th><th>文件</th><th>大小</th><th>修改时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for file in files %}
+      <tr data-row>
+        <td><input type="checkbox" class="exports-check" name="names" value="{{ file.name }}"></td>
+        <td><a href="/exports/{{ file.name }}/download">{{ file.name }}</a></td>
+        <td>{{ file.size }}</td>
+        <td>{{ file.modified }}</td>
+        <td>
+          <form method="post" action="/exports/{{ file.name }}/delete" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small danger" data-confirm="确定删除导出文件 {{ file.name }}？">删除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">暂无导出文件</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+  const exportCsrf = "{{ csrf_token }}";
+  async function refreshExportJobs() {
+    const table = document.getElementById("export-jobs-table");
+    if (!table) return;
+    try {
+      const actor = document.getElementById("jobs-actor-filter").value;
+      const url = actor
+        ? "/exports/jobs?actor=" + encodeURIComponent(actor)
+        : "/exports/jobs";
+      const response = await fetch(url);
+      const data = await response.json();
+      const jobs = data.jobs || [];
+      const tbody = table.querySelector("tbody");
+      tbody.innerHTML = "";
+      if (!jobs.length) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 7;
+        td.className = "empty";
+        td.textContent = "暂无导出任务";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+      jobs.forEach((job) => {
+        const tr = document.createElement("tr");
+        tr.dataset.row = "";
+        tr.dataset.actor = job.actor || "";
+        const badge =
+          job.status === "done"
+            ? '<span class="badge success">完成</span>'
+            : job.status === "failed"
+              ? '<span class="badge danger">失败</span>'
+              : job.status === "running"
+                ? '<span class="badge warning">进行中</span>'
+                : '<span class="badge">排队中</span>';
+        const download =
+          job.filename
+            ? `<a class="btn small secondary" href="/exports/${job.filename}/download">下载</a>`
+            : job.status === "failed"
+              ? `<button type="button" class="small" data-export-retry="${job.id}" data-csrf="${exportCsrf}">重试</button>`
+              : "—";
+        tr.innerHTML =
+          `<td class="mono">${job.id}</td>` +
+          `<td>${job.record_type === "audit" ? '<a href="/audit">audit</a>' : (job.record_type ? '<a href="/records?record_type=' + encodeURIComponent(job.record_type) + '">' + job.record_type + '</a>' : "—")}</td>` +
+          `<td>${job.fmt}</td>` +
+          `<td>${badge}</td>` +
+          `<td>${job.actor || "—"}</td>` +
+          `<td>${job.message || ""}</td>` +
+          `<td>${download}</td>`;
+        tbody.appendChild(tr);
+      });
+    } catch (err) {}
+  }
+  document.getElementById("jobs-actor-filter").addEventListener("change", refreshExportJobs);
+  document.addEventListener("click", async (event) => {
+    const btn = event.target.closest("[data-export-retry]");
+    if (!btn) return;
+    const body = new FormData();
+    body.append("csrf_token", btn.dataset.csrf);
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "重试中…";
+    try {
+      const response = await fetch(`/exports/jobs/${btn.dataset.exportRetry}/retry`, { method: "POST", body });
+      if (response.redirected) window.location.href = response.url;
+      else toast(response.ok ? "已重新排队" : "重试失败", response.ok ? "success" : "error");
+    } catch (err) {
+      toast("网络错误", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
+  refreshExportJobs();
+  setInterval(refreshExportJobs, 2000);
+
+  document.addEventListener("DOMContentLoaded", () => {
+    initSelectAll("exports-select-all", "exports-check");
+  });
+  const exportsDownloadForm = document.getElementById(
+    "exports-bulk-download-form"
+  );
+  if (exportsDownloadForm) {
+    exportsDownloadForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const names = collectChecked("exports-check");
+      if (!names.length) {
+        toast("请先选择文件", "error");
+        return;
+      }
+      const body = new FormData();
+      body.set("csrf_token", exportCsrf);
+      names.forEach((name) => body.append("names", name));
+      const button = exportsDownloadForm.querySelector("button");
+      button.disabled = true;
+      const original = button.textContent;
+      button.textContent = "打包中…";
+      try {
+        const response = await fetch("/exports/bulk-download", {
+          method: "POST",
+          body,
+        });
+        if (!response.ok) {
+          toast("打包失败", "error");
+          return;
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "exports_bulk.zip";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        toast("网络错误，请重试", "error");
+      } finally {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    });
+  }
+  const exportsDeleteForm = document.getElementById(
+    "exports-bulk-delete-form"
+  );
+  if (exportsDeleteForm) {
+    exportsDeleteForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const names = collectChecked("exports-check");
+      if (!names.length) {
+        toast("请先选择文件", "error");
+        return;
+      }
+      const body = new FormData();
+      body.set("csrf_token", exportCsrf);
+      names.forEach((name) => body.append("names", name));
+      const button = exportsDeleteForm.querySelector("button");
+      button.disabled = true;
+      const original = button.textContent;
+      button.textContent = "删除中…";
+      try {
+        const response = await fetch("/exports/bulk-delete", {
+          method: "POST",
+          body,
+        });
+        if (response.redirected) {
+          window.location.href = response.url;
+          return;
+        }
+        toast(response.ok ? "已删除" : "删除失败", response.ok ? "success" : "error");
+      } catch (err) {
+        toast("网络错误，请重试", "error");
+      } finally {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    });
+  }
+</script>
+{% endblock %}

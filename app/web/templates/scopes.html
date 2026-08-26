@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}监听环境 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>监听环境</h1>
+    <div class="sub">每个群 / 私聊独立控制功能开关、权限、黑名单与账号绑定</div>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">{{ request.query_params.get("error") }}</div>{% endif %}
+{% if request.query_params.get("msg") %}<div class="alert success">{{ request.query_params.get("msg") }}</div>{% endif %}
+
+<div class="card">
+  <div class="card-head">
+    <h2>功能开关矩阵</h2>
+    <div class="search-box">
+      <input data-table-filter="feature-matrix" placeholder="搜索功能…">
+    </div>
+  </div>
+  {% if features %}
+  <div class="table-wrap">
+    <table id="feature-matrix">
+      <thead>
+        <tr>
+          <th>监听环境</th>
+          {% for feature in features %}
+          <th title="{{ feature.description }}">
+            {{ feature.label }}<br>
+            <span class="badge">{{ feature.plugin }}</span>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for scope in scopes %}
+      <tr data-row>
+        <td>
+          <strong>{{ scope.key }}</strong>
+          {% if scope.key == global_group %}<span class="badge">全部群默认</span>{% endif %}
+          {% if scope.key == private_scope %}<span class="badge">私聊</span>{% endif %}
+        </td>
+        {% for feature in features %}
+        <td>
+          {% set current = scope.entry.features.get(feature.key) %}
+          {% if current is none %}{% set shown = 'default' %}
+          {% elif current %}{% set shown = 'on' %}
+          {% else %}{% set shown = 'off' %}{% endif %}
+          <form method="post" action="/scopes/{{ scope.key }}/feature" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="key" value="{{ feature.key }}">
+            <select name="value" class="small-select"
+              data-default="{{ 'default' if feature.enable_on_default else 'off' }}">
+              <option value="default" {{ 'selected' if shown == 'default' }}>跟随默认</option>
+              <option value="on" {{ 'selected' if shown == 'on' }}>开启</option>
+              <option value="off" {{ 'selected' if shown == 'off' }}>关闭</option>
+            </select>
+            <button class="small secondary" title="应用">✓</button>
+          </form>
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-foot">
+    <span>批量设置：</span>
+    {% for feature in features %}
+    <span class="bulk-group">
+      <strong>{{ feature.label }}</strong>
+      {% for value, label in [('on', '全开'), ('off', '全关'), ('default', '恢复默认')] %}
+      <form method="post" action="/scopes/features/bulk" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="key" value="{{ feature.key }}">
+        <input type="hidden" name="value" value="{{ value }}">
+        <button class="small secondary" data-confirm="确定对所有群执行「{{ label }}」？">{{ label }}</button>
+      </form>
+      {% endfor %}
+    </span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">暂无插件功能。加载插件后，这里会出现可逐群控制的功能开关。</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>添加监听环境</h2></div>
+  <form method="post" action="/scopes/add" class="form-row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>群号</label>
+    <input name="group_id" placeholder="例如 123456" required>
+    <button type="submit">添加群</button>
+  </form>
+</div>
+
+{% for scope in scopes %}
+<div class="card">
+  <div class="card-head">
+    <h2>{{ scope.key }}</h2>
+    {% if scope.key != global_group and scope.key != private_scope %}
+    <form method="post" action="/scopes/{{ scope.key }}/remove" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="small danger" data-confirm="删除该监听环境及全部覆盖设置？">删除</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="grid-2">
+    <div>
+      <h3>账号绑定（出站消息）</h3>
+      <form method="post" action="/scopes/{{ scope.key }}/connection" class="form-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <select name="connection_id">
+          <option value="">自动（第一个可用连接）</option>
+          {% for conn in connections %}
+          <option value="{{ conn.id }}" {{ 'selected' if scope.entry.connection == conn.id }}>
+            {{ conn.id }}（{{ conn.protocol }} {{ '开' if conn.enabled else '关' }}）
+          </option>
+          {% endfor %}
+        </select>
+        <button type="submit">保存</button>
+      </form>
+    </div>
+    <div>
+      <h3>功能未开启时静默</h3>
+      <form method="post" action="/scopes/{{ scope.key }}/silent" class="form-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <select name="value">
+          <option value="off" {{ 'selected' if not scope.entry.silent_deny }}>回复友好提示</option>
+          <option value="on" {{ 'selected' if scope.entry.silent_deny }}>静默忽略</option>
+        </select>
+        <button type="submit">保存</button>
+      </form>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div>
+      <h3>黑名单（该环境内禁用命令）</h3>
+      <form method="post" action="/scopes/{{ scope.key }}/blocked/add" class="form-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input name="user_ids" placeholder="每行一个 QQ，支持逗号分隔" required>
+        <button type="submit">拉黑</button>
+      </form>
+      {% if scope.entry.blocked_users %}
+      <table>
+        <tbody>
+        {% for user_id in scope.entry.blocked_users %}
+        <tr>
+          <td class="mono">{{ user_id }}</td>
+          <td>
+            <form method="post" action="/scopes/{{ scope.key }}/blocked/remove" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="user_id" value="{{ user_id }}">
+              <button class="small secondary">解封</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty">暂无黑名单</div>
+      {% endif %}
+    </div>
+    <div>
+      <h3>权限覆盖</h3>
+      <form method="post" action="/scopes/{{ scope.key }}/permission" class="form-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input name="permission" placeholder="权限点，如 system.restart" required>
+        <select name="value">
+          <option value="allow">允许</option>
+          <option value="deny">拒绝</option>
+          <option value="default">跟随全局</option>
+        </select>
+        <button type="submit">保存</button>
+      </form>
+      {% if scope.entry.permissions %}
+      <table>
+        <tbody>
+        {% for permission, allowed in scope.entry.permissions.items() %}
+        <tr>
+          <td class="mono">{{ permission }}</td>
+          <td><span class="badge {{ 'success' if allowed else 'danger' }}">{{ '允许' if allowed else '拒绝' }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty">暂无权限覆盖，全部跟随全局权限</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

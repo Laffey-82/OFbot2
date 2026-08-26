@@ -1,0 +1,14 @@
+{
+  "name": "reminder",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "延迟提醒",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["reminder.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

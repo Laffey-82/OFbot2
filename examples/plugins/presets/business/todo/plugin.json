@@ -1,0 +1,14 @@
+{
+  "name": "todo",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "个人待办清单",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["todo.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

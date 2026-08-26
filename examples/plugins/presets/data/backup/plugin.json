@@ -1,0 +1,14 @@
+{
+  "name": "backup",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "手动创建数据备份",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["backup.run"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

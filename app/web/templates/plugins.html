@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}插件 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>插件管理</h1>
+    <div class="sub">已加载插件列表，支持重载、卸载与配置</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/docs/dev">开发指南</a>
+  </div>
+</div>
+
+{% if request.query_params.get("error") == "2" %}
+<div class="alert error">安装失败：插件包不合法（清单缺失、api_version 不支持或插件已存在）。</div>
+{% elif request.query_params.get("error") %}
+<div class="alert error">{{ request.query_params.get("error") }}</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head">
+    <h2>安装插件包（zip）</h2>
+    <span class="badge warning">代码执行</span>
+  </div>
+  <form method="post" action="/plugins/install" enctype="multipart/form-data" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="plugin-zip">选择 plugin.zip</label>
+        <input id="plugin-zip" type="file" name="file" accept=".zip,application/zip" required>
+        <span class="hint">安装即执行插件代码，请确认 zip 来源可信；清单将校验 name / api_version / version。</span>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">安装插件</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>插件列表</h2>
+    <div class="search-box">
+      <input data-table-filter="plugins-table" placeholder="搜索插件…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="plugins-table">
+      <thead><tr><th>名称</th><th>版本</th><th>状态</th><th>命令</th><th>功能</th><th>说明</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for plugin in plugins %}
+      <tr data-row>
+        <td>{{ plugin.name }}</td>
+        <td class="mono">{{ plugin.version }}</td>
+        <td>
+          {% if plugin.state == "loaded" %}<span class="badge success">已加载</span>
+          {% elif plugin.state == "unloaded" %}<span class="badge">未加载</span>
+          {% elif plugin.state == "error" %}<span class="badge danger">错误</span>
+          {% else %}<span class="badge warning">{{ plugin.state }}</span>{% endif %}
+          {% if plugin.error %}
+          <div class="muted" style="font-size:12px;color:var(--danger);margin-top:2px" title="{{ plugin.error }}">{{ plugin.error[:120] }}{% if plugin.error|length > 120 %}…{% endif %}</div>
+          {% endif %}
+        </td>
+        <td>
+          {% set count = command_counts.get(plugin.name, 0) %}
+          {% if count %}
+          <a href="/commands?plugin={{ plugin.name }}">{{ count }} 个</a>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td>
+          {% for feature in plugin.get('features', []) %}
+          <span class="badge" title="{{ feature.description }} · 命令 {{ feature.commands }} / 任务 {{ feature.tasks }} / 监听 {{ feature.listeners }}">
+            {{ feature.label }}{{ '（默认开）' if feature.enable_on_default else '（默认关）' }}
+          </span>
+          {% else %}<span class="muted">—</span>{% endfor %}
+        </td>
+        <td>{{ plugin.description or '—' }}</td>
+        <td>
+          <div class="actions">
+            {% if plugin.state == "unloaded" %}
+            <form method="post" action="/plugins/{{ plugin.name }}/load" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small">启用</button>
+            </form>
+            {% else %}
+            <form method="post" action="/plugins/{{ plugin.name }}/reload" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small secondary">重载</button>
+            </form>
+            <form method="post" action="/plugins/{{ plugin.name }}/unload" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small danger" data-confirm="确定卸载插件 {{ plugin.name }}？">卸载</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">暂无已加载插件</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>新建插件</h2>
+    <span class="muted" style="font-size:12.5px">从官方示例生成包式插件，创建后自动启用</span>
+  </div>
+  <form method="post" action="/plugins/new" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="new-plugin-name">插件名（小写字母开头，仅小写字母 / 数字 / 下划线）</label>
+        <input id="new-plugin-name" name="name" pattern="[a-z][a-z0-9_]*" placeholder="例如：my_todo" required>
+      </div>
+      <div class="form-row">
+        <label for="new-plugin-template">示例模板</label>
+        <select id="new-plugin-template" name="template" required>
+          {% for tpl in templates %}
+          <option value="{{ tpl.name }}">{{ tpl.name }}（{{ tpl.category }}）— {{ tpl.description }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">生成插件</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>插件配置</h2>
+    <span class="muted" style="font-size:12.5px">根据 config_schema 生成，保存后自动重载插件</span>
+  </div>
+  {% set configurable = plugins | selectattr('config_schema') | list %}
+  {% if configurable %}
+  {% for plugin in configurable %}
+  <details class="plugin-config">
+    <summary>{{ plugin.name }} <span class="muted mono">v{{ plugin.version }}</span></summary>
+    <form method="post" action="/plugins/{{ plugin.name }}/config" class="js-ajax">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-row">
+        <label class="switch-inline">
+          <input type="checkbox" class="plugin-form-mode" checked> 字段表单
+        </label>
+      </div>
+      <div class="plugin-fields form-grid" data-schema='{{ plugin.config_schema | tojson }}' data-config='{{ plugin.config | tojson }}'></div>
+      <div class="form-row">
+        <label for="cfg-{{ plugin.name }}">配置 JSON（字段：{{ plugin.config_schema.get('properties', {}).keys() | join(', ') }}）</label>
+        <textarea id="cfg-{{ plugin.name }}" class="plugin-json" name="config_json" rows="6">{{ plugin.config | tojson(2) }}</textarea>
+      </div>
+      <div class="form-actions">
+        <button type="submit">保存并重载</button>
+      </div>
+    </form>
+  </details>
+  {% endfor %}
+  {% else %}
+  <div class="empty">暂无插件声明 config_schema</div>
+  {% endif %}
+</div>
+
+<script>
+  function renderPluginFields(container) {
+    let schema, config;
+    try {
+      schema = JSON.parse(container.dataset.schema || "{}");
+      config = JSON.parse(container.dataset.config || "{}");
+    } catch (e) {
+      return;
+    }
+    container.innerHTML = "";
+    const properties = (schema.properties || {});
+    Object.entries(properties).forEach(([key, def]) => {
+      const wrap = document.createElement("div");
+      wrap.className = "form-row";
+      const label = document.createElement("label");
+      label.htmlFor = "plugin-field-" + key;
+      label.textContent = key + "（" + (def.type || "any") + "）";
+      let input;
+      const value = config[key] !== undefined ? config[key] : (def.default !== undefined ? def.default : "");
+      if (def.enum && Array.isArray(def.enum)) {
+        input = document.createElement("select");
+        def.enum.forEach((opt) => {
+          const option = document.createElement("option");
+          option.value = String(opt);
+          option.textContent = String(opt);
+          input.appendChild(option);
+        });
+        input.value = String(value);
+      } else if (def.type === "boolean") {
+        input = document.createElement("select");
+        input.innerHTML = '<option value="true">true</option><option value="false">false</option>';
+        if (value === false) input.value = "false";
+      } else if (def.type === "number" || def.type === "integer") {
+        input = document.createElement("input");
+        input.type = "number";
+        input.step = "any";
+        if (value !== "" && value !== null && value !== undefined) input.value = value;
+      } else if (def.type === "array" || def.type === "object") {
+        input = document.createElement("textarea");
+        input.rows = 3;
+        input.value = JSON.stringify(value, null, 2);
+        input.classList.add("mono");
+      } else {
+        input = document.createElement("input");
+        if (value !== "" && value !== null && value !== undefined) input.value = value;
+      }
+      input.id = "plugin-field-" + key;
+      input.dataset.fieldName = key;
+      input.dataset.fieldType = def.type || "any";
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      if (def.description) {
+        const hint = document.createElement("span");
+        hint.className = "hint";
+        hint.textContent = def.description;
+        wrap.appendChild(hint);
+      }
+      container.appendChild(wrap);
+    });
+  }
+
+  function collectPluginJson(container) {
+    const data = {};
+    container.querySelectorAll("[data-field-name]").forEach((el) => {
+      const key = el.dataset.fieldName;
+      const type = el.dataset.fieldType;
+      let value = el.value;
+      if (type === "number" || type === "integer") value = value === "" ? null : Number(value);
+      else if (type === "boolean") value = value === "true";
+      else if (type === "array" || type === "object") {
+        try { value = JSON.parse(value); } catch (e) { value = null; }
+      }
+      data[key] = value;
+    });
+    return JSON.stringify(data, null, 2);
+  }
+
+  document.querySelectorAll(".plugin-config").forEach((details) => {
+    const container = details.querySelector(".plugin-fields");
+    if (!container) return;
+    const jsonArea = details.querySelector(".plugin-json");
+    const modeToggle = details.querySelector(".plugin-form-mode");
+    renderPluginFields(container);
+    container.addEventListener("input", () => {
+      if (modeToggle.checked) jsonArea.value = collectPluginJson(container);
+    });
+    modeToggle.addEventListener("change", () => {
+      const showForm = modeToggle.checked;
+      container.style.display = showForm ? "" : "none";
+      if (showForm) jsonArea.value = collectPluginJson(container);
+    });
+  });
+</script>
+{% endblock %}

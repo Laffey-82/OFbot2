@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}能力中心 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>能力中心</h1>
+    <div class="sub">框架与插件可用的能力注册表</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>已注册能力</h2>
+    <div class="search-box">
+      <input data-table-filter="capabilities-table" placeholder="搜索能力…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="capabilities-table">
+      <thead><tr><th>能力</th><th>版本</th><th>说明</th><th>方法</th></tr></thead>
+      <tbody>
+      {% for capability in capabilities %}
+      <tr data-row>
+        <td><span class="badge info">{{ capability.name }}</span></td>
+        <td class="mono">{{ capability.version }}</td>
+        <td>{{ capability.description }}</td>
+        <td class="mono">{{ capability.methods | join(', ') }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="empty">暂无能力注册</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

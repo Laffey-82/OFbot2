@@ -1,0 +1,14 @@
+{
+  "name": "example_ai",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "官方示例：调用统一 AI 能力",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["example_ai.ask"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

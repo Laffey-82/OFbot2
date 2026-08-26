@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}文件中心 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>文件中心</h1>
+    <div class="sub">媒体与附件文件管理，内容哈希去重</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>上传文件</h2></div>
+  <form method="post" action="/files/upload" enctype="multipart/form-data" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="upload-file">选择文件</label>
+        <input id="upload-file" type="file" name="file" required>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">上传</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>文件列表</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <form method="post" id="files-bulk-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" formaction="/files/bulk-delete" class="small danger" data-confirm="确定删除选中的文件？">批量删除</button>
+        <button type="submit" formaction="/files/bulk-download" class="small secondary" title="打包下载选中的文件">批量下载</button>
+      </form>
+      <select id="files-type-filter" style="max-width:140px">
+        <option value="">全部类型</option>
+        <option value="image">图片</option>
+        <option value="doc">文档</option>
+        <option value="archive">压缩包</option>
+        <option value="other">其他</option>
+      </select>
+      <div class="search-box">
+        <input data-table-filter="files-table" placeholder="搜索文件…">
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="files-table">
+      <thead><tr><th><input type="checkbox" id="files-select-all" aria-label="全选"></th><th>文件</th><th>大小</th><th>上传时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for file in files %}
+      {% set ext = file.name.rsplit('.', 1)[-1].lower() if '.' in file.name else '' %}
+      {% set file_cat = 'image' if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] else ('doc' if ext in ['txt', 'md', 'csv', 'json', 'docx', 'xlsx', 'pdf'] else ('archive' if ext in ['zip', '7z', 'rar', 'tar', 'gz'] else 'other')) %}
+      <tr data-row data-ext="{{ file_cat }}">
+        <td><input type="checkbox" class="file-check" name="names" value="{{ file.name }}" form="files-bulk-form"></td>
+        <td>
+          {% if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] %}
+          <button type="button" class="img-lightbox-btn" data-lightbox="/files/{{ file.name }}/download" aria-label="放大预览">
+            <img class="file-thumb" src="/files/{{ file.name }}/download" alt="{{ file.name }}">
+          </button>
+          {% endif %}
+          {{ file.name }}
+        </td>
+        <td>{{ file.size }}</td>
+        <td>{{ humanize_datetime(file.modified) }}</td>
+        <td>
+          <div class="actions">
+            <a class="btn small secondary" href="/files/{{ file.name }}/download">下载</a>
+            {% if ext in ['txt', 'md', 'json', 'csv', 'log', 'py', 'html', 'css', 'js', 'yaml', 'yml', 'ini', 'conf'] %}
+            <button type="button" class="small secondary" data-preview-file="{{ file.name }}">预览</button>
+            {% endif %}
+            <form method="post" action="/files/{{ file.name }}/delete" class="js-ajax">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small danger" data-confirm="确定删除文件 {{ file.name }}？">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">暂无文件</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<dialog id="file-preview-dialog" class="dialog">
+  <div class="dialog-head">
+    <h2>文件预览 <span class="mono" id="file-preview-name"></span></h2>
+    <button type="button" class="dialog-close" data-close-dialog aria-label="关闭">&times;</button>
+  </div>
+  <div class="code-block" id="file-preview-content" style="max-height:480px;overflow:auto"></div>
+  <div class="form-actions" style="margin-top:12px">
+    <button type="button" class="secondary" data-close-dialog>关闭</button>
+  </div>
+</dialog>
+
+<dialog id="lightbox-dialog" class="dialog" style="width:min(860px,94vw);background:transparent;border:none;box-shadow:none;padding:0">
+  <div style="position:relative">
+    <button type="button" class="dialog-close" data-close-dialog aria-label="关闭" style="position:absolute;top:-8px;right:-8px;background:rgba(0,0,0,.6);color:#fff;border-radius:50%">&times;</button>
+    <img id="lightbox-img" src="" alt="预览" style="max-width:100%;max-height:80vh;display:block;margin:0 auto;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+  </div>
+</dialog>
+
+<script>
+  const lightboxDialog = document.getElementById("lightbox-dialog");
+  document.addEventListener("click", (event) => {
+    const lb = event.target.closest("[data-lightbox]");
+    if (lb) {
+      document.getElementById("lightbox-img").src = lb.dataset.lightbox;
+      lightboxDialog.showModal();
+      return;
+    }
+    if (event.target.closest("[data-close-dialog]")) {
+      lightboxDialog.close();
+    }
+  });
+  const previewDialog = document.getElementById("file-preview-dialog");
+  document.addEventListener("click", async (event) => {
+    if (event.target.closest("[data-close-dialog]")) {
+      previewDialog.close();
+      return;
+    }
+    const btn = event.target.closest("[data-preview-file]");
+    if (!btn) return;
+    const name = btn.dataset.previewFile;
+    document.getElementById("file-preview-name").textContent = name;
+    const content = document.getElementById("file-preview-content");
+    content.textContent = "加载中…";
+    previewDialog.showModal();
+    try {
+      const response = await fetch("/files/" + name + "/preview");
+      const data = await response.json();
+      if (data.ok) {
+        if (data.html) {
+          content.innerHTML = data.html + (data.truncated ? "<p class=\"muted\">…（内容超过 50KB，已截断）</p>" : "");
+        } else {
+          content.textContent = data.content + (data.truncated ? "\n\n…（内容超过 50KB，已截断）" : "");
+        }
+      } else {
+        content.textContent = "预览失败：" + (data.detail || "");
+      }
+    } catch (err) {
+      content.textContent = "预览失败：网络错误";
+    }
+  });
+  const filesSelectAll = document.getElementById("files-select-all");
+  if (filesSelectAll) {
+    filesSelectAll.addEventListener("change", () => {
+      document.querySelectorAll(".file-check").forEach((checkbox) => {
+        checkbox.checked = filesSelectAll.checked;
+      });
+    });
+  }
+  const filesBulkForm = document.getElementById("files-bulk-form");
+  if (filesBulkForm) {
+    filesBulkForm.addEventListener("submit", (event) => {
+      if (!document.querySelectorAll(".file-check:checked").length) {
+        event.preventDefault();
+        toast("请先选择要删除的文件", "error");
+      }
+    });
+  }
+  document.getElementById("files-type-filter").addEventListener("change", (event) => {
+    const value = event.target.value;
+    document.querySelectorAll("#files-table tbody tr[data-row]").forEach((row) => {
+      row.style.display = !value || row.dataset.ext === value ? "" : "none";
+    });
+  });
+</script>
+{% endblock %}

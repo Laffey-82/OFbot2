@@ -1,0 +1,19 @@
+{
+  "name": "announcement",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "向指定群发送公告",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["announcement.send"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "groups": {"type": "array", "items": {"type": "string"}, "default": []}
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}状态机 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>状态机</h1>
+    <div class="sub">通用状态流转定义，业务流转由插件声明</div>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">添加失败，请检查 JSON 格式。</div>{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>注册状态机</h2></div>
+  <form method="post" action="/state-machines/add" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="sm-name">状态机名</label>
+        <input id="sm-name" name="name" placeholder="例如：order_status" required>
+      </div>
+      <div class="form-row">
+        <label for="sm-transitions">流转定义（JSON）</label>
+        <textarea id="sm-transitions" name="transitions_json" rows="4" required>[{"from":"pending","to":"done"}]</textarea>
+        <span class="hint">支持 from / to / permission</span>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">注册</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>已注册状态机</h2>
+    <span class="muted">{{ machines | length }} 个</span>
+  </div>
+  {% if machines %}
+  {% for machine in machines %}
+  <div class="plugin-config">
+    <div class="card-head">
+      <h3><span class="badge info">{{ machine.name }}</span></h3>
+      <form method="post" action="/state-machines/{{ machine.name }}/delete" class="js-ajax">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="small danger" data-confirm="确定删除状态机 {{ machine.name }}？">删除</button>
+      </form>
+    </div>
+    <div class="machine-graph" data-transitions='{{ machine.transitions | tojson }}'></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>当前状态</th><th>目标状态</th><th>所需权限</th></tr></thead>
+        <tbody>
+        {% for transition in machine.transitions %}
+        <tr data-row>
+          <td><span class="badge">{{ transition.from_status }}</span></td>
+          <td>→ <span class="badge">{{ transition.to_status }}</span></td>
+          <td class="mono">{{ transition.permission or '—' }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty">暂无状态机，请先注册</div>
+  {% endif %}
+</div>
+<script>
+  function escapeGraphText(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+  }
+
+  function renderMachineGraph(container) {
+    let transitions = [];
+    try {
+      transitions = JSON.parse(container.dataset.transitions || "[]");
+    } catch (error) {
+      transitions = [];
+    }
+    if (!transitions.length) return;
+    const states = [];
+    transitions.forEach((transition) => {
+      [transition.from_status, transition.to_status].forEach((state) => {
+        if (state && !states.includes(state)) states.push(state);
+      });
+    });
+    if (states.length < 2) return;
+    const width = Math.max(360, container.clientWidth || 600);
+    const height = Math.max(180, Math.min(240, states.length * 48 + 80));
+    const centerX = width / 2;
+    const centerY = height / 2 + 8;
+    const radius = Math.max(60, Math.min(width, height) / 2 - 42);
+    const positions = {};
+    states.forEach((state, index) => {
+      const angle = (index / states.length) * Math.PI * 2 - Math.PI / 2;
+      positions[state] = {
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle)
+      };
+    });
+    const nodeRadius = 17;
+    let svg =
+      `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="状态流转图">`;
+    transitions.forEach((transition) => {
+      const from = positions[transition.from_status];
+      const to = positions[transition.to_status];
+      if (!from || !to) return;
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const length = Math.hypot(dx, dy) || 1;
+      const ux = dx / length;
+      const uy = dy / length;
+      const x1 = from.x + ux * nodeRadius;
+      const y1 = from.y + uy * nodeRadius;
+      const x2 = to.x - ux * nodeRadius;
+      const y2 = to.y - uy * nodeRadius;
+      svg +=
+        `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" class="graph-edge"/>`;
+      svg +=
+        `<path d="M ${x2.toFixed(1)} ${y2.toFixed(1)} l ${(-ux * 10 - uy * 5).toFixed(1)} ${(-uy * 10 + ux * 5).toFixed(1)} l ${(-ux * 10 + uy * 5).toFixed(1)} ${(-uy * 10 - ux * 5).toFixed(1)} z" class="graph-arrow"/>`;
+      if (transition.permission) {
+        const label = escapeGraphText(transition.permission);
+        svg +=
+          `<text x="${((x1 + x2) / 2).toFixed(1)}" y="${((y1 + y2) / 2 - 8).toFixed(1)}" class="graph-label" text-anchor="middle">[${label}]</text>`;
+      }
+    });
+    states.forEach((state) => {
+      const position = positions[state];
+      const label = escapeGraphText(state);
+      svg +=
+        `<g class="graph-node">` +
+        `<circle cx="${position.x.toFixed(1)}" cy="${position.y.toFixed(1)}" r="${nodeRadius}"/>` +
+        `<text x="${position.x.toFixed(1)}" y="${(position.y + 4).toFixed(1)}" text-anchor="middle" class="graph-node-text">${label}</text>` +
+        `</g>`;
+    });
+    svg += "</svg>";
+    container.innerHTML = svg;
+  }
+
+  const graphContainers = document.querySelectorAll(".machine-graph");
+  graphContainers.forEach(renderMachineGraph);
+  let graphResizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(graphResizeTimer);
+    graphResizeTimer = setTimeout(() => {
+      graphContainers.forEach(renderMachineGraph);
+    }, 150);
+  });
+</script>
+{% endblock %}

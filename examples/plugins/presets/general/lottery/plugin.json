@@ -1,0 +1,14 @@
+{
+  "name": "lottery",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "从候选名单中随机抽取",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["lottery.draw"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

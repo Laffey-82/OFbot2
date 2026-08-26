@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}编辑流程 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>编辑流程</h1>
+    <div class="sub">流程 #{{ workflow.id }} · 使用可视化编辑器修改步骤与触发器</div>
+  </div>
+  <div class="page-actions">
+    <button type="button" class="btn secondary" id="wf-undo" disabled>撤销</button>
+    <button type="button" class="btn secondary" id="wf-redo" disabled>重做</button>
+    <span class="muted" style="font-size:12.5px;align-self:center">Ctrl+Z / Ctrl+Shift+Z</span>
+    <a class="btn secondary" href="/workflows">返回流程列表</a>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">保存失败，请检查步骤 JSON。</div>{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>流程定义</h2></div>
+  <form method="post" action="/workflows/{{ workflow.id }}/edit" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="wf-name">流程名称</label>
+        <input id="wf-name" name="name" value="{{ workflow.name }}" required>
+      </div>
+      <div class="form-row">
+        <label for="wf-trigger">触发器</label>
+        <select id="wf-trigger">
+          <option value="message">消息触发</option>
+          <option value="schedule">定时触发</option>
+          <option value="webhook">Webhook 触发</option>
+          <option value="alert">告警触发</option>
+        </select>
+      </div>
+      <div class="form-row" id="wf-cron-row">
+        <label for="wf-cron">Cron 表达式</label>
+        <input id="wf-cron" placeholder="0 8 * * *">
+      </div>
+      <div class="form-row" style="grid-column:1/-1">
+        <label for="wf-condition">条件（JSON，可选）</label>
+        <div id="wf-condition-rows" class="condition-rows"></div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+          <select id="wf-condition-mode" style="width:auto">
+            <option value="all">全部满足（AND）</option>
+            <option value="any">任一满足（OR）</option>
+          </select>
+          <button type="button" class="secondary small" id="wf-add-condition">+ 添加条件</button>
+        </div>
+        <textarea id="wf-condition" name="condition_json" rows="2" placeholder='[{"field": "message", "op": "contains", "value": "签到"}]'>{{ workflow.definition.get('condition') | tojson if workflow.definition.get('condition') else '' }}</textarea>
+        <span class="hint">支持 eq / ne / contains / exists / gt / lt / in，多个条件为 AND；不满足时流程状态为 skipped</span>
+      </div>
+    </div>
+
+    <h3 style="margin-top:6px">步骤生成器</h3>
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="wf-action">动作</label>
+        <select id="wf-action">
+          {% for action in actions %}<option value="{{ action }}">{{ action }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>参数</label>
+        <div id="wf-param-rows"></div>
+        <button type="button" class="secondary small" id="wf-add-param">+ 添加参数</button>
+      </div>
+    </div>
+    <div class="form-actions" style="margin-top:4px">
+      <button type="button" class="secondary" id="wf-add-step">添加步骤</button>
+    </div>
+    <div class="form-row" id="wf-record-helper" hidden>
+      <label>create_record 数据模板</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="wf-record-type" style="width:auto" aria-label="记录类型"></select>
+        <button type="button" class="secondary small" id="wf-load-schema">生成数据模板</button>
+        <span class="muted" style="font-size:12px">为 create_record 动作生成 record_type 与 data 参数（基于记录类型 Schema）</span>
+      </div>
+    </div>
+    <ul id="wf-steps" class="step-list"></ul>
+
+    <div class="form-row">
+      <label for="wf-json">定义 JSON（自动生成，可手改）</label>
+      <textarea id="wf-json" name="steps_json" rows="5" required>{{ workflow.definition.get('steps', []) | tojson(2) }}</textarea>
+      <input type="hidden" name="trigger_json" id="wf-trigger-json">
+    </div>
+    <div class="form-actions">
+      <button type="submit">保存修改</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  window.WORKFLOW_INIT = {
+    actions: {{ actions | tojson }},
+    steps: {{ workflow.definition.get('steps', []) | tojson }},
+    trigger: {{ workflow.definition.get('trigger', {'type': 'message'}) | tojson }},
+    condition: {{ workflow.definition.get('condition') | tojson if workflow.definition.get('condition') else [] }},
+    recordTypes: {{ record_types | tojson }},
+    recordSchemas: {{ record_schemas | tojson }}
+  };
+</script>
+<script src="/static/js/workflow-builder.js"></script>
+<script>initWorkflowBuilder(window.WORKFLOW_INIT);</script>
+{% endblock %}

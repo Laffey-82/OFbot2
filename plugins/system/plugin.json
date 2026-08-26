@@ -1,0 +1,100 @@
+{
+  "name": "system",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "内置系统命令：help / about / echo / whitelist / plugins / status / task。",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["system.status", "system.restart", "task.manage"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "groups": {
+        "type": "array",
+        "items": {"type": "string"},
+        "default": []
+      }
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "core",
+      "label": "基础功能",
+      "description": "帮助、关于与调试回声",
+      "enable_on_default": true,
+      "manage_permission": "system.admin",
+      "commands": [
+        {
+          "name": "help",
+          "aliases": ["帮助"],
+          "handler": "handlers.help_command",
+          "permission": "bot.command",
+          "description": "查看命令帮助与常用操作说明",
+          "usage": "/help [命令名]",
+          "examples": ["/help", "/help whitelist"]
+        },
+        {
+          "name": "about",
+          "aliases": ["关于"],
+          "handler": "handlers.about_command",
+          "permission": "bot.command",
+          "description": "查看框架版本与核心能力清单",
+          "usage": "/about"
+        },
+        {
+          "name": "echo",
+          "aliases": ["回声"],
+          "handler": "handlers.echo_command",
+          "permission": "system.status",
+          "description": "调试：原样回复内容与发送者信息（开发/排障用）",
+          "usage": "/echo <内容>"
+        }
+      ]
+    },
+    {
+      "id": "ops",
+      "label": "运维管理",
+      "description": "白名单、插件、状态与定时任务管理",
+      "enable_on_default": true,
+      "manage_permission": "system.admin",
+      "commands": [
+        {
+          "name": "whitelist",
+          "handler": "handlers.whitelist_command",
+          "permission": "system.status",
+          "description": "群白名单管理：add 添加 / del 删除 / list 查看",
+          "usage": "/whitelist add|del|list [群号]",
+          "examples": ["/whitelist list", "/whitelist add 123456"]
+        },
+        {
+          "name": "plugins",
+          "handler": "handlers.plugins_command",
+          "permission": "system.status",
+          "description": "查看当前已加载的插件列表",
+          "usage": "/plugins"
+        },
+        {
+          "name": "status",
+          "aliases": ["系统状态"],
+          "handler": "handlers.status_command",
+          "permission": "system.status",
+          "description": "查看机器人运行状态",
+          "usage": "/status"
+        },
+        {
+          "name": "task",
+          "aliases": ["定时任务"],
+          "handler": "handlers.task_command",
+          "permission": "task.manage",
+          "description": "定时任务管理：list 查看 / add 创建 / enable|disable|remove 启停删除",
+          "usage": "/task list ｜ /task add interval|cron <名称> <群号> <参数> <消息>",
+          "examples": ["/task list", "/task add interval 播报 123456 60 你好"]
+        }
+      ]
+    }
+  ]
+}

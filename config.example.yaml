@@ -1,0 +1,112 @@
+basic:
+  command_sep:
+  - .
+  command_start:
+  - /
+  - '!'
+  log_level: INFO
+  log_max_files: 60
+  log_retention_days: 14
+  nickname:
+  - OFbot_2
+  superusers: []
+database:
+  url: sqlite+aiosqlite:///data/ofbot2.db
+plugin_configs:
+  ai:
+    ollama:
+      api_key: ''
+      base_url: http://127.0.0.1:11434
+      model: qwen2.5:7b
+  alerts:
+    rules: []
+  records:
+    types: []
+  system:
+    groups: []
+  template:
+    greeting: 你好
+  webhooks: {}
+plugins:
+  example_ai: true
+  system: true
+  template: true
+runtime:
+  plugin_tasks: {}
+  scopes:
+    group:*:
+      blocked_users: []
+      connection: ""
+      features: {}
+      permissions: {}
+      silent_deny: false
+    private:*:
+      blocked_users: []
+      connection: ""
+      features: {}
+      permissions: {}
+      silent_deny: false
+scheduler:
+  auto_backup_enabled: false
+  auto_disable_after_failures: 0
+  auto_reenable_after_seconds: 0
+  auto_reenable_interval_seconds: 60
+  backup_interval_hours: 24
+  coalesce: true
+  max_instances: 1
+  timezone: Asia/Shanghai
+security:
+  audit_retention_days: 90
+  blocked_users: []
+  default_cooldown_seconds: 1.0
+  heartbeat_stale_seconds: 300
+  login_failure_delay_seconds: 0.5
+  login_lock_seconds: 300
+  max_arg_length: 500
+  max_login_attempts: 5
+  max_message_length: 2000
+  rate_limit_default: 20/minute
+  sensitive_words: []
+  unknown_command_hint: true
+transport:
+  connections:
+  - access_token: ''
+    enabled: true
+    host: 127.0.0.1
+    id: napcat_main
+    mode: reverse_ws
+    path: /onebot/v11/ws
+    port: 8080
+    protocol: onebot
+    version: v11
+  onebot:
+    access_token: ''
+    enabled: false
+    host: 127.0.0.1
+    mode: forward
+    path: /onebot/v11/ws
+    port: 9090
+  protocol: onebot
+  red:
+    api_base: http://127.0.0.1:16530
+    enabled: false
+    host: 127.0.0.1
+    port: 16530
+    reconnect_interval: 3.0
+    token: ''
+web:
+  alert_history_retention_days: 30
+  alert_min_interval_seconds: 0
+  api_keys: []
+  auto_disable_workflows_after_failures: 0
+  cpu_threshold: 80
+  export_job_retention: 50
+  export_job_retention_days: 0
+  export_retries: 0
+  host: 127.0.0.1
+  memory_threshold: 85
+  port: 8080
+  secret: ''
+  session_ttl_seconds: 28800
+  webhook_history_page_size: 20
+  webhook_history_retention: 200

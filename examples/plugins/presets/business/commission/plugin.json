@@ -1,0 +1,14 @@
+{
+  "name": "commission",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "分账比例计算",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["commission.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

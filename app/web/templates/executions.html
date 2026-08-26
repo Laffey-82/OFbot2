@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}执行历史 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>执行历史</h1>
+    <div class="sub">定时任务与自动化流程运行的统一视图</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/tasks">定时任务</a>
+    <a class="btn secondary" href="/workflows">流程引擎</a>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/executions">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="exec-source">来源</label>
+        <select id="exec-source" name="source" style="width:auto">
+          <option value="">全部</option>
+          <option value="task" {% if source == "task" %}selected{% endif %}>定时任务</option>
+          <option value="workflow" {% if source == "workflow" %}selected{% endif %}>流程</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="exec-status">结果</label>
+        <select id="exec-status" name="status" style="width:auto">
+          <option value="">全部</option>
+          <option value="succeeded" {% if status == "succeeded" %}selected{% endif %}>成功</option>
+          <option value="failed" {% if status == "failed" %}selected{% endif %}>失败</option>
+          <option value="running" {% if status == "running" %}selected{% endif %}>运行中</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="exec-start">开始日期</label>
+        <input id="exec-start" type="date" name="start" value="{{ filter_start }}">
+      </div>
+      <div class="form-row">
+        <label for="exec-end">结束日期</label>
+        <input id="exec-end" type="date" name="end" value="{{ filter_end }}">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit">筛选</button>
+      <a class="btn secondary" href="/executions">清除</a>
+      <button type="button" class="secondary" id="executions-export-btn">导出 CSV</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>执行记录（共 {{ total }} 条）</h2>
+    <div class="search-box">
+      <input data-table-filter="executions-table" placeholder="搜索…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="executions-table" class="js-paginate">
+      <thead><tr><th>时间</th><th>来源</th><th>目标</th><th>状态</th><th>详情</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+      <tr data-row>
+        <td>{{ row.time }}</td>
+        <td><span class="badge {{ 'info' if row.source == 'workflow' else '' }}">{{ '流程' if row.source == 'workflow' else '定时任务' }}</span></td>
+        <td class="mono">{{ row.target }}</td>
+        <td><span class="badge {{ 'success' if row.status == 'succeeded' else ('danger' if row.status == 'failed' else 'warning') }}">{{ row.status }}</span></td>
+        <td class="cell-truncate" title="{{ row.detail }}">{{ row.detail or '—' }}{% if row.auto_disabled %} <span class="badge danger">自动停用</span>{% endif %}</td>
+        <td>
+          <div class="actions">
+            <a class="btn small secondary" href="{{ row.link }}">查看</a>
+            {% if row.status == "failed" %}
+              {% if row.source == "task" and row.task_id %}
+              <form method="post" action="/tasks/{{ row.task_id }}/run" class="js-ajax">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="small">重试</button>
+              </form>
+              {% elif row.source == "workflow" and row.workflow_id %}
+              <form method="post" action="/workflows/{{ row.workflow_id }}/run" class="js-ajax">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="small">重试</button>
+              </form>
+              {% endif %}
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">暂无执行记录</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    <a class="btn small secondary {{ 'disabled' if page <= 1 }}" href="/executions?page={{ page - 1 }}&source={{ source }}&status={{ status }}&start={{ filter_start }}&end={{ filter_end }}">上一页</a>
+    <span class="muted">第 {{ page }} / {{ total_pages }} 页</span>
+    <a class="btn small secondary {{ 'disabled' if page >= total_pages }}" href="/executions?page={{ page + 1 }}&source={{ source }}&status={{ status }}&start={{ filter_start }}&end={{ filter_end }}">下一页</a>
+  </div>
+  {% endif %}
+</div>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    initExportButton("executions-export-btn", "/executions/export", {
+      source: "exec-source",
+      status: "exec-status",
+      start: "exec-start",
+      end: "exec-end"
+    });
+  });
+</script>
+{% endblock %}

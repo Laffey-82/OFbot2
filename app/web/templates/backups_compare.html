@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}备份对比 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>备份对比</h1>
+    <div class="sub">对比两个备份的文件清单差异</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn secondary" href="/backups">返回备份</a>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/backups/compare" class="form-grid">
+    <div class="form-row">
+      <label for="cmp-a">备份 A</label>
+      <select id="cmp-a" name="a" required>
+        <option value="">请选择…</option>
+        {% for item in backups %}<option value="{{ item.name }}" {% if a == item.name %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="cmp-b">备份 B</label>
+      <select id="cmp-b" name="b" required>
+        <option value="">请选择…</option>
+        {% for item in backups %}<option value="{{ item.name }}" {% if b == item.name %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-actions" style="align-self:end">
+      <button type="submit">对比</button>
+    </div>
+  </form>
+</div>
+
+{% if result %}
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value">{{ result.only_in_a | length }}</div>
+    <div class="stat-label">仅 A 存在</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ result.only_in_b | length }}</div>
+    <div class="stat-label">仅 B 存在</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ result.changed | length }}</div>
+    <div class="stat-label">大小变化</div>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="card-head"><h2>仅 A 存在</h2></div>
+    <ul class="diff-list">
+      {% for name in result.only_in_a %}<li class="mono">{{ name }}</li>{% else %}<li class="muted">无</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>仅 B 存在</h2></div>
+    <ul class="diff-list">
+      {% for name in result.only_in_b %}<li class="mono">{{ name }}</li>{% else %}<li class="muted">无</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>大小变化</h2></div>
+    <ul class="diff-list">
+      {% for name in result.changed %}
+      <li class="mono">{{ name }}（{{ humanize_bytes(result.size_deltas.get(name, 0) | abs) }}{% if result.size_deltas.get(name, 0) >= 0 %} ↑{% else %} ↓{% endif %}）</li>
+      {% else %}<li class="muted">无</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+{% elif a or b %}
+<div class="alert info">无法对比所选备份，请选择两个不同的有效备份。</div>
+{% else %}
+<div class="card"><div class="empty">选择两个备份开始对比</div></div>
+{% endif %}
+{% endblock %}

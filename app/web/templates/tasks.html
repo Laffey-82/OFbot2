@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+{% block title %}定时任务 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>定时任务</h1>
+    <div class="sub">interval / cron 任务管理，任务状态与执行历史</div>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">操作失败，请检查 cron 表达式或间隔参数。</div>{% endif %}
+
+<div class="stats-grid">
+  <div class="card">
+    <div class="stat-value">{{ total_runs }}</div>
+    <div class="stat-label">总运行次数</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ succeeded_runs }}</div>
+    <div class="stat-label">成功</div>
+  </div>
+  <div class="card">
+    <div class="stat-value">{{ failed_runs_total }}</div>
+    <div class="stat-label">失败</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>插件任务（由插件声明，只读展示 + 启停）</h2>
+    <span class="badge info">执行前按所在群功能开关门控</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>任务</th><th>功能</th><th>类型</th><th>参数</th><th>目标</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for entry in plugin_tasks %}
+      <tr data-row>
+        <td class="mono">{{ entry.plugin }}.{{ entry.task_id }}</td>
+        <td><span class="badge">{{ entry.feature_id }}</span></td>
+        <td><span class="badge info">{{ entry.kind }}</span></td>
+        <td class="mono cell-truncate" title="{{ entry.params | tojson }}">{{ entry.params | tojson }}</td>
+        <td class="mono">{{ entry.target }}</td>
+        <td><span class="badge {{ 'success' if entry.enabled else 'warning' }}">{{ '启用' if entry.enabled else '停用' }}</span></td>
+        <td>
+          <form method="post" action="/tasks/plugin/{{ entry.plugin }}/{{ entry.task_id }}/toggle" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small secondary">{{ '停用' if entry.enabled else '启用' }}</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">暂无插件任务。插件在 plugin.json 中声明 tasks 后自动登记。</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>任务列表</h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <form method="post" id="tasks-bulk-form" action="/tasks/bulk">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <select name="action" id="task-bulk-action" style="width:auto" aria-label="批量操作">
+          <option value="enable">批量启用</option>
+          <option value="disable">批量禁用</option>
+          <option value="delete">批量删除</option>
+        </select>
+        <button type="submit" class="small secondary" id="tasks-bulk-btn">执行</button>
+      </form>
+      <div class="search-box">
+        <input data-table-filter="tasks-table" placeholder="搜索任务…">
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="tasks-table" class="js-paginate">
+      <thead>
+        <tr><th><input type="checkbox" id="task-select-all" aria-label="全选"></th><th>名称</th><th>类型</th><th>状态</th><th>启用</th><th>上次运行</th><th>操作</th></tr>
+      </thead>
+      <tbody>
+      {% for task in tasks %}
+      <tr data-row>
+        <td><input type="checkbox" class="task-check" name="ids" value="{{ task.task_id }}" form="tasks-bulk-form"></td>
+        <td>{{ task.name }}</td>
+        <td><span class="badge info">{{ task.type }}</span></td>
+        <td><span class="badge {{ 'success' if task.status == 'succeeded' else ('danger' if task.status == 'failed' else 'warning') }}">{{ task.status }}</span></td>
+        <td>
+          <span class="badge {{ 'success' if task.enabled else 'warning' }}">{{ '启用' if task.enabled else '禁用' }}</span>
+          {% if task.params.get('auto_disabled') %}
+          <span class="badge danger" title="{{ task.params.get('auto_disabled_reason', '') }} · {{ task.params.get('auto_disabled', '') }}">自动停用</span>
+          {% endif %}
+        </td>
+        <td>{{ task.last_run_time or '从未运行' }}</td>
+        <td>
+          <div class="actions">
+            <button type="button" class="small" data-task-run="{{ task.task_id }}" data-message="{{ task.params.get('message', '') }}" title="立即执行一次">立即运行</button>
+            <button type="button" class="small secondary" data-task-edit="{{ task.task_id }}" data-name="{{ task.name }}" data-type="{{ task.type }}" data-interval="{{ task.interval_seconds or '' }}" data-cron="{{ task.cron_expression or '' }}" data-group="{{ task.params.get('group_id', '') }}" data-message="{{ task.params.get('message', '') }}" data-params='{{ task.params | tojson }}' data-enabled="{{ '1' if task.enabled else '0' }}">编辑</button>
+            <form method="post" action="/tasks/{{ task.task_id }}/toggle" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small secondary">{{ '禁用' if task.enabled else '启用' }}</button>
+            </form>
+            <form method="post" action="/tasks/{{ task.task_id }}/remove" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small danger" data-confirm="确定删除任务 {{ task.name }}？">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">暂无定时任务</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>执行历史</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button type="button" class="btn small secondary" id="runs-export-btn">导出 CSV</button>
+      <input type="date" id="runs-start" value="{{ runs_start }}">
+      <span class="muted">至</span>
+      <input type="date" id="runs-end" value="{{ runs_end }}">
+      <button type="button" class="small secondary" id="runs-apply-dates">应用时间</button>
+      <select id="runs-status-filter" style="max-width:140px">
+        <option value="">全部结果</option>
+        <option value="succeeded">成功</option>
+        <option value="failed">失败</option>
+        <option value="running">运行中</option>
+      </select>
+      <select id="runs-task-filter" style="max-width:220px">
+        <option value="">全部任务</option>
+        {% for task in tasks %}<option value="{{ task.task_id }}">{{ task.name }}</option>{% endfor %}
+      </select>
+      <form method="post" action="/tasks/runs/clear" id="runs-clear-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="start" id="runs-clear-start">
+        <input type="hidden" name="end" id="runs-clear-end">
+        <input type="hidden" name="status" id="runs-clear-status">
+        <button type="submit" class="small danger" data-confirm="确定清除当前日期范围与结果筛选内的执行历史？该操作不可恢复。">清除历史</button>
+      </form>
+      <div class="search-box">
+        <input data-table-filter="runs-table" placeholder="搜索历史…">
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="runs-table" class="js-paginate">
+      <thead><tr><th>任务 ID</th><th>状态</th><th>消息</th><th>时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for run in runs %}
+      <tr data-row>
+        <td class="mono">{{ run.task_id }}</td>
+        <td><span class="badge {{ 'success' if run.status == 'succeeded' else ('danger' if run.status == 'failed' else 'warning') }}">{{ run.status }}</span></td>
+        <td>{{ run.message or '—' }}</td>
+        <td>{{ run.created_at }}</td>
+        <td>
+          {% if run.status == 'failed' %}
+          <form method="post" action="/tasks/{{ run.task_id }}/run" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small secondary">重试</button>
+          </form>
+          {% endif %}
+          <button type="button" class="small secondary" data-run-detail="{{ run.message or '' }}" data-run-task="{{ run.task_id }}" data-run-status="{{ run.status }}" data-run-time="{{ run.created_at }}">详情</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">暂无执行历史</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if total_runs_pages > 1 %}
+  <div class="pagination">
+    <a class="btn small secondary {{ 'disabled' if runs_page <= 1 }}" href="/tasks?runs_page={{ runs_page - 1 }}&runs_start={{ runs_start }}&runs_end={{ runs_end }}">上一页</a>
+    <span class="muted">第 {{ runs_page }} / {{ total_runs_pages }} 页，共 {{ total_runs }} 条</span>
+    <a class="btn small secondary {{ 'disabled' if runs_page >= total_runs_pages }}" href="/tasks?runs_page={{ runs_page + 1 }}&runs_start={{ runs_start }}&runs_end={{ runs_end }}">下一页</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>添加任务</h2></div>
+  <form method="post" action="/tasks/add">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="task-name">名称</label>
+        <input id="task-name" name="name" placeholder="例如：每日早报" required>
+      </div>
+      <div class="form-row">
+        <label for="task-type">类型</label>
+        <select id="task-type" name="task_type">
+          <option value="interval">interval（间隔执行）</option>
+          <option value="cron">cron（表达式）</option>
+        </select>
+      </div>
+      <div class="form-row task-type-row" data-for="interval">
+        <label for="task-interval">间隔秒数（interval）</label>
+        <input id="task-interval" name="interval_seconds" value="60" type="number" min="1">
+      </div>
+      <div class="form-row task-type-row" data-for="cron">
+        <label for="task-cron">Cron 表达式（cron）</label>
+        <input id="task-cron" name="cron_expression" placeholder="0 8 * * *">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+          <select id="cron-preset" style="width:auto">
+            <option value="">Cron 预设…</option>
+            <option value="0 * * * *">每小时</option>
+            <option value="0 8 * * *">每天 08:00</option>
+            <option value="0 8 * * 1">每周一 08:00</option>
+            <option value="0 8 1 * *">每月 1 日 08:00</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="task-group">群号</label>
+        <input id="task-group" name="group_id" placeholder="目标群号" required>
+      </div>
+      <div class="form-row">
+        <label for="task-message">消息内容</label>
+        <input id="task-message" name="message" placeholder="要发送的消息" required>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit">添加任务</button>
+    </div>
+  </form>
+</div>
+
+<dialog id="task-run-dialog" class="dialog">
+  <form method="post" id="task-run-form">
+    <div class="dialog-head">
+      <h2>立即运行任务</h2>
+      <button type="button" class="dialog-close" data-close-dialog aria-label="关闭">&times;</button>
+    </div>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-row">
+      <label for="task-run-message">消息内容（留空使用任务默认消息）</label>
+      <input id="task-run-message" name="message">
+    </div>
+    <div class="form-actions">
+      <button type="submit">执行</button>
+      <button type="button" class="secondary" data-close-dialog>取消</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="task-edit-dialog" class="dialog">
+  <form method="post" id="task-edit-form">
+    <div class="dialog-head">
+      <h2>编辑任务</h2>
+      <button type="button" class="dialog-close" data-close-dialog aria-label="关闭">&times;</button>
+    </div>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" id="task-edit-id" name="task_id" value="">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="task-edit-name">名称</label>
+        <input id="task-edit-name" name="name" required>
+      </div>
+      <div class="form-row">
+        <label for="task-edit-type">类型</label>
+        <select id="task-edit-type" name="task_type">
+          <option value="interval">interval</option>
+          <option value="cron">cron</option>
+        </select>
+      </div>
+      <div class="form-row task-type-row" data-for="interval">
+        <label for="task-edit-interval">间隔秒数</label>
+        <input id="task-edit-interval" name="interval_seconds" type="number" min="1">
+      </div>
+      <div class="form-row task-type-row" data-for="cron">
+        <label for="task-edit-cron">Cron 表达式</label>
+        <input id="task-edit-cron" name="cron_expression" placeholder="0 8 * * *">
+        <select id="task-edit-cron-preset" style="width:auto;margin-top:6px">
+          <option value="">Cron 预设…</option>
+          <option value="0 * * * *">每小时</option>
+          <option value="0 8 * * *">每天 08:00</option>
+          <option value="0 8 * * 1">每周一 08:00</option>
+          <option value="0 8 1 * *">每月 1 日 08:00</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="task-edit-group">群号</label>
+        <input id="task-edit-group" name="group_id">
+      </div>
+      <div class="form-row">
+        <label for="task-edit-message">消息</label>
+        <input id="task-edit-message" name="message">
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="task-edit-params">参数 JSON（可选，合并覆盖）</label>
+      <textarea id="task-edit-params" name="params_json" rows="3" class="mono">{}</textarea>
+    </div>
+    <div class="form-row">
+      <label class="switch-inline"><input type="checkbox" id="task-edit-enabled" name="enabled" value="on" checked> 启用</label>
+    </div>
+    <div class="form-actions">
+      <button type="submit">保存</button>
+      <button type="button" class="secondary" data-close-dialog>取消</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="run-detail-dialog" class="dialog">
+  <div class="dialog-head">
+    <h2>运行详情</h2>
+    <button type="button" class="dialog-close" data-close-dialog aria-label="关闭">&times;</button>
+  </div>
+  <div class="config-grid">
+    <div class="config-item"><div class="config-label">任务 ID</div><div class="mono" id="run-detail-task"></div></div>
+    <div class="config-item"><div class="config-label">状态</div><div id="run-detail-status"></div></div>
+    <div class="config-item"><div class="config-label">时间</div><div class="mono" id="run-detail-time"></div></div>
+  </div>
+  <div class="form-row">
+    <label>消息 / 错误</label>
+    <pre class="code-block" id="run-detail-message"></pre>
+  </div>
+  <div class="form-actions">
+    <button type="button" class="secondary" data-close-dialog>关闭</button>
+  </div>
+</dialog>
+
+<script>
+  const taskRunDialog = document.getElementById("task-run-dialog");
+  const taskRunForm = document.getElementById("task-run-form");
+  let taskRunTarget = "";
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-dialog]")) {
+      taskRunDialog.close();
+      return;
+    }
+    const btn = event.target.closest("[data-task-run]");
+    if (!btn) return;
+    taskRunTarget = btn.dataset.taskRun;
+    document.getElementById("task-run-message").value = btn.dataset.message || "";
+    taskRunDialog.showModal();
+  });
+  taskRunForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = new FormData(taskRunForm);
+    const submitBtn = event.target.querySelector("button[type='submit']");
+    submitBtn.disabled = true;
+    const original = submitBtn.textContent;
+    submitBtn.textContent = "执行中…";
+    try {
+      const response = await fetch("/tasks/" + taskRunTarget + "/run", { method: "POST", body });
+      if (response.redirected) window.location.href = response.url;
+      else toast(response.ok ? "已执行" : "执行失败", response.ok ? "success" : "error");
+    } catch (err) {
+      toast("网络错误", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = original;
+    }
+  });
+  const taskEditDialog = document.getElementById("task-edit-dialog");
+  const taskEditForm = document.getElementById("task-edit-form");
+  let taskEditTarget = "";
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-dialog]")) {
+      taskEditDialog.close();
+      return;
+    }
+    const btn = event.target.closest("[data-task-edit]");
+    if (!btn) return;
+    taskEditTarget = btn.dataset.taskEdit;
+    document.getElementById("task-edit-id").value = taskEditTarget;
+    document.getElementById("task-edit-name").value = btn.dataset.name || "";
+    document.getElementById("task-edit-type").value = btn.dataset.type || "interval";
+    document.getElementById("task-edit-interval").value = btn.dataset.interval || "";
+    document.getElementById("task-edit-cron").value = btn.dataset.cron || "";
+    document.getElementById("task-edit-group").value = btn.dataset.group || "";
+    document.getElementById("task-edit-message").value = btn.dataset.message || "";
+    document.getElementById("task-edit-params").value = btn.dataset.params || "{}";
+    document.getElementById("task-edit-enabled").checked = btn.dataset.enabled === "1";
+    toggleTaskTypeRows(document.getElementById("task-edit-type").value);
+    taskEditDialog.showModal();
+  });
+  taskEditForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = new FormData(taskEditForm);
+    const submitBtn = event.target.querySelector("button[type='submit']");
+    submitBtn.disabled = true;
+    const original = submitBtn.textContent;
+    submitBtn.textContent = "保存中…";
+    try {
+      const response = await fetch("/tasks/" + taskEditTarget + "/edit", { method: "POST", body });
+      if (response.redirected) window.location.href = response.url;
+      else toast(response.ok ? "已保存" : "保存失败", response.ok ? "success" : "error");
+    } catch (err) {
+      toast("网络错误", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = original;
+    }
+  });
+  const runDetailDialog = document.getElementById("run-detail-dialog");
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-dialog]")) {
+      runDetailDialog.close();
+      return;
+    }
+    const btn = event.target.closest("[data-run-detail]");
+    if (!btn) return;
+    document.getElementById("run-detail-task").textContent = btn.dataset.runTask;
+    const status = btn.dataset.runStatus;
+    document.getElementById("run-detail-status").innerHTML =
+      `<span class="badge ${status === "succeeded" ? "success" : status === "failed" ? "danger" : "warning"}">${status}</span>`;
+    document.getElementById("run-detail-time").textContent = btn.dataset.runTime || "";
+    document.getElementById("run-detail-message").textContent = btn.dataset.runDetail || "—";
+    runDetailDialog.showModal();
+  });
+  document.getElementById("task-edit-cron-preset").addEventListener("change", (event) => {
+    if (event.target.value) document.getElementById("task-edit-cron").value = event.target.value;
+  });
+  document.getElementById("cron-preset").addEventListener("change", (event) => {
+    if (event.target.value) document.getElementById("task-cron").value = event.target.value;
+  });
+  function toggleTaskTypeRows(type) {
+    document.querySelectorAll(".task-type-row").forEach((row) => {
+      row.style.display = row.dataset.for === type ? "" : "none";
+    });
+  }
+  document.getElementById("task-type").addEventListener("change", (event) => {
+    toggleTaskTypeRows(event.target.value);
+  });
+  document.getElementById("task-edit-type").addEventListener("change", (event) => {
+    toggleTaskTypeRows(event.target.value);
+  });
+  toggleTaskTypeRows(document.getElementById("task-type").value);
+  document.getElementById("runs-task-filter").addEventListener("change", (event) => {
+    const value = event.target.value;
+    document.querySelectorAll("#runs-table tbody tr[data-row]").forEach((row) => {
+      const cell = row.querySelector("td");
+      const taskId = cell ? cell.textContent.trim() : "";
+      row.style.display = !value || taskId === value ? "" : "none";
+    });
+  });
+  document.addEventListener("DOMContentLoaded", () => {
+    initExportButton("runs-export-btn", "/tasks/export", {
+      task_id: "runs-task-filter",
+      status: "runs-status-filter",
+      start: "runs-start",
+      end: "runs-end"
+    });
+  });
+  document.getElementById("runs-apply-dates").addEventListener("click", () => {
+    const params = new URLSearchParams(window.location.search);
+    const start = document.getElementById("runs-start").value;
+    const end = document.getElementById("runs-end").value;
+    if (start) params.set("runs_start", start);
+    else params.delete("runs_start");
+    if (end) params.set("runs_end", end);
+    else params.delete("runs_end");
+    params.delete("runs_page");
+    window.location.href = "/tasks?" + params.toString();
+  });
+  document.getElementById("runs-status-filter").addEventListener("change", (event) => {
+    const value = event.target.value;
+    document.querySelectorAll("#runs-table tbody tr[data-row]").forEach((row) => {
+      const badge = row.querySelector("td:nth-child(2) .badge");
+      const status = badge ? badge.textContent.trim() : "";
+      row.style.display = !value || status === value ? "" : "none";
+    });
+  });
+  document.addEventListener("DOMContentLoaded", () => {
+    initSelectAll("task-select-all", "task-check");
+  });
+  const tasksBulkForm = document.getElementById("tasks-bulk-form");
+  if (tasksBulkForm) {
+    tasksBulkForm.addEventListener("submit", (event) => {
+      const action = document.getElementById("task-bulk-action").value;
+      const selected = document.querySelectorAll(".task-check:checked").length;
+      if (!selected) {
+        event.preventDefault();
+        toast("请先选择任务", "error");
+        return;
+      }
+      if (action === "delete") {
+        const confirmed = window.confirm(`确定删除选中的 ${selected} 个任务？`);
+        if (!confirmed) event.preventDefault();
+      }
+    });
+  }
+  const runsClearForm = document.getElementById("runs-clear-form");
+  if (runsClearForm) {
+    runsClearForm.addEventListener("submit", () => {
+      document.getElementById("runs-clear-start").value =
+        document.getElementById("runs-start").value;
+      document.getElementById("runs-clear-end").value =
+        document.getElementById("runs-end").value;
+      document.getElementById("runs-clear-status").value =
+        document.getElementById("runs-status-filter").value;
+    });
+  }
+</script>
+{% endblock %}

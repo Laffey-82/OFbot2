@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}API Key - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>API Key 管理</h1>
+    <div class="sub">用于非浏览器客户端调用 REST API</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>添加 API Key</h2></div>
+  <form method="post" action="/api-keys/add" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="new-key">新 API Key</label>
+        <div style="display:flex;gap:8px">
+          <input id="new-key" name="key" placeholder="建议使用随机长字符串" required>
+          <button type="button" class="secondary" id="generate-key" style="white-space:nowrap">生成随机 Key</button>
+        </div>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">添加</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Key 列表</h2>
+    <div class="search-box">
+      <input data-table-filter="keys-table" placeholder="搜索 Key…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="keys-table">
+      <thead><tr><th>Key</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for key in keys %}
+      <tr data-row>
+        <td class="mono">{{ key }} <button type="button" class="small ghost" data-copy="{{ key }}">复制</button></td>
+        <td>
+          <form method="post" action="/api-keys/remove" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="key" value="{{ key }}">
+            <button class="small danger" data-confirm="确定删除该 API Key？">删除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2" class="empty">暂无 API Key</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+  document.getElementById("generate-key").addEventListener("click", () => {
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    const key = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+    document.getElementById("new-key").value = "ofb_" + key;
+  });
+</script>
+{% endblock %}

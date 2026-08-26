@@ -1,0 +1,14 @@
+{
+  "name": "poll",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "创建投票与投票统计",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["poll.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "signin",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "每日签到与连续天数统计",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["signin.do"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "points_per_day": {"type": "integer", "default": 10}
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

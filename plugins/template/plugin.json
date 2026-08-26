@@ -1,0 +1,62 @@
+{
+  "name": "template",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "声明式插件模板：命令 + 定时任务 + 监听 + 配置 schema + Web 路由。",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["template.ping"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "greeting": {
+        "type": "string",
+        "default": "你好",
+        "description": "ping 回复前缀"
+      }
+    }
+  },
+  "web": true,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "ping",
+      "label": "连通测试",
+      "description": "ping 命令、群消息监听与每日任务示例",
+      "enable_on_default": true,
+      "manage_permission": "template.admin",
+      "commands": [
+        {
+          "name": "ping",
+          "aliases": ["p"],
+          "handler": "handlers.ping_command",
+          "permission": "template.ping",
+          "description": "连通性测试，返回 pong 与参数（模板插件示例）",
+          "usage": "/ping [内容]",
+          "examples": ["/ping", "/ping 你好"],
+          "cooldown": 3,
+          "rate_limit": "10/minute"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "daily",
+          "kind": "interval",
+          "params": {"seconds": 3600},
+          "handler": "handlers.daily_task",
+          "target": "all",
+          "description": "每小时触发一次的后台任务示例"
+        }
+      ],
+      "listeners": [
+        {
+          "event": "GroupMessageReceived",
+          "handler": "handlers.on_group_message",
+          "description": "收到群消息时检查 template:echo 关键字"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "keyword_reply",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "关键词自动回复",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "rules": {
+        "type": "object",
+        "default": {"你好": "你好呀"}
+      }
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin"
+}

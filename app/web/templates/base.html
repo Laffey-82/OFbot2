@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}OFbot 2{% endblock %}</title>
+  <script>
+    // 首帧前应用主题，避免深浅色闪烁；受限环境（沙箱 iframe）读取失败时静默降级
+    (function () {
+      try {
+        var theme = window.localStorage.getItem("theme");
+        if (theme === "dark") {
+          document.documentElement.setAttribute("data-theme", "dark");
+        } else if (
+          theme !== "light" &&
+          window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches
+        ) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        } else {
+          document.documentElement.removeAttribute("data-theme");
+        }
+      } catch (err) {}
+    })();
+  </script>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/css/app.css?v={{ static_version('css/app.css') }}">
+</head>
+<body>
+  {% if user %}
+  <div class="layout">
+    <button type="button" class="menu-toggle" id="menu-toggle" aria-label="打开菜单">☰ 菜单</button>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <strong class="brand">OFbot 2</strong>
+        <button type="button" class="sidebar-close" id="sidebar-close" aria-label="关闭菜单">&times;</button>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-group">
+          <div class="nav-title">概览</div>
+          <a href="/" class="{{ nav_active(request, '/') }}">仪表盘</a>
+          <a href="/stats" class="{{ nav_active(request, '/stats') }}">命令统计</a>
+          <a href="/commands" class="{{ nav_active(request, '/commands') }}">命令速查</a>
+          <a href="/monitor" class="{{ nav_active(request, '/monitor') }}">系统监控</a>
+          <a href="/capabilities" class="{{ nav_active(request, '/capabilities') }}">能力中心</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">管理</div>
+          <a href="/config" class="{{ nav_active(request, '/config') }}">配置</a>
+          <a href="/plugins" class="{{ nav_active(request, '/plugins') }}">插件</a>
+          <a href="/scopes" class="{{ nav_active(request, '/scopes') }}">监听环境</a>
+          <a href="/connections" class="{{ nav_active(request, '/connections') }}">连接</a>
+          <a href="/api-keys" class="{{ nav_active(request, '/api-keys') }}">API Key</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">数据</div>
+          <a href="/records" class="{{ nav_active(request, '/records') }}">记录中心</a>
+          <a href="/state-machines" class="{{ nav_active(request, '/state-machines') }}">状态机</a>
+          <a href="/exports" class="{{ nav_active(request, '/exports') }}">导出中心</a>
+          <a href="/files" class="{{ nav_active(request, '/files') }}">文件中心</a>
+          <a href="/backups" class="{{ nav_active(request, '/backups') }}">数据备份</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">自动化</div>
+          <a href="/workflows" class="{{ nav_active(request, '/workflows') }}">流程引擎</a>
+          <a href="/tasks" class="{{ nav_active(request, '/tasks') }}">定时任务</a>
+          <a href="/executions" class="{{ nav_active(request, '/executions') }}">执行历史</a>
+          <a href="/self-heal" class="{{ nav_active(request, '/self-heal') }}">自愈中心</a>
+          <a href="/webhooks" class="{{ nav_active(request, '/webhooks') }}">Webhook</a>
+          <a href="/alerts" class="{{ nav_active(request, '/alerts') }}">告警</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">智能</div>
+          <a href="/ai" class="{{ nav_active(request, '/ai') }}">AI 能力</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">系统</div>
+          <a href="/setup" class="{{ nav_active(request, '/setup') }}">设置向导</a>
+          <a href="/audit" class="{{ nav_active(request, '/audit') }}">审计日志</a>
+          <a href="/logs" class="{{ nav_active(request, '/logs') }}">运行日志</a>
+          <a href="/docs/index" class="{{ nav_active(request, '/docs/index') }}">文档</a>
+          <a href="/account" class="{{ nav_active(request, '/account') }}">账户</a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="user-chip" title="{{ user.username }}">{{ user.username }}</span>
+        <button type="button" id="theme-toggle">主题</button>
+        <a href="/logout" class="logout-link">退出</a>
+      </div>
+    </aside>
+  {% endif %}
+    <main id="main">
+      {% block content %}{% endblock %}
+    </main>
+  {% if user %}</div>{% endif %}
+  <script src="/static/js/app.js?v={{ static_version('js/app.js') }}"></script>
+</body>
+</html>

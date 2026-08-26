@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+{% block title %}记录中心 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>记录中心</h1>
+    <div class="sub">通用数据模型：注册记录类型并管理数据，业务字段由插件定义</div>
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">操作失败，请检查输入。</div>{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>注册记录类型</h2></div>
+  <form method="post" action="/records/add" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="record-type-name">类型名</label>
+        <input id="record-type-name" name="name" placeholder="例如：order" required>
+      </div>
+      <div class="form-row">
+        <label for="record-fields">字段定义（JSON）</label>
+        <textarea id="record-fields" name="fields_json" rows="4" required>[{"name":"title","type":"string","required":true}]</textarea>
+        <span class="hint">字段支持 name / type（string、number、integer、boolean）/ required / default / description</span>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit">注册类型</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>创建记录</h2>
+    <label class="switch-inline">
+      <input type="checkbox" id="record-form-mode" checked> 表单模式
+    </label>
+  </div>
+  <form method="post" action="/records/create" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="record-type-select">记录类型</label>
+        <select id="record-type-select" name="record_type" required>
+          {% for type in types %}<option value="{{ type.name }}">{{ type.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div id="record-dynamic-fields" class="form-grid"></div>
+    <div class="form-row" id="record-json-row">
+      <label for="record-data">数据（JSON，表单模式自动生成）</label>
+      <textarea id="record-data" name="data_json" rows="4" required>{"title": "示例"}</textarea>
+    </div>
+    <div class="form-actions"><button type="submit">创建记录</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>记录类型</h2>
+    <span class="muted">{{ types | length }} 个类型</span>
+  </div>
+  {% if types %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>名称</th><th>字段</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for type in types %}
+      <tr data-row>
+        <td><span class="badge info">{{ type.name }}</span></td>
+        <td class="mono">{{ type.fields | map(attribute='name') | join(', ') }}</td>
+        <td>
+          <form method="post" action="/records/types/{{ type.name }}/delete" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="small danger" data-confirm="确定删除记录类型 {{ type.name }}？已有记录将保留但不再校验。">删除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">暂无记录类型，请先注册</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>记录列表</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <form method="post" id="bulk-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label class="switch-inline"><input type="checkbox" id="bulk-select-all" name="select_all" value="on"> 全选全部</label>
+        <input type="hidden" name="record_type" id="bulk-record-type">
+        <input type="hidden" name="status" id="bulk-status">
+        <button type="submit" formaction="/records/bulk-delete" class="small danger" data-confirm="确定删除选中的记录？">批量删除</button>
+        <select name="fmt" style="width:auto">
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+          <option value="excel">Excel</option>
+          <option value="docx">Word</option>
+        </select>
+        <button type="submit" formaction="/records/bulk-export" class="small">导出选中</button>
+      </form>
+      <select id="records-type-filter" style="max-width:180px">
+        <option value="">全部类型</option>
+        {% for type in types %}<option value="{{ type.name }}" {% if record_type == type.name %}selected{% endif %}>{{ type.name }}</option>{% endfor %}
+      </select>
+      <select id="records-status-filter" style="max-width:140px">
+        <option value="">全部状态</option>
+        <option value="active" {% if status == 'active' %}selected{% endif %}>active</option>
+        <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>inactive</option>
+        <option value="archived" {% if status == 'archived' %}selected{% endif %}>archived</option>
+      </select>
+      <select id="records-order-filter" style="max-width:140px">
+        <option value="desc" {% if order == 'desc' %}selected{% endif %}>最新优先</option>
+        <option value="asc" {% if order == 'asc' %}selected{% endif %}>最早优先</option>
+      </select>
+      <div class="search-box">
+        <input data-table-filter="records-table" placeholder="搜索当前页记录…">
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="records-table">
+      <thead><tr><th><input type="checkbox" id="records-select-all" aria-label="全选"></th><th>ID</th><th>类型</th><th>状态</th><th>数据</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for record in records %}
+      <tr data-row>
+        <td><input type="checkbox" class="record-check" name="ids" value="{{ record.id }}" form="bulk-form"></td>
+        <td>{{ record.id }}</td>
+        <td>
+          <span class="badge info">{{ record.record_type }}</span>
+          {% if type_field_counts.get(record.record_type) %}
+          <span class="badge" title="{{ type_field_summaries.get(record.record_type, '') }}">{{ type_field_counts[record.record_type] }} 字段</span>
+          {% endif %}
+        </td>
+        <td><span class="badge">{{ record.status or '—' }}</span></td>
+        <td class="mono record-data-cell cell-truncate" title="{{ record.data }}">{{ record.data }}</td>
+        <td>
+          <div class="actions">
+            <button type="button" class="small secondary" data-view-record="{{ record.id }}" data-type="{{ record.record_type }}" data-data='{{ record.data | tojson }}' data-created="{{ record.created_at }}" data-updated="{{ record.updated_at }}">查看</button>
+            <button type="button" class="small secondary" data-edit-record="{{ record.id }}" data-type="{{ record.record_type }}" data-data='{{ record.data | tojson }}'>编辑</button>
+            <form method="post" action="/records/{{ record.id }}/delete" class="js-ajax">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="small danger" data-confirm="确定删除记录 #{{ record.id }}？">删除</button>
+            </form>
+            {% set machine = machine_transitions.get(record.record_type) %}
+            {% if machine %}
+            {% set targets = machine.transitions | selectattr('from_status', 'equalto', record.status or '') | map(attribute='to_status') | list %}
+            {% if targets %}
+            <form method="post" action="/records/{{ record.id }}/transition" style="display:inline-flex;gap:4px">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <select name="target" class="small" style="width:auto" aria-label="流转目标">
+                {% for target in targets %}<option value="{{ target }}">{{ target }}</option>{% endfor %}
+              </select>
+              <button class="small secondary" title="按状态机流转">流转</button>
+            </form>
+            {% endif %}
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">暂无记录</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    <a class="btn small secondary {{ 'disabled' if page <= 1 }}" href="/records?page={{ page - 1 }}">上一页</a>
+    <span class="muted">第 {{ page }} / {{ total_pages }} 页，共 {{ total }} 条</span>
+    <a class="btn small secondary {{ 'disabled' if page >= total_pages }}" href="/records?page={{ page + 1 }}">下一页</a>
+  </div>
+  {% endif %}
+</div>
+
+<dialog id="record-edit-dialog" class="dialog">
+  <form method="post" id="record-edit-form" class="js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="dialog-head">
+      <h2>编辑记录 #<span id="edit-record-id"></span></h2>
+      <button type="button" class="dialog-close" data-close-dialog aria-label="关闭">&times;</button>
+    </div>
+    <div class="form-row">
+      <label>类型</label>
+      <input id="edit-record-type" disabled>
+    </div>
+    <div id="edit-dynamic-fields" class="form-grid"></div>
+    <div class="form-row">
+      <label for="edit-record-data">数据（JSON）</label>
+      <textarea id="edit-record-data" name="data_json" rows="6" required></textarea>
+    </div>
+    <div class="form-actions">
+      <button type="submit">保存</button>
+      <button type="button" class="secondary" data-close-dialog>取消</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="record-view-dialog" class="dialog">
+  <div class="dialog-head">
+    <h2>记录 #<span id="view-record-id"></span></h2>
+    <button type="button" class="dialog-close" data-close-dialog aria-label="关闭">&times;</button>
+  </div>
+  <div class="form-row">
+    <label>类型</label>
+    <input id="view-record-type" disabled>
+  </div>
+  <div class="form-row">
+    <label>字段（Schema）</label>
+    <div id="view-record-fields" class="field-badges"><span class="muted">—</span></div>
+  </div>
+  <div class="form-grid">
+    <div class="config-item"><div class="config-label">创建时间</div><div class="mono" id="view-record-created"></div></div>
+    <div class="config-item"><div class="config-label">更新时间</div><div class="mono" id="view-record-updated"></div></div>
+  </div>
+  <div class="form-row">
+    <label>数据</label>
+    <pre class="code-block" id="view-record-data"></pre>
+  </div>
+  <div class="form-actions">
+    <button type="button" class="secondary" id="view-copy-json">复制 JSON</button>
+    <button type="button" class="secondary" data-close-dialog>关闭</button>
+  </div>
+</dialog>
+
+<script>
+  const recordTypes = {{ types_json | tojson }};
+  const typeSelect = document.getElementById("record-type-select");
+  const fieldContainer = document.getElementById("record-dynamic-fields");
+  const dataArea = document.getElementById("record-data");
+  const formMode = document.getElementById("record-form-mode");
+
+  function schemaByName(name) {
+    return recordTypes.find((t) => t.name === name);
+  }
+
+  function renderFields(container, schema, data, prefix) {
+    container.innerHTML = "";
+    if (!schema || !schema.fields || !schema.fields.length) return;
+    schema.fields.forEach((field) => {
+      const wrap = document.createElement("div");
+      wrap.className = "form-row";
+      const label = document.createElement("label");
+      label.htmlFor = prefix + "-" + field.name;
+      label.textContent = field.name + (field.required ? " *" : "") + "（" + (field.type || "string") + "）";
+      let input;
+      if (field.type === "boolean") {
+        input = document.createElement("select");
+        input.innerHTML = '<option value="true">true</option><option value="false">false</option>';
+        if (data && data[field.name] === false) input.value = "false";
+      } else {
+        input = document.createElement("input");
+        input.type = field.type === "number" || field.type === "integer" ? "number" : "text";
+        if (input.type === "number") input.step = "any";
+        const value = data && data[field.name] !== undefined ? data[field.name] : field.default;
+        if (value !== null && value !== undefined) input.value = value;
+      }
+      input.id = prefix + "-" + field.name;
+      input.dataset.fieldName = field.name;
+      input.dataset.fieldType = field.type || "string";
+      if (field.required) input.required = true;
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      if (field.description) {
+        const hint = document.createElement("span");
+        hint.className = "hint";
+        hint.textContent = field.description;
+        wrap.appendChild(hint);
+      }
+      container.appendChild(wrap);
+    });
+  }
+
+  function collectFieldsJson(container) {
+    const data = {};
+    container.querySelectorAll("input, select, textarea").forEach((el) => {
+      const name = el.dataset.fieldName;
+      if (!name) return;
+      const type = el.dataset.fieldType || "string";
+      let value = el.value;
+      if (type === "number" || type === "integer") value = value === "" ? null : Number(value);
+      else if (type === "boolean") value = value === "true";
+      data[name] = value;
+    });
+    return JSON.stringify(data, null, 2);
+  }
+
+  typeSelect.addEventListener("change", () => {
+    renderFields(fieldContainer, schemaByName(typeSelect.value), {}, "record-field");
+    if (formMode.checked) dataArea.value = collectFieldsJson(fieldContainer);
+  });
+  fieldContainer.addEventListener("input", () => {
+    if (formMode.checked) dataArea.value = collectFieldsJson(fieldContainer);
+  });
+  formMode.addEventListener("change", () => {
+    const showForm = formMode.checked;
+    fieldContainer.style.display = showForm ? "" : "none";
+    document.getElementById("record-json-row").style.display = showForm ? "none" : "";
+    if (showForm) dataArea.value = collectFieldsJson(fieldContainer);
+  });
+
+  const dialog = document.getElementById("record-edit-dialog");
+  const editForm = document.getElementById("record-edit-form");
+  const viewDialog = document.getElementById("record-view-dialog");
+  const typeFields = {};
+  recordTypes.forEach((type) => {
+    typeFields[type.name] = type.fields || [];
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-dialog]")) {
+      dialog.close();
+      viewDialog.close();
+      return;
+    }
+    const viewBtn = event.target.closest("[data-view-record]");
+    if (viewBtn) {
+      let data = {};
+      try { data = JSON.parse(viewBtn.dataset.data || "{}"); } catch (e) {}
+      document.getElementById("view-record-id").textContent = viewBtn.dataset.viewRecord;
+      document.getElementById("view-record-type").value = viewBtn.dataset.type;
+      document.getElementById("view-record-created").textContent = viewBtn.dataset.created || "—";
+      document.getElementById("view-record-updated").textContent = viewBtn.dataset.updated || "—";
+      const fields = typeFields[viewBtn.dataset.type] || [];
+      const fieldEl = document.getElementById("view-record-fields");
+      fieldEl.innerHTML = fields.length
+        ? fields
+            .map(
+              (field) =>
+                `<span class="badge">${field.name}</span> ` +
+                `<span class="badge ${field.required ? "warning" : "info"}">${field.type || "string"}${field.required ? " *" : ""}</span>`
+            )
+            .join(" ")
+        : '<span class="muted">未定义 Schema</span>';
+      const jsonText = JSON.stringify(data, null, 2);
+      document.getElementById("view-record-data").textContent = jsonText;
+      document.getElementById("view-copy-json").setAttribute("data-copy", jsonText);
+      viewDialog.showModal();
+      return;
+    }
+    const btn = event.target.closest("[data-edit-record]");
+    if (!btn) return;
+    const id = btn.dataset.editRecord;
+    const typeName = btn.dataset.type;
+    let data = {};
+    try { data = JSON.parse(btn.dataset.data || "{}"); } catch (e) {}
+    document.getElementById("edit-record-id").textContent = id;
+    document.getElementById("edit-record-type").value = typeName;
+    editForm.action = "/records/" + id + "/update";
+    renderFields(document.getElementById("edit-dynamic-fields"), schemaByName(typeName), data, "edit-field");
+    document.getElementById("edit-record-data").value = collectFieldsJson(document.getElementById("edit-dynamic-fields"));
+    dialog.showModal();
+  });
+
+  document.getElementById("records-type-filter").addEventListener("change", (event) => {
+    const params = new URLSearchParams(window.location.search);
+    if (event.target.value) params.set("record_type", event.target.value);
+    else params.delete("record_type");
+    params.delete("page");
+    window.location.href = "/records?" + params.toString();
+  });
+  document.getElementById("records-status-filter").addEventListener("change", (event) => {
+    const params = new URLSearchParams(window.location.search);
+    if (event.target.value) params.set("status", event.target.value);
+    else params.delete("status");
+    params.delete("page");
+    window.location.href = "/records?" + params.toString();
+  });
+  document.getElementById("records-order-filter").addEventListener("change", (event) => {
+    const params = new URLSearchParams(window.location.search);
+    if (event.target.value !== "desc") params.set("order", event.target.value);
+    else params.delete("order");
+    params.delete("page");
+    window.location.href = "/records?" + params.toString();
+  });
+
+  const selectAll = document.getElementById("records-select-all");
+  if (selectAll) {
+    selectAll.addEventListener("change", () => {
+      document.querySelectorAll(".record-check").forEach((checkbox) => {
+        checkbox.checked = selectAll.checked;
+      });
+    });
+  }
+  const bulkForm = document.getElementById("bulk-form");
+  if (bulkForm) {
+    bulkForm.addEventListener("submit", (event) => {
+      const selectAll = document.getElementById("bulk-select-all").checked;
+      document.getElementById("bulk-record-type").value =
+        document.getElementById("records-type-filter").value;
+      document.getElementById("bulk-status").value =
+        document.getElementById("records-status-filter").value;
+      const checked = document.querySelectorAll(".record-check:checked").length;
+      if (!selectAll && !checked) {
+        event.preventDefault();
+        toast("请勾选记录或启用「全选全部」", "error");
+        return;
+      }
+      const submitter = event.submitter;
+      if (submitter && submitter.formAction.includes("/bulk-export")) {
+        return; // 下载由浏览器处理
+      }
+    });
+  }
+</script>
+{% endblock %}
