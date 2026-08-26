@@ -26,12 +26,15 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
 
     _DOC_MAPPING = {
         "readme": "readme.md",
-        "dev": "dev_guide.md",
-        "api": "API.md",
+        "dev": "docs/DEVELOPMENT.md",
+        "api": "docs/API.md",
         "presets": "docs/PRESETS.md",
         "connections": "docs/CONNECTIONS.md",
         "manifest": "docs/PLUGIN_MANIFEST.md",
         "architecture": "docs/ARCHITECTURE.md",
+        "chronocat": "docs/CHRONOCAT.md",
+        "goals": "docs/GOALS.md",
+        "license": "LICENSE",
         "changelog": "docs/CHANGELOG.md",
         "faq": "docs/FAQ.md",
     }

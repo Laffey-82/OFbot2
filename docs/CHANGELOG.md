@@ -29,6 +29,7 @@
 ### 文档与版本
 
 - 新增 `docs/PLUGIN_MANIFEST.md`；dev_guide 增加功能清单声明规范、监听环境、多连接与三角色指南；`API.md` 重新生成。
+- 工程化：新增 MIT `LICENSE`、`SECURITY.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`；文档统一收纳至 `docs/`（DEVELOPMENT / API / CHRONOCAT / GOALS），Web 内置文档同步更新。
 
 ## v3.0.0（2026-08）— 全面成熟化里程碑
 

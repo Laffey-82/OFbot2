@@ -60,13 +60,13 @@ py scripts/e2e_smoke.py
 | 文档 | 说明 |
 | --- | --- |
 | [docs/CONNECTIONS.md](docs/CONNECTIONS.md) | QQ 接入方案总览、能力矩阵与图文步骤 |
-| [dev_guide.md](dev_guide.md) | 插件开发指南（声明式规范、能力 API、CLI） |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 插件开发指南（声明式规范、能力 API、CLI） |
 | [docs/PLUGIN_MANIFEST.md](docs/PLUGIN_MANIFEST.md) | `plugin.json` 全字段参考与校验错误对照 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构分层、消息流、作用域判定、插件生命周期 |
 | [docs/FAQ.md](docs/FAQ.md) | 常见问题与运维排查 |
-| [API.md](API.md) | REST 接口清单（自动生成） |
+| [docs/API.md](docs/API.md) | REST 接口清单（自动生成） |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | 版本更新记录 |
-| [CHRONOCAT.md](CHRONOCAT.md) | Chronocat/Red 旧接入指南（兼容保留） |
+| [docs/CHRONOCAT.md](docs/CHRONOCAT.md) | Chronocat/Red 旧接入指南（兼容保留） |
 
 ## 目录结构
 
@@ -118,7 +118,7 @@ py -m app.cli plugin check my_plugin
 py -m app.cli plugin dev my_plugin
 ```
 
-完整规范见 [dev_guide.md](dev_guide.md) 与 [docs/PLUGIN_MANIFEST.md](docs/PLUGIN_MANIFEST.md)。
+完整规范见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) 与 [docs/PLUGIN_MANIFEST.md](docs/PLUGIN_MANIFEST.md)。
 
 ## 配置
 

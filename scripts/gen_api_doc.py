@@ -87,7 +87,7 @@ def main() -> None:
             lines.append(f"| {method} | `{path}` | {summary} |")
         lines.append("")
 
-    target = ROOT / "API.md"
+    target = ROOT / "docs" / "API.md"
     target.write_text("\n".join(lines), encoding="utf-8")
     print(f"API.md 已生成：{len(paths)} 个路径，{sum(len(v) for v in groups.values())} 个端点")
 

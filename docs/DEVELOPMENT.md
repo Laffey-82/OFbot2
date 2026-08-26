@@ -353,7 +353,7 @@ ofbot2 workflow run <id>           # 立即运行流程
 - `handler` 为插件包内点分符号（如 `handlers.roll_command`），`__init__.py` 需 `from . import handlers`。
 - 无 `features` 时，顶层 `commands` / `tasks` / `listeners` 回落 `<plugin>.default` 功能。
 - 每个功能可在「监听环境」页逐群/私聊三态开关；关闭后命令拦截、任务与监听跳过、帮助隐藏。
-- 完整字段参考见 `docs/PLUGIN_MANIFEST.md`；`ofbot2 plugin check <name>` 可在加载前校验。
+- 完整字段参考见 [PLUGIN_MANIFEST.md](PLUGIN_MANIFEST.md)；`ofbot2 plugin check <name>` 可在加载前校验。
 - 运行时 `ctx.commands.command()` / `ctx.subscribe()` / `ctx.scheduler` 仍可用，作为动态注册逃生通道（不入功能矩阵）。
 
 ## 参数与子命令（分段命令）
@@ -420,7 +420,7 @@ enabled = ctx.scope_policy.feature_enabled(ctx.name, "roll", "group:123")
 
 ## 多连接接入
 
-`transport.connections` 支持 onebot v11 / v12、red、satori、mirai、qq_official 并存，每个连接独立启停。接入步骤与能力对比见 `docs/CONNECTIONS.md`。开发新适配器时实现 `ProtocolAdapter`（`start/stop/send_group_message/send_private_message/test`）并归一化为统一 `BotEvent` + `MessageSegment`；反向 WS / HTTP 事件入口通过 `handle_reverse_ws` / `handle_http_event` 暴露。
+`transport.connections` 支持 onebot v11 / v12、red、satori、mirai、qq_official 并存，每个连接独立启停。接入步骤与能力对比见 [CONNECTIONS.md](CONNECTIONS.md)。开发新适配器时实现 `ProtocolAdapter`（`start/stop/send_group_message/send_private_message/test`）并归一化为统一 `BotEvent` + `MessageSegment`；反向 WS / HTTP 事件入口通过 `handle_reverse_ws` / `handle_http_event` 暴露。
 
 ## 三角色使用指南
 

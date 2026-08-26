@@ -1,6 +1,6 @@
 # Chronocat Red 接入指南
 
-> **兼容保留说明**：Chronocat 项目已停止更新，Red 协议仅作兼容保留；新版 Chronocat 仅支持 Satori 协议。新部署建议改用 NapCat（OneBot v11，见 [docs/CONNECTIONS.md](docs/CONNECTIONS.md)）。
+> **兼容保留说明**：Chronocat 项目已停止更新，Red 协议仅作兼容保留；新版 Chronocat 仅支持 Satori 协议。新部署建议改用 NapCat（OneBot v11，见 [CONNECTIONS.md](CONNECTIONS.md)）。
 
 ## 1. 安装 Chronocat
 
