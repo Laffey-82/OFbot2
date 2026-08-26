@@ -4,6 +4,7 @@ basic:
   command_start:
   - /
   - '!'
+  language: zh-CN
   log_level: INFO
   log_max_files: 60
   log_retention_days: 14

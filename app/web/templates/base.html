@@ -32,61 +32,61 @@
     <button type="button" class="menu-toggle" id="menu-toggle" aria-label="打开菜单">☰ 菜单</button>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
-        <strong class="brand">OFbot 2</strong>
+        <strong class="brand">{{ t_('brand') }}</strong>
         <button type="button" class="sidebar-close" id="sidebar-close" aria-label="关闭菜单">&times;</button>
       </div>
       <nav class="sidebar-nav">
         <div class="nav-group">
-          <div class="nav-title">概览</div>
-          <a href="/" class="{{ nav_active(request, '/') }}">仪表盘</a>
-          <a href="/stats" class="{{ nav_active(request, '/stats') }}">命令统计</a>
-          <a href="/commands" class="{{ nav_active(request, '/commands') }}">命令速查</a>
-          <a href="/monitor" class="{{ nav_active(request, '/monitor') }}">系统监控</a>
-          <a href="/capabilities" class="{{ nav_active(request, '/capabilities') }}">能力中心</a>
+          <div class="nav-title">{{ t_('nav.groups.overview') }}</div>
+          <a href="/" class="{{ nav_active(request, '/') }}">{{ t_('nav.dashboard') }}</a>
+          <a href="/stats" class="{{ nav_active(request, '/stats') }}">{{ t_('nav.stats') }}</a>
+          <a href="/commands" class="{{ nav_active(request, '/commands') }}">{{ t_('nav.commands') }}</a>
+          <a href="/monitor" class="{{ nav_active(request, '/monitor') }}">{{ t_('nav.monitor') }}</a>
+          <a href="/capabilities" class="{{ nav_active(request, '/capabilities') }}">{{ t_('nav.capabilities') }}</a>
         </div>
         <div class="nav-group">
-          <div class="nav-title">管理</div>
-          <a href="/config" class="{{ nav_active(request, '/config') }}">配置</a>
-          <a href="/plugins" class="{{ nav_active(request, '/plugins') }}">插件</a>
-          <a href="/plugins/repo" class="{{ nav_active(request, '/plugins/repo') }}">插件市场</a>
-          <a href="/scopes" class="{{ nav_active(request, '/scopes') }}">监听环境</a>
-          <a href="/connections" class="{{ nav_active(request, '/connections') }}">连接</a>
-          <a href="/api-keys" class="{{ nav_active(request, '/api-keys') }}">API Key</a>
+          <div class="nav-title">{{ t_('nav.groups.admin') }}</div>
+          <a href="/config" class="{{ nav_active(request, '/config') }}">{{ t_('nav.config') }}</a>
+          <a href="/plugins" class="{{ nav_active(request, '/plugins') }}">{{ t_('nav.plugins') }}</a>
+          <a href="/plugins/repo" class="{{ nav_active(request, '/plugins/repo') }}">{{ t_('nav.market') }}</a>
+          <a href="/scopes" class="{{ nav_active(request, '/scopes') }}">{{ t_('nav.scopes') }}</a>
+          <a href="/connections" class="{{ nav_active(request, '/connections') }}">{{ t_('nav.connections') }}</a>
+          <a href="/api-keys" class="{{ nav_active(request, '/api-keys') }}">{{ t_('nav.api_keys') }}</a>
         </div>
         <div class="nav-group">
-          <div class="nav-title">数据</div>
-          <a href="/records" class="{{ nav_active(request, '/records') }}">记录中心</a>
-          <a href="/state-machines" class="{{ nav_active(request, '/state-machines') }}">状态机</a>
-          <a href="/exports" class="{{ nav_active(request, '/exports') }}">导出中心</a>
-          <a href="/files" class="{{ nav_active(request, '/files') }}">文件中心</a>
-          <a href="/backups" class="{{ nav_active(request, '/backups') }}">数据备份</a>
+          <div class="nav-title">{{ t_('nav.groups.data') }}</div>
+          <a href="/records" class="{{ nav_active(request, '/records') }}">{{ t_('nav.records') }}</a>
+          <a href="/state-machines" class="{{ nav_active(request, '/state-machines') }}">{{ t_('nav.state_machines') }}</a>
+          <a href="/exports" class="{{ nav_active(request, '/exports') }}">{{ t_('nav.exports') }}</a>
+          <a href="/files" class="{{ nav_active(request, '/files') }}">{{ t_('nav.files') }}</a>
+          <a href="/backups" class="{{ nav_active(request, '/backups') }}">{{ t_('nav.backups') }}</a>
         </div>
         <div class="nav-group">
-          <div class="nav-title">自动化</div>
-          <a href="/workflows" class="{{ nav_active(request, '/workflows') }}">流程引擎</a>
-          <a href="/tasks" class="{{ nav_active(request, '/tasks') }}">定时任务</a>
-          <a href="/executions" class="{{ nav_active(request, '/executions') }}">执行历史</a>
-          <a href="/self-heal" class="{{ nav_active(request, '/self-heal') }}">自愈中心</a>
-          <a href="/webhooks" class="{{ nav_active(request, '/webhooks') }}">Webhook</a>
-          <a href="/alerts" class="{{ nav_active(request, '/alerts') }}">告警</a>
+          <div class="nav-title">{{ t_('nav.groups.automation') }}</div>
+          <a href="/workflows" class="{{ nav_active(request, '/workflows') }}">{{ t_('nav.workflows') }}</a>
+          <a href="/tasks" class="{{ nav_active(request, '/tasks') }}">{{ t_('nav.tasks') }}</a>
+          <a href="/executions" class="{{ nav_active(request, '/executions') }}">{{ t_('nav.executions') }}</a>
+          <a href="/self-heal" class="{{ nav_active(request, '/self-heal') }}">{{ t_('nav.self_heal') }}</a>
+          <a href="/webhooks" class="{{ nav_active(request, '/webhooks') }}">{{ t_('nav.webhooks') }}</a>
+          <a href="/alerts" class="{{ nav_active(request, '/alerts') }}">{{ t_('nav.alerts') }}</a>
         </div>
         <div class="nav-group">
-          <div class="nav-title">智能</div>
-          <a href="/ai" class="{{ nav_active(request, '/ai') }}">AI 能力</a>
+          <div class="nav-title">{{ t_('nav.groups.ai') }}</div>
+          <a href="/ai" class="{{ nav_active(request, '/ai') }}">{{ t_('nav.ai') }}</a>
         </div>
         <div class="nav-group">
-          <div class="nav-title">系统</div>
-          <a href="/setup" class="{{ nav_active(request, '/setup') }}">设置向导</a>
-          <a href="/audit" class="{{ nav_active(request, '/audit') }}">审计日志</a>
-          <a href="/logs" class="{{ nav_active(request, '/logs') }}">运行日志</a>
-          <a href="/docs/index" class="{{ nav_active(request, '/docs/index') }}">文档</a>
-          <a href="/account" class="{{ nav_active(request, '/account') }}">账户</a>
+          <div class="nav-title">{{ t_('nav.groups.system') }}</div>
+          <a href="/setup" class="{{ nav_active(request, '/setup') }}">{{ t_('nav.setup') }}</a>
+          <a href="/audit" class="{{ nav_active(request, '/audit') }}">{{ t_('nav.audit') }}</a>
+          <a href="/logs" class="{{ nav_active(request, '/logs') }}">{{ t_('nav.logs') }}</a>
+          <a href="/docs/index" class="{{ nav_active(request, '/docs/index') }}">{{ t_('nav.docs') }}</a>
+          <a href="/account" class="{{ nav_active(request, '/account') }}">{{ t_('nav.account') }}</a>
         </div>
       </nav>
       <div class="sidebar-footer">
         <span class="user-chip" title="{{ user.username }}">{{ user.username }}</span>
-        <button type="button" id="theme-toggle">主题</button>
-        <a href="/logout" class="logout-link">退出</a>
+        <button type="button" id="theme-toggle">{{ t_('nav.theme') }}</button>
+        <a href="/logout" class="logout-link">{{ t_('nav.logout') }}</a>
       </div>
     </aside>
   {% endif %}

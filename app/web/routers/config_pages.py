@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import (
@@ -34,6 +35,8 @@ from app.web.helpers import flash_redirect
 from app.web.security import password_hasher
 
 logger = get_logger(__name__)
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def _validate_rate_limit(value: str) -> bool:
@@ -84,6 +87,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         log_level: str = Form("INFO"),
         nickname: str = Form(""),
         superusers: str = Form(""),
+        language: str = Form(""),
         plugin_repo_url: str = Form(""),
         plugin_repo_token: str = Form(""),
         webhook_history_retention: int = Form(-1),
@@ -134,6 +138,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             settings.basic.superusers = [
                 item.strip() for item in superusers.split(",") if item.strip()
             ]
+        if language in {"zh-CN", "en"}:
+            settings.basic.language = language
         if webhook_history_retention >= 0:
             settings.web.webhook_history_retention = webhook_history_retention
         if webhook_history_page_size >= 0:
@@ -223,6 +229,14 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         user: WebAccount = Depends(get_current_user),
         csrf_token: str = Depends(get_csrf_token),
     ) -> HTMLResponse:
+        plugin_count = 0
+        plugins_dir = ROOT / "plugins"
+        if plugins_dir.exists():
+            plugin_count = sum(
+                1
+                for path in plugins_dir.iterdir()
+                if (path / "plugin.json").exists()
+            )
         return templates.TemplateResponse(
             request,
             "setup.html",
@@ -230,6 +244,9 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                 "request": request,
                 "user": user,
                 "config": settings.model_dump(mode="json"),
+                "connections": settings.transport.connections,
+                "plugin_count": plugin_count,
+                "scope_count": len(settings.runtime.scopes),
                 "csrf_token": csrf_token,
             },
         )

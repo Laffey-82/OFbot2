@@ -13,6 +13,7 @@ class BasicSettings(BaseModel):
     command_sep: list[str] = Field(default_factory=lambda: ["."])
     nickname: list[str] = Field(default_factory=lambda: ["OFbot_2"])
     superusers: list[str] = Field(default_factory=list)
+    language: str = "zh-CN"
     log_level: str = "INFO"
     log_retention_days: int = 14
     log_max_files: int = 60
@@ -218,6 +219,7 @@ DEFAULT_CONFIG = {
         "command_sep": ["."],
         "nickname": ["OFbot_2"],
         "superusers": [],
+        "language": "zh-CN",
         "log_level": "INFO",
         "log_retention_days": 14,
         "log_max_files": 60,

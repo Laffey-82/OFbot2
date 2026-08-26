@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1>设置向导</h1>
-    <div class="sub">首次启动建议：修改管理员密码并确认协议连接配置</div>
+    <div class="sub">三步完成首次配置：连接机器人 → 安装插件 → 开启功能</div>
   </div>
 </div>
 
@@ -12,9 +12,9 @@
 
 <div class="card">
   <div class="setup-steps">
-    <span class="setup-step-indicator active" data-indicator="1">1. 密码</span>
-    <span class="setup-step-indicator" data-indicator="2">2. 协议</span>
-    <span class="setup-step-indicator" data-indicator="3">3. 确认</span>
+    <span class="setup-step-indicator active" data-indicator="1">1. 连接</span>
+    <span class="setup-step-indicator" data-indicator="2">2. 插件市场</span>
+    <span class="setup-step-indicator" data-indicator="3">3. 监听环境</span>
   </div>
 </div>
 
@@ -36,75 +36,59 @@
         </div>
       </div>
     </div>
+    <div class="card">
+      <div class="card-head">
+        <h2>机器人连接</h2>
+        <a class="btn small secondary" href="/connections">打开连接中心</a>
+      </div>
+      <p class="muted" style="margin-top:0">连接新增、启停与测试在「连接中心」完成并即时生效。当前连接配置：</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>协议</th><th>模式</th><th>地址</th><th>状态</th></tr></thead>
+          <tbody>
+          {% for conn in connections %}
+          <tr data-row>
+            <td class="mono">{{ conn.id }}</td>
+            <td><span class="badge info">{{ conn.protocol }}{% if conn.protocol == 'onebot' %} {{ conn.version }}{% endif %}</span></td>
+            <td class="mono">{{ conn.mode }}</td>
+            <td class="mono">{{ conn.host }}:{{ conn.port }}{{ conn.path }}</td>
+            <td>{% if conn.enabled %}<span class="badge success">启用</span>{% else %}<span class="badge">停用</span>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="empty">暂无连接，请到「连接中心」新增（推荐 NapCat OneBot v11 反向 WS）</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted" style="font-size:12.5px">接入方式与图文步骤见 <a href="/docs/view/connections">《连接方案指南》</a>。</p>
+    </div>
   </div>
 
   <div class="setup-step" data-step="2" hidden>
     <div class="card">
-      <div class="card-head"><h2>协议连接</h2><span class="badge warning">重启后生效</span></div>
-      <div class="alert info">修改协议、主机 / 端口、Token 或监听地址后需重启服务生效；已连接的适配器可在「连接中心」手动重连。</div>
-      <div class="form-row">
-        <label>默认协议</label>
-        <div class="protocol-radio">
-          <label class="switch-inline"><input type="radio" name="protocol" value="red" {% if config.transport.protocol == 'red' %}checked{% endif %}> Red / Chronocat（QQNT）</label>
-          <label class="switch-inline"><input type="radio" name="protocol" value="onebot" {% if config.transport.protocol == 'onebot' %}checked{% endif %}> OneBot（NapCat / LLOneBot）</label>
-        </div>
+      <div class="card-head">
+        <h2>安装插件</h2>
+        <a class="btn small secondary" href="/plugins/repo">打开插件市场</a>
       </div>
-
-      <div id="setup-red" class="form-grid">
-        <div class="form-row">
-          <label for="red-host">Red 主机</label>
-          <input id="red-host" name="red_host" value="{{ config.transport.red.host }}">
-        </div>
-        <div class="form-row">
-          <label for="red-port">Red 端口</label>
-          <input id="red-port" name="red_port" type="number" value="{{ config.transport.red.port }}">
-        </div>
-        <div class="form-row">
-          <label for="red-token">Red Token</label>
-          <input id="red-token" name="red_token" type="password" value="{{ config.transport.red.token }}" autocomplete="off">
-        </div>
-        <div class="form-row">
-          <label for="red-api-base">API Base</label>
-          <input id="red-api-base" name="red_api_base" value="{{ config.transport.red.api_base }}">
-        </div>
+      <p class="muted" style="margin-top:0">当前已安装插件 <strong>{{ plugin_count }}</strong> 个。到「插件市场」一键安装社区/官方插件（安装后默认未启用）。</p>
+      <div class="actions">
+        <a class="btn secondary" href="/plugins">管理已装插件</a>
+        <a class="btn secondary" href="/plugins/repo">前往插件市场</a>
       </div>
-
-      <div id="setup-onebot" class="form-grid">
-        <div class="form-row">
-          <label class="switch-inline"><input type="checkbox" id="onebot-enabled" name="onebot_enabled" value="on" {% if config.transport.onebot.enabled %}checked{% endif %}> 启用 OneBot</label>
-        </div>
-        <div class="form-row">
-          <label for="onebot-mode">连接模式</label>
-          <select id="onebot-mode" name="onebot_mode">
-            <option value="forward" {% if config.transport.onebot.mode == 'forward' %}selected{% endif %}>正向（主动连接 NapCat）</option>
-            <option value="reverse" {% if config.transport.onebot.mode == 'reverse' %}selected{% endif %}>反向（等待 NapCat 连接）</option>
-          </select>
-        </div>
-        <div class="form-row">
-          <label for="onebot-host">OneBot 主机</label>
-          <input id="onebot-host" name="onebot_host" value="{{ config.transport.onebot.host }}">
-        </div>
-        <div class="form-row">
-          <label for="onebot-port">OneBot 端口</label>
-          <input id="onebot-port" name="onebot_port" type="number" value="{{ config.transport.onebot.port }}">
-        </div>
-        <div class="form-row">
-          <label for="onebot-path">路径</label>
-          <input id="onebot-path" name="onebot_path" value="{{ config.transport.onebot.path }}">
-        </div>
-        <div class="form-row">
-          <label for="onebot-token">Access Token（可选）</label>
-          <input id="onebot-token" name="onebot_access_token" type="password" value="{{ config.transport.onebot.access_token }}" autocomplete="off">
-        </div>
-      </div>
+      <p class="muted" style="font-size:12.5px;margin-top:8px">安装即执行插件代码，请确认来源可信；安装器会校验清单并拒绝路径穿越。</p>
     </div>
   </div>
 
   <div class="setup-step" data-step="3" hidden>
     <div class="card">
-      <div class="card-head"><h2>确认设置</h2></div>
-      <div class="config-grid" id="setup-summary"></div>
-      <p class="muted" style="margin-top:12px">点击「保存设置」后，协议连接配置将在重启服务后生效。</p>
+      <div class="card-head">
+        <h2>开启功能</h2>
+        <a class="btn small secondary" href="/scopes">打开监听环境</a>
+      </div>
+      <p class="muted" style="margin-top:0">当前已配置 <strong>{{ scope_count }}</strong> 个监听环境。在「监听环境」页为每个群/私聊开启需要的插件功能。</p>
+      <div class="actions">
+        <a class="btn secondary" href="/scopes">配置功能开关</a>
+      </div>
     </div>
     <div class="card">
       <div class="card-head">
@@ -141,29 +125,8 @@
     document.getElementById("setup-next").hidden = step === totalSteps;
     document.getElementById("setup-submit").hidden = step !== totalSteps;
     if (step === totalSteps) {
-      renderSummary();
       runSetupCheck();
     }
-  }
-
-  function renderSummary() {
-    const protocol = document.querySelector('input[name="protocol"]:checked').value;
-    const rows = [];
-    const newPassword = document.getElementById("setup-new").value;
-    rows.push({ label: "管理员密码", value: newPassword ? "已设置新密码" : "保持当前密码" });
-    rows.push({ label: "协议", value: protocol === "red" ? "Red / Chronocat" : "OneBot" });
-    if (protocol === "red") {
-      rows.push({ label: "Red 地址", value: document.getElementById("red-host").value + ":" + document.getElementById("red-port").value });
-      rows.push({ label: "Token", value: document.getElementById("red-token").value ? "已设置" : "未设置" });
-    } else {
-      rows.push({ label: "OneBot", value: document.getElementById("onebot-enabled").checked ? "启用" : "关闭" });
-      rows.push({ label: "模式", value: document.getElementById("onebot-mode").value });
-      rows.push({ label: "地址", value: document.getElementById("onebot-host").value + ":" + document.getElementById("onebot-port").value });
-    }
-    const container = document.getElementById("setup-summary");
-    container.innerHTML = rows
-      .map((row) => `<div class="config-item"><div class="config-label">${row.label}</div><div class="mono">${row.value}</div></div>`)
-      .join("");
   }
 
   function escapeCheckText(value) {
@@ -239,57 +202,8 @@
       button.textContent = "重新检查";
     }
   }
-  document
-    .getElementById("setup-check-btn")
-    .addEventListener("click", runSetupCheck);
 
-  document.getElementById("setup-next").addEventListener("click", () => {
-    if (setupStep === 2) {
-      const protocol = document.querySelector('input[name="protocol"]:checked').value;
-      const redPort = Number(document.getElementById("red-port").value);
-      const onebotPort = Number(document.getElementById("onebot-port").value);
-      if (!(redPort >= 1 && redPort <= 65535) || !(onebotPort >= 1 && onebotPort <= 65535)) {
-        toast("端口需在 1-65535 之间", "error");
-        return;
-      }
-      if (protocol === "red" && !document.getElementById("red-token").value.trim()) {
-        toast("Red 协议需要填写 Token", "error");
-        return;
-      }
-    }
-    if (setupStep < totalSteps) showStep(setupStep + 1);
-  });
-  document.getElementById("setup-prev").addEventListener("click", () => {
-    if (setupStep > 1) showStep(setupStep - 1);
-  });
-
-  function toggleProtocol() {
-    const protocol = document.querySelector('input[name="protocol"]:checked').value;
-    document.getElementById("setup-red").style.display = protocol === "red" ? "" : "none";
-    document.getElementById("setup-onebot").style.display = protocol === "onebot" ? "" : "none";
-  }
-  document.querySelectorAll('input[name="protocol"]').forEach((radio) => {
-    radio.addEventListener("change", toggleProtocol);
-  });
-  toggleProtocol();
-  showStep(1);
-  document.getElementById("setup-new").addEventListener("input", (event) => {
-    const value = event.target.value;
-    const hint = document.getElementById("password-strength-hint");
-    if (!value) {
-      hint.textContent = "建议 8 位以上，包含字母与数字";
-      hint.className = "hint";
-      return;
-    }
-    let score = 0;
-    if (value.length >= 8) score += 1;
-    if (/[A-Za-z]/.test(value) && /\d/.test(value)) score += 1;
-    if (/[^A-Za-z0-9]/.test(value)) score += 1;
-    const labels = ["较弱", "中等", "良好", "强"];
-    hint.textContent = "密码强度：" + labels[Math.min(score, 3)];
-    hint.className =
-      "hint " +
-      (score >= 2 ? "strength-ok" : score === 1 ? "strength-mid" : "strength-weak");
-  });
+  document.getElementById("setup-next").addEventListener("click", () => showStep(setupStep + 1));
+  document.getElementById("setup-prev").addEventListener("click", () => showStep(setupStep - 1));
 </script>
 {% endblock %}

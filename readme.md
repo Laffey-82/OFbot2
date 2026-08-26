@@ -61,6 +61,7 @@ py scripts/e2e_smoke.py
 
 | 文档 | 说明 |
 | --- | --- |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | 3 分钟上手：连接 → 插件 → 功能开关 |
 | [docs/CONNECTIONS.md](docs/CONNECTIONS.md) | QQ 接入方案总览、能力矩阵与图文步骤 |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 插件开发指南（声明式规范、能力 API、CLI） |
 | [docs/PLUGIN_MANIFEST.md](docs/PLUGIN_MANIFEST.md) | `plugin.json` 全字段参考与校验错误对照 |

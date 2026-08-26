@@ -42,6 +42,14 @@
         <span class="hint">保存后立即生效（权限）</span>
       </div>
       <div class="form-row">
+        <label for="cfg-language">界面语言</label>
+        <select id="cfg-language" name="language">
+          <option value="zh-CN" {% if config.basic.language == 'zh-CN' %}selected{% endif %}>中文（简体）</option>
+          <option value="en" {% if config.basic.language == 'en' %}selected{% endif %}>English</option>
+        </select>
+        <span class="hint">侧边栏与主要导航文案（i18n 骨架）</span>
+      </div>
+      <div class="form-row">
         <label for="cfg-plugin-repo-url">插件仓库地址（留空 = 本地目录模式）</label>
         <input id="cfg-plugin-repo-url" name="plugin_repo_url" value="{{ config.web.plugin_repo_url }}" placeholder="https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/registry.json">
         <span class="hint">指向 plugin-repo/registry.json；私有仓库需同时填写 Token</span>
@@ -67,6 +75,7 @@
     <input type="hidden" name="log_level" value="{{ config.basic.log_level }}">
     <input type="hidden" name="nickname" value="{{ config.basic.nickname | join(',') }}">
     <input type="hidden" name="superusers" value="{{ config.basic.superusers | join(',') }}">
+    <input type="hidden" name="language" value="{{ config.basic.language }}">
     <input type="hidden" name="plugin_repo_url" value="{{ config.web.plugin_repo_url }}">
     <input type="hidden" name="plugin_repo_token" value="{{ config.web.plugin_repo_token }}">
     <div class="form-grid">
@@ -132,6 +141,7 @@
     <input type="hidden" name="log_level" value="{{ config.basic.log_level }}">
     <input type="hidden" name="nickname" value="{{ config.basic.nickname | join(',') }}">
     <input type="hidden" name="superusers" value="{{ config.basic.superusers | join(',') }}">
+    <input type="hidden" name="language" value="{{ config.basic.language }}">
     <input type="hidden" name="plugin_repo_url" value="{{ config.web.plugin_repo_url }}">
     <input type="hidden" name="plugin_repo_token" value="{{ config.web.plugin_repo_token }}">
     <div class="alert info">以下配置在服务重启后生效：日志保留、会话有效期、调度器参数与安全策略。</div>

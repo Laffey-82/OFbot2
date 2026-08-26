@@ -21,6 +21,7 @@ from fastapi.templating import Jinja2Templates
 
 from app import __version__
 from app.core.config import Settings
+from app.core.i18n import t as translate
 from app.core.logger import get_logger
 from app.web.deps import (
     SessionManager,
@@ -86,6 +87,9 @@ def create_app(
     templates.env.globals["humanize_datetime"] = humanize_datetime
     templates.env.globals["nav_active"] = nav_active
     templates.env.globals["APP_VERSION"] = __version__
+    templates.env.globals["t_"] = lambda key: translate(
+        key, settings.basic.language
+    )
 
     def static_version(path: str) -> str:
         """静态资源内容哈希，文件变更自动刷新缓存，无需手动递增版本号。"""
