@@ -64,7 +64,7 @@ def build_zip(category: str, plugin_dir: Path, owner: str, repo: str, branch: st
     name = plugin_dir.name
     PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
     zip_path = PACKAGES_DIR / f"{name}.zip"
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as archive:
         for file_path in sorted(plugin_dir.rglob("*")):
             if file_path.is_dir():
                 continue
@@ -76,7 +76,7 @@ def build_zip(category: str, plugin_dir: Path, owner: str, repo: str, branch: st
             arcname = f"{name}/{file_path.relative_to(plugin_dir).as_posix()}"
             # 确定性打包：固定时间戳与属性，保证跨平台/跨机器产物字节一致
             info = zipfile.ZipInfo(arcname, date_time=(1980, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
+            info.compress_type = zipfile.ZIP_STORED
             info.external_attr = 0o600 << 16
             info.create_system = 3
             archive.writestr(info, file_path.read_bytes())
