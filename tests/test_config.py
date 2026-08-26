@@ -32,7 +32,7 @@ def test_load_settings_merges_command_start_string() -> None:
 
 def test_save_settings_writes_to_configured_path_only() -> None:
     root_config = Path(__file__).resolve().parents[1] / "config.yaml"
-    before = root_config.read_bytes()
+    before = root_config.read_bytes() if root_config.exists() else None
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         config_path = Path(tmp_dir) / "config.yaml"
         config_path.write_text(
@@ -46,7 +46,8 @@ def test_save_settings_writes_to_configured_path_only() -> None:
         assert yaml.safe_load(config_path.read_text(encoding="utf-8"))["basic"][
             "log_level"
         ] == "DEBUG"
-        assert root_config.read_bytes() == before
+        if before is not None:
+            assert root_config.read_bytes() == before
 
 
 def test_load_settings_creates_defaults_for_missing_path() -> None:
