@@ -6,6 +6,8 @@
 
 > 要求 Python >= 3.11；默认本地/私域部署，公网部署请阅读 [FAQ](docs/FAQ.md) 的安全建议。
 
+> [English Overview](docs/README.en.md)
+
 ## 功能特性
 
 - **多连接接入**：一个实例同时接入 NapCat / LLOneBot / Lagrange / Chronocat / Mirai / 官方机器人，连接独立启停、按群绑定账号路由出站消息。

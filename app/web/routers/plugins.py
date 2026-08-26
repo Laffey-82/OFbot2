@@ -41,6 +41,17 @@ logger = get_logger(__name__)
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def _version_greater(candidate: str, base: str) -> bool:
+    """简单语义化版本比较（X.Y.Z）。"""
+
+    def parts(value: str) -> tuple:
+        return tuple(
+            int(part) for part in value.split(".")[:3] if part.isdigit()
+        ) or (0,)
+
+    return parts(candidate) > parts(base)
+
+
 def _repo_service(app: FastAPI, settings: Settings):
     """获取插件仓库服务；每次读取最新 repo_url/token（配置页修改即时生效）。"""
     service = getattr(app.state, "plugin_repo_service", None)
@@ -276,20 +287,45 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         request: Request,
         user: WebAccount = Depends(get_current_user),
         csrf_token: str = Depends(get_csrf_token),
+        q: str = "",
+        category: str = "",
     ) -> HTMLResponse:
         service = _repo_service(app, settings)
         plugins: list[dict] = []
         error = ""
         try:
             for meta in await service.list_plugins():
-                plugins.append(meta.model_dump())
+                data = meta.model_dump()
+                installed_version = service.installed_version(data["name"])
+                data["installed_version"] = installed_version or ""
+                data["can_update"] = bool(
+                    installed_version
+                    and _version_greater(data.get("version", ""), installed_version)
+                )
+                plugins.append(data)
         except Exception as exc:
             error = str(exc)
         installed = {
             path.name
-            for path in (ROOT / "plugins").iterdir()
+            for path in service.plugins_dir.iterdir()
             if (path / "plugin.json").exists()
         }
+        categories = sorted(
+            {str(item["category"]) for item in plugins if item.get("category")}
+        )
+        query = q.strip().lower()
+        if query:
+            plugins = [
+                item
+                for item in plugins
+                if query in item["name"].lower()
+                or query in item.get("description", "").lower()
+                or query in item.get("author", "").lower()
+            ]
+        if category:
+            plugins = [
+                item for item in plugins if item.get("category") == category
+            ]
         return templates.TemplateResponse(
             request,
             "plugin_repo.html",
@@ -299,6 +335,9 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                 "plugins": plugins,
                 "error": error,
                 "installed": installed,
+                "categories": categories,
+                "q": q,
+                "category": category,
                 "mode": "URL" if settings.web.plugin_repo_url else "本地目录",
                 "repo_url": settings.web.plugin_repo_url,
                 "has_token": bool(settings.web.plugin_repo_token),
@@ -312,12 +351,15 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         user: WebAccount = Depends(require_admin),
         plugin_id: str = Form(...),
         target_name: str = Form(""),
+        replace: str = Form(""),
         csrf: None = Depends(require_csrf),
     ) -> RedirectResponse:
         service = _repo_service(app, settings)
         try:
             installed = await service.install(
-                plugin_id, target_name.strip() or None
+                plugin_id,
+                target_name.strip() or None,
+                replace=replace == "1",
             )
         except Exception as exc:
             audit_logger.record(

@@ -1,0 +1,36 @@
+{
+  "name": "signin",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "每日签到：记录连续天数与累计天数",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["signin.do"],
+  "config_schema": {
+    "type": "object",
+    "properties": {}
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "sign",
+      "label": "每日签到",
+      "description": "签到并统计连续/累计天数",
+      "enable_on_default": true,
+      "manage_permission": "signin.admin",
+      "commands": [
+        {
+          "name": "signin",
+          "aliases": ["签到"],
+          "handler": "handlers.signin_command",
+          "permission": "signin.do",
+          "description": "每日签到",
+          "usage": "/signin"
+        }
+      ]
+    }
+  ]
+}

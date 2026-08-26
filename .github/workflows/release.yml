@@ -1,0 +1,23 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          awk '/^## v/{if (seen) exit} /^## v/{seen=1} seen' docs/CHANGELOG.md > release_notes.md
+          echo "notes=$(cat release_notes.md)" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          generate_release_notes: false

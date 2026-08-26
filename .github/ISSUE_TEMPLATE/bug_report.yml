@@ -1,0 +1,40 @@
+name: Bug 报告
+description: 提交一个可复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: `py -m app.cli version` 的输出
+    validations:
+      required: true
+  - type: textarea
+    id: describe
+    attributes:
+      label: 问题描述
+      description: 期望行为与实际行为
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 报错信息
+      render: shell
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 部署环境
+      options: ["Windows", "Linux", "macOS", "Docker"]
+    validations:
+      required: true

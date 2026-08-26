@@ -3,6 +3,15 @@
   "updated_at": "2026-08-26",
   "plugins": [
     {
+      "id": "schedule_message",
+      "name": "schedule_message",
+      "version": "1.0.0",
+      "description": "定时播报：按 cron 定时向指定群发送消息",
+      "author": "OFbot 2",
+      "category": "data",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/schedule_message.zip"
+    },
+    {
       "id": "dice",
       "name": "dice",
       "version": "1.0.0",
@@ -10,6 +19,33 @@
       "author": "OFbot 2",
       "category": "general",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/dice.zip"
+    },
+    {
+      "id": "signin",
+      "name": "signin",
+      "version": "1.0.0",
+      "description": "每日签到：记录连续天数与累计天数",
+      "author": "OFbot 2",
+      "category": "general",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/signin.zip"
+    },
+    {
+      "id": "todo",
+      "name": "todo",
+      "version": "1.0.0",
+      "description": "个人待办：添加 / 列表 / 完成 / 删除",
+      "author": "OFbot 2",
+      "category": "general",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/todo.zip"
+    },
+    {
+      "id": "keyword_reply",
+      "name": "keyword_reply",
+      "version": "1.0.0",
+      "description": "关键词自动回复：命中配置的关键词即回复对应内容",
+      "author": "OFbot 2",
+      "category": "group",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/keyword_reply.zip"
     },
     {
       "id": "welcome",

@@ -1,0 +1,81 @@
+{
+  "name": "todo",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "个人待办：添加 / 列表 / 完成 / 删除",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["todo.use"],
+  "config_schema": {
+    "type": "object",
+    "properties": {}
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "todos",
+      "label": "个人待办",
+      "description": "待办事项管理（子命令示例）",
+      "enable_on_default": true,
+      "manage_permission": "todo.admin",
+      "commands": [
+        {
+          "name": "todo",
+          "aliases": ["待办"],
+          "handler": "handlers.todo_command",
+          "permission": "todo.use",
+          "description": "待办管理：add 添加 / list 列表 / done 完成 / del 删除",
+          "subcommands": [
+            {
+              "name": "add",
+              "aliases": ["添加"],
+              "description": "添加待办",
+              "params": [
+                {
+                  "name": "content",
+                  "type": "string",
+                  "required": true,
+                  "description": "待办内容"
+                }
+              ]
+            },
+            {
+              "name": "list",
+              "aliases": ["列表"],
+              "description": "查看我的待办"
+            },
+            {
+              "name": "done",
+              "aliases": ["完成"],
+              "description": "标记完成",
+              "params": [
+                {
+                  "name": "id",
+                  "type": "int",
+                  "required": true,
+                  "description": "待办序号"
+                }
+              ]
+            },
+            {
+              "name": "del",
+              "aliases": ["删除"],
+              "description": "删除待办",
+              "params": [
+                {
+                  "name": "id",
+                  "type": "int",
+                  "required": true,
+                  "description": "待办序号"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

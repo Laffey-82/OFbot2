@@ -329,7 +329,9 @@ def _plugin_repo_install(args: argparse.Namespace) -> int:
     )
     print("提示：安装插件即执行其代码，请确认来源可信。")
     try:
-        installed = asyncio.run(service.install(args.id, args.name))
+        installed = asyncio.run(
+            service.install(args.id, args.name, replace=args.force)
+        )
     except Exception as exc:
         print(f"安装失败：{exc}")
         return 1
@@ -558,6 +560,9 @@ def build_parser() -> argparse.ArgumentParser:
     repo_install = repo_sub.add_parser("install", help="安装仓库中的插件")
     repo_install.add_argument("id", help="插件 ID")
     repo_install.add_argument("--name", default=None, help="安装后的插件名（可选）")
+    repo_install.add_argument(
+        "--force", action="store_true", help="已存在时覆盖更新（旧包移入 .trash）"
+    )
     repo_install.set_defaults(func=_plugin_repo_install)
 
     install = plugin_sub.add_parser("install", help="安装插件 zip")

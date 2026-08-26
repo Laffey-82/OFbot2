@@ -1,0 +1,33 @@
+name: 插件投稿
+description: 提交新插件到 plugin-repo/ 插件仓库
+title: "[Plugin] "
+labels: ["plugin"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: 插件名
+      description: 与 plugin-repo/plugins/<分类>/<插件名>/ 目录一致
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本（X.Y.Z）
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 功能说明
+      description: 命令、监听、配置与使用方式
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 投稿检查
+      options:
+        - label: 已运行 `py plugin-repo/tools/build_packages.py --check`
+        - label: 已提交 plugins/ 源码、packages/*.zip 与 registry.json 变更
+        - label: plugin.json 遵循 docs/PLUGIN_MANIFEST.md（api_version=1、features 声明）

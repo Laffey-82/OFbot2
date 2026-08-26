@@ -1,0 +1,46 @@
+{
+  "name": "keyword_reply",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "关键词自动回复：命中配置的关键词即回复对应内容",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "rules": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "keyword": {"type": "string"},
+            "reply": {"type": "string"}
+          },
+          "required": ["keyword", "reply"]
+        },
+        "default": []
+      }
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "keyword",
+      "label": "关键词回复",
+      "description": "命中关键词自动回复",
+      "enable_on_default": false,
+      "manage_permission": "keyword_reply.admin",
+      "listeners": [
+        {
+          "event": "GroupMessageReceived",
+          "handler": "handlers.on_group_message",
+          "description": "群消息关键词匹配"
+        }
+      ]
+    }
+  ]
+}

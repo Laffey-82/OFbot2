@@ -42,6 +42,7 @@ class PluginRepoService:
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self.plugins_dir = Path(plugins_dir)
+        self.plugins_dir.mkdir(parents=True, exist_ok=True)
         self.repo_dir = Path(repo_dir)
         self.repo_url = (repo_url or "").strip()
         self.token = (token or "").strip()
@@ -148,7 +149,11 @@ class PluginRepoService:
         raise KeyError(f"插件仓库中不存在：{plugin_id}")
 
     async def install(
-        self, plugin_id: str, target_name: str | None = None
+        self,
+        plugin_id: str,
+        target_name: str | None = None,
+        *,
+        replace: bool = False,
     ) -> Path:
         meta = await self.get_plugin(plugin_id)
         if meta.zip_url.startswith(("http://", "https://")):
@@ -157,14 +162,35 @@ class PluginRepoService:
             archive = Path(meta.zip_url)
             if not archive.exists():
                 raise FileNotFoundError(f"插件包不存在：{archive}")
+        install_name = target_name or meta.name
+        target = self.plugins_dir / install_name
+        if target.exists():
+            if not replace:
+                raise ValueError(f"插件已存在：{install_name}")
+            self._trash(target)
         installed = PluginInstaller(self.plugins_dir).install_zip(archive)
         if target_name and target_name != installed.name:
-            renamed = self.plugins_dir / target_name
-            if renamed.exists():
-                raise ValueError(f"插件已存在：{target_name}")
-            installed.rename(renamed)
-            installed = renamed
+            installed_path = self.plugins_dir / installed.name
+            if installed_path.exists() and installed_path != target:
+                installed_path.rename(target)
+            installed = target
         return installed
+
+    def installed_version(self, name: str) -> str | None:
+        manifest_path = self.plugins_dir / name / "plugin.json"
+        if not manifest_path.exists():
+            return None
+        try:
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            return str(data.get("version", "")) or None
+        except (ValueError, json.JSONDecodeError):
+            return None
+
+    def _trash(self, target: Path) -> None:
+        trash_dir = self.plugins_dir / ".trash"
+        trash_dir.mkdir(parents=True, exist_ok=True)
+        archived = trash_dir / f"{target.name}-{int(time.time())}"
+        target.rename(archived)
 
     async def _download(self, url: str) -> Path:
         headers = {}

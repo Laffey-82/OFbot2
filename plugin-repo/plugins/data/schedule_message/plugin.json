@@ -1,0 +1,47 @@
+{
+  "name": "schedule_message",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "定时播报：按 cron 定时向指定群发送消息",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "group_id": {
+        "type": "string",
+        "default": "",
+        "description": "目标群号"
+      },
+      "message": {
+        "type": "string",
+        "default": "",
+        "description": "播报内容"
+      }
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "broadcast",
+      "label": "定时播报",
+      "description": "按计划向指定群发送消息",
+      "enable_on_default": false,
+      "manage_permission": "schedule_message.admin",
+      "tasks": [
+        {
+          "id": "daily_broadcast",
+          "kind": "cron",
+          "params": {"cron": "0 9 * * *"},
+          "handler": "handlers.broadcast",
+          "target": "all",
+          "description": "每日 09:00 播报（可在 plugin.json 中调整 cron）"
+        }
+      ]
+    }
+  ]
+}

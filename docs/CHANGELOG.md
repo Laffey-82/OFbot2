@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.2.0（2026-08）— 公开准备 + 插件生态
+
+### 社区设施
+
+- Issue 模板（Bug / 功能建议 / 插件投稿）、PR 模板、Dependabot 依赖更新。
+- Release 工作流：推送 `v*` tag 自动生成 GitHub Release。
+- CI 增加 `pip-audit` 依赖漏洞扫描；插件仓库校验保持内容级比对。
+
+### 插件市场升级
+
+- 市场页支持搜索与分类筛选、插件详情展开、已安装版本与可更新标记。
+- 支持覆盖更新安装（保留旧包备份），Web 与 CLI 均可执行。
+- 插件仓库扩充官方插件：keyword_reply、schedule_message、signin、todo。
+
+### 文档
+
+- 新增英文概览 `docs/README.en.md`；readme 增加入口。
+
 ## v3.1.0（2026-08）— 监听环境化重构 + 多连接接入
 
 ### 监听环境（逐群/私聊独立控制）

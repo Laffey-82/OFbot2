@@ -27,9 +27,17 @@
 <div class="card">
   <div class="card-head">
     <h2>可用插件</h2>
-    <div class="search-box">
-      <input data-table-filter="plugin-repo-grid" placeholder="搜索插件…">
-    </div>
+    <form method="get" action="/plugins/repo" class="form-row" style="flex-direction:row;align-items:center;gap:8px;margin:0">
+      <input name="q" value="{{ q }}" placeholder="搜索名称 / 说明 / 作者…" style="max-width:240px">
+      <select name="category" style="width:auto">
+        <option value="">全部分类</option>
+        {% for name in categories %}
+        <option value="{{ name }}" {{ 'selected' if category == name else '' }}>{{ name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="small secondary">筛选</button>
+      {% if q or category %}<a class="small ghost" href="/plugins/repo">清除</a>{% endif %}
+    </form>
   </div>
   {% if plugins %}
   <div class="grid-2">
@@ -41,11 +49,22 @@
           {% if plugin.category %}<span class="badge">{{ plugin.category }}</span>{% endif %}
         </h3>
         {% if plugin.id in installed %}
-        <span class="badge success">已安装</span>
+          {% if plugin.can_update %}
+          <span class="badge warning">可更新（{{ plugin.installed_version }} → {{ plugin.version }}）</span>
+          {% else %}
+          <span class="badge success">已安装 {{ plugin.installed_version }}</span>
+          {% endif %}
         {% endif %}
       </div>
       <p class="muted" style="margin:4px 0">{{ plugin.description or '（无说明）' }}</p>
-      <p class="muted" style="font-size:12px">作者：{{ plugin.author or '未知' }}</p>
+      <details>
+        <summary class="muted" style="font-size:12px;cursor:pointer">详情</summary>
+        <div class="muted" style="font-size:12px;margin-top:6px">
+          <div>作者：{{ plugin.author or '未知' }}</div>
+          <div>版本：{{ plugin.version }}</div>
+          <div class="cell-truncate" title="{{ plugin.zip_url }}">来源：{{ plugin.zip_url }}</div>
+        </div>
+      </details>
       {% if plugin.id not in installed %}
       <form method="post" action="/plugins/repo/install" class="js-ajax" style="margin-top:10px">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -54,6 +73,13 @@
           <input name="target_name" placeholder="安装名（可选，默认同插件名）" style="max-width:220px">
         </div>
         <button type="submit" class="small" data-confirm="安装即执行插件代码，确认来源可信后安装 {{ plugin.name }}？">安装</button>
+      </form>
+      {% elif plugin.can_update %}
+      <form method="post" action="/plugins/repo/install" class="js-ajax" style="margin-top:10px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
+        <input type="hidden" name="replace" value="1">
+        <button type="submit" class="small warning" data-confirm="更新将归档旧版本（移入 .trash）后安装 {{ plugin.version }}，确认？">更新</button>
       </form>
       {% endif %}
     </div>

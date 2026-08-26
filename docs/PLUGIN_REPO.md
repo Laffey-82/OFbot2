@@ -19,13 +19,14 @@ web:
 
 ## 使用入口
 
-- Web 后台 → 管理 → **插件市场**：卡片展示插件（名称/版本/分类/作者/说明），一键安装（二次确认），已安装插件标注状态。
+- Web 后台 → 管理 → **插件市场**：支持搜索与分类筛选、插件详情展开、已安装版本与可更新标记；一键安装（二次确认），已安装可覆盖更新（旧版本归档到 `plugins/.trash/`）。
 - CLI：
 
 ```powershell
 py -m app.cli plugin repo list
 py -m app.cli plugin repo install dice
 py -m app.cli plugin repo install dice --name my_dice
+py -m app.cli plugin repo install dice --force   # 已存在时覆盖更新
 ```
 
 ## 安装行为与安全
@@ -45,7 +46,7 @@ plugin-repo/
   tools/build_packages.py     # 打包与校验脚本
 ```
 
-投稿流程：
+官方插件：`dice`、`welcome`、`keyword_reply`、`schedule_message`、`signin`、`todo`（见 `plugin-repo/plugins/`）。投稿流程：
 
 1. 在 `plugin-repo/plugins/<分类>/<插件名>/` 创建包式插件（参考 `dice`、`welcome` 与 [PLUGIN_MANIFEST.md](PLUGIN_MANIFEST.md)）。
 2. 本地校验并构建：

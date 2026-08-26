@@ -76,6 +76,11 @@ def test_plugin_repo_install_unknown_fails(capsys) -> None:
     """安装不存在的插件应失败且不写入。"""
     from app.cli import _plugin_repo_install
 
-    assert _plugin_repo_install(Namespace(id="not_exist_plugin", name=None)) == 1
+    assert (
+        _plugin_repo_install(
+            Namespace(id="not_exist_plugin", name=None, force=False)
+        )
+        == 1
+    )
     output = capsys.readouterr().out
     assert "安装失败" in output
