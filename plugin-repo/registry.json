@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "updated_at": "2026-08-26",
+  "plugins": [
+    {
+      "id": "dice",
+      "name": "dice",
+      "version": "1.0.0",
+      "description": "掷骰子：随机 1-N 点数",
+      "author": "OFbot 2",
+      "category": "general",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/dice.zip"
+    },
+    {
+      "id": "welcome",
+      "name": "welcome",
+      "version": "1.0.0",
+      "description": "入群欢迎：新成员加入时自动发送欢迎语",
+      "author": "OFbot 2",
+      "category": "group",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/welcome.zip"
+    }
+  ]
+}

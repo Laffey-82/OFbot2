@@ -84,6 +84,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         log_level: str = Form("INFO"),
         nickname: str = Form(""),
         superusers: str = Form(""),
+        plugin_repo_url: str = Form(""),
+        plugin_repo_token: str = Form(""),
         webhook_history_retention: int = Form(-1),
         webhook_history_page_size: int = Form(-1),
         export_job_retention: int = Form(-1),
@@ -121,6 +123,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             settings.basic.command_sep = [
                 item.strip() for item in command_sep.split(",") if item.strip()
             ]
+        settings.web.plugin_repo_url = plugin_repo_url.strip()
+        settings.web.plugin_repo_token = plugin_repo_token.strip()
         settings.basic.log_level = log_level
         if nickname:
             settings.basic.nickname = [

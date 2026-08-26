@@ -1,0 +1,39 @@
+{
+  "name": "welcome",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "入群欢迎：新成员加入时自动发送欢迎语",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "welcome_text": {
+        "type": "string",
+        "default": "欢迎 {nickname} 加入本群！发送 /help 查看可用命令。",
+        "description": "欢迎语模板，{nickname} 替换为成员昵称"
+      }
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "greet",
+      "label": "入群欢迎",
+      "description": "新成员加入时发送欢迎语",
+      "enable_on_default": false,
+      "manage_permission": "welcome.admin",
+      "listeners": [
+        {
+          "event": "MemberJoined",
+          "handler": "handlers.on_member_joined",
+          "description": "新成员入群欢迎"
+        }
+      ]
+    }
+  ]
+}

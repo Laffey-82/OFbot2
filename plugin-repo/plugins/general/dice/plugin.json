@@ -1,0 +1,54 @@
+{
+  "name": "dice",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "掷骰子：随机 1-N 点数",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["dice.roll"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "max_faces": {
+        "type": "integer",
+        "default": 100,
+        "description": "默认最大面数"
+      }
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "roll",
+      "label": "掷骰子",
+      "description": "随机点数",
+      "enable_on_default": true,
+      "manage_permission": "dice.admin",
+      "commands": [
+        {
+          "name": "roll",
+          "aliases": ["掷骰子", "骰子"],
+          "handler": "handlers.roll_command",
+          "permission": "dice.roll",
+          "description": "随机掷 1-N 点数",
+          "usage": "/roll [面数]",
+          "examples": ["/roll", "/roll 6"],
+          "params": [
+            {
+              "name": "faces",
+              "type": "int",
+              "required": false,
+              "default": 100,
+              "description": "骰子面数"
+            }
+          ],
+          "cooldown": 2,
+          "rate_limit": "10/minute"
+        }
+      ]
+    }
+  ]
+}

@@ -34,6 +34,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         "architecture": "docs/ARCHITECTURE.md",
         "chronocat": "docs/CHRONOCAT.md",
         "goals": "docs/GOALS.md",
+        "plugin-repo": "docs/PLUGIN_REPO.md",
         "license": "LICENSE",
         "changelog": "docs/CHANGELOG.md",
         "faq": "docs/FAQ.md",

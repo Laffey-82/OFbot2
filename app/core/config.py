@@ -151,6 +151,8 @@ class WebSettings(BaseModel):
     secret: str = ""
     session_ttl_seconds: int = 60 * 60 * 8
     api_keys: list[str] = Field(default_factory=list)
+    plugin_repo_url: str = ""
+    plugin_repo_token: str = ""
     export_job_retention: int = 50
     export_retries: int = 0
     export_job_retention_days: int = 0
@@ -246,6 +248,8 @@ DEFAULT_CONFIG = {
         "secret": "",
         "session_ttl_seconds": 28800,
         "api_keys": [],
+        "plugin_repo_url": "",
+        "plugin_repo_token": "",
         "cpu_threshold": 80,
         "memory_threshold": 85,
         "alert_history_retention_days": 30,

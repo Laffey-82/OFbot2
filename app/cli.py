@@ -287,6 +287,59 @@ def _plugin_test(args: argparse.Namespace) -> int:
     return result.returncode
 
 
+def _plugin_repo_list(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from app.services.plugin_repo import PluginRepoService
+
+    settings = _settings()
+    service = PluginRepoService(
+        ROOT / "plugins",
+        ROOT / "plugin-repo",
+        repo_url=settings.web.plugin_repo_url,
+        token=settings.web.plugin_repo_token,
+    )
+    try:
+        plugins = asyncio.run(service.list_plugins())
+    except Exception as exc:
+        print(f"获取插件仓库失败：{exc}")
+        return 1
+    if not plugins:
+        print("插件仓库为空")
+        return 0
+    for plugin in plugins:
+        print(
+            f"{plugin.id} v{plugin.version} [{plugin.category or '—'}] "
+            f"{plugin.description}（{plugin.author or '未知作者'}）"
+        )
+    return 0
+
+
+def _plugin_repo_install(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from app.services.plugin_repo import PluginRepoService
+
+    settings = _settings()
+    service = PluginRepoService(
+        ROOT / "plugins",
+        ROOT / "plugin-repo",
+        repo_url=settings.web.plugin_repo_url,
+        token=settings.web.plugin_repo_token,
+    )
+    print("提示：安装插件即执行其代码，请确认来源可信。")
+    try:
+        installed = asyncio.run(service.install(args.id, args.name))
+    except Exception as exc:
+        print(f"安装失败：{exc}")
+        return 1
+    print(
+        f"已安装插件：{installed.name}（默认未启用，"
+        "可在 Web 插件页或 config.yaml 的 plugins 中启用）"
+    )
+    return 0
+
+
 def _plugin_install(args: argparse.Namespace) -> None:
     from app.services.plugin_installer import PluginInstaller
 
@@ -496,6 +549,16 @@ def build_parser() -> argparse.ArgumentParser:
     test_cmd = plugin_sub.add_parser("test", help="运行插件自带测试")
     test_cmd.add_argument("name", help="插件名")
     test_cmd.set_defaults(func=_plugin_test)
+
+    repo_cmd = plugin_sub.add_parser("repo", help="插件仓库（市场）")
+    repo_sub = repo_cmd.add_subparsers(dest="repo_command")
+    repo_sub.add_parser("list", help="列出仓库中的插件").set_defaults(
+        func=_plugin_repo_list
+    )
+    repo_install = repo_sub.add_parser("install", help="安装仓库中的插件")
+    repo_install.add_argument("id", help="插件 ID")
+    repo_install.add_argument("--name", default=None, help="安装后的插件名（可选）")
+    repo_install.set_defaults(func=_plugin_repo_install)
 
     install = plugin_sub.add_parser("install", help="安装插件 zip")
     install.add_argument("zip", help="zip 路径")

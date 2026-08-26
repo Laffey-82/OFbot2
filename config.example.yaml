@@ -105,6 +105,8 @@ web:
   export_retries: 0
   host: 127.0.0.1
   memory_threshold: 85
+  plugin_repo_token: ''
+  plugin_repo_url: ''
   port: 8080
   secret: ''
   session_ttl_seconds: 28800

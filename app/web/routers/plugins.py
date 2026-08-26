@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import (
@@ -36,6 +37,27 @@ from app.web.deps import (
 from app.web.helpers import flash_redirect
 
 logger = get_logger(__name__)
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def _repo_service(app: FastAPI, settings: Settings):
+    """获取插件仓库服务；每次读取最新 repo_url/token（配置页修改即时生效）。"""
+    service = getattr(app.state, "plugin_repo_service", None)
+    if service is None:
+        from app.services.plugin_repo import PluginRepoService
+
+        service = PluginRepoService(
+            ROOT / "plugins",
+            ROOT / "plugin-repo",
+            repo_url=settings.web.plugin_repo_url,
+            token=settings.web.plugin_repo_token,
+        )
+        app.state.plugin_repo_service = service
+    service.repo_url = (settings.web.plugin_repo_url or "").strip()
+    service.token = (settings.web.plugin_repo_token or "").strip()
+    service._cache = None
+    return service
 
 
 def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRouter:
@@ -247,6 +269,76 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             headers={
                 "Content-Disposition": f'attachment; filename="{filename}"'
             },
+        )
+
+    @router.get("/plugins/repo", response_class=HTMLResponse)
+    async def plugin_repo_page(
+        request: Request,
+        user: WebAccount = Depends(get_current_user),
+        csrf_token: str = Depends(get_csrf_token),
+    ) -> HTMLResponse:
+        service = _repo_service(app, settings)
+        plugins: list[dict] = []
+        error = ""
+        try:
+            for meta in await service.list_plugins():
+                plugins.append(meta.model_dump())
+        except Exception as exc:
+            error = str(exc)
+        installed = {
+            path.name
+            for path in (ROOT / "plugins").iterdir()
+            if (path / "plugin.json").exists()
+        }
+        return templates.TemplateResponse(
+            request,
+            "plugin_repo.html",
+            {
+                "request": request,
+                "user": user,
+                "plugins": plugins,
+                "error": error,
+                "installed": installed,
+                "mode": "URL" if settings.web.plugin_repo_url else "本地目录",
+                "repo_url": settings.web.plugin_repo_url,
+                "has_token": bool(settings.web.plugin_repo_token),
+                "csrf_token": csrf_token,
+            },
+        )
+
+    @router.post("/plugins/repo/install")
+    async def plugin_repo_install(
+        request: Request,
+        user: WebAccount = Depends(require_admin),
+        plugin_id: str = Form(...),
+        target_name: str = Form(""),
+        csrf: None = Depends(require_csrf),
+    ) -> RedirectResponse:
+        service = _repo_service(app, settings)
+        try:
+            installed = await service.install(
+                plugin_id, target_name.strip() or None
+            )
+        except Exception as exc:
+            audit_logger.record(
+                "plugin_repo.install_failed",
+                user.username,
+                target=plugin_id,
+                success=False,
+                detail={"error": str(exc)},
+            )
+            return flash_redirect(
+                "/plugins/repo", error=f"安装失败：{exc}"
+            )
+        audit_logger.record(
+            "plugin_repo.installed",
+            user.username,
+            target=plugin_id,
+            success=True,
+        )
+        return flash_redirect(
+            "/plugins/repo",
+            message=f"已安装 {installed.name}（默认未启用，可在「插件」页启用）",
         )
 
     @router.post("/plugins/{name}/reload")

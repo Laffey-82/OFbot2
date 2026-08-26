@@ -60,3 +60,22 @@ def test_connections_list(capsys, tmp_path, monkeypatch) -> None:
     output = capsys.readouterr().out
     assert "napcat_main" in output
     assert "onebot" in output
+
+
+def test_plugin_repo_list_offline(capsys) -> None:
+    """本地插件仓库（plugin-repo/）离线可列出。"""
+    from app.cli import _plugin_repo_list
+
+    assert _plugin_repo_list(Namespace()) == 0
+    output = capsys.readouterr().out
+    assert "dice" in output
+    assert "welcome" in output
+
+
+def test_plugin_repo_install_unknown_fails(capsys) -> None:
+    """安装不存在的插件应失败且不写入。"""
+    from app.cli import _plugin_repo_install
+
+    assert _plugin_repo_install(Namespace(id="not_exist_plugin", name=None)) == 1
+    output = capsys.readouterr().out
+    assert "安装失败" in output

@@ -64,6 +64,7 @@ from app.services.capability_setup import register_builtin_capabilities
 from app.services.export import ExportService
 from app.services.files import FileService
 from app.services.plugin_installer import PluginInstaller
+from app.services.plugin_repo import PluginRepoService
 from app.services.records import (
     FieldSchema,
     RecordService,
@@ -263,6 +264,12 @@ async def run(settings: Settings) -> None:
         "backup": BackupService(ROOT / "data" / "backups"),
         "whitelist": whitelist_service,
         "installer": PluginInstaller(ROOT / "plugins"),
+        "plugin_repo": PluginRepoService(
+            ROOT / "plugins",
+            ROOT / "plugin-repo",
+            repo_url=settings.web.plugin_repo_url,
+            token=settings.web.plugin_repo_token,
+        ),
         "scaffold": ScaffoldService(ROOT / "examples" / "plugins", ROOT / "plugins"),
         "schema_registry": schema_registry,
         "records": record_service,
@@ -564,6 +571,7 @@ async def run(settings: Settings) -> None:
     web_app.state.scheduler = scheduler
     web_app.state.services = services
     web_app.state.scope_policy = scope_policy
+    web_app.state.plugin_repo_service = services.get("plugin_repo")
 
     connection_manager = ConnectionManager()
     connection_manager.attach(bot_client)

@@ -1,0 +1,24 @@
+name: Plugin Repo Check
+
+on:
+  push:
+    paths: ["plugin-repo/**"]
+  pull_request:
+    paths: ["plugin-repo/**"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install tools
+        run: pip install ruff
+      - name: Lint
+        run: ruff check plugin-repo/tools
+      - name: Build and verify committed artifacts
+        run: |
+          python plugin-repo/tools/build_packages.py
+          git diff --exit-code -- plugin-repo

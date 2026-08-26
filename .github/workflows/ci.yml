@@ -19,6 +19,6 @@ jobs:
       - name: Compile
         run: python -m compileall app plugins main.py tests scripts
       - name: Lint
-        run: ruff check app plugins main.py tests scripts
+        run: ruff check app plugins main.py tests scripts plugin-repo/tools
       - name: Test
         run: python -m pytest -q

@@ -41,6 +41,16 @@
         <input id="cfg-superusers" name="superusers" value="{{ config.basic.superusers | join(',') }}">
         <span class="hint">保存后立即生效（权限）</span>
       </div>
+      <div class="form-row">
+        <label for="cfg-plugin-repo-url">插件仓库地址（留空 = 本地目录模式）</label>
+        <input id="cfg-plugin-repo-url" name="plugin_repo_url" value="{{ config.web.plugin_repo_url }}" placeholder="https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/registry.json">
+        <span class="hint">指向 plugin-repo/registry.json；私有仓库需同时填写 Token</span>
+      </div>
+      <div class="form-row">
+        <label for="cfg-plugin-repo-token">插件仓库 Token（可选）</label>
+        <input id="cfg-plugin-repo-token" name="plugin_repo_token" type="password" value="{{ config.web.plugin_repo_token }}" autocomplete="off">
+        <span class="hint">GitHub Token（读取私有仓库注册表与插件包）</span>
+      </div>
     </div>
     <div class="form-actions"><button type="submit">保存配置</button></div>
   </form>
@@ -57,6 +67,8 @@
     <input type="hidden" name="log_level" value="{{ config.basic.log_level }}">
     <input type="hidden" name="nickname" value="{{ config.basic.nickname | join(',') }}">
     <input type="hidden" name="superusers" value="{{ config.basic.superusers | join(',') }}">
+    <input type="hidden" name="plugin_repo_url" value="{{ config.web.plugin_repo_url }}">
+    <input type="hidden" name="plugin_repo_token" value="{{ config.web.plugin_repo_token }}">
     <div class="form-grid">
       <div class="form-row">
         <label for="cfg-wh-retention">Webhook 历史保留条数</label>
@@ -120,6 +132,8 @@
     <input type="hidden" name="log_level" value="{{ config.basic.log_level }}">
     <input type="hidden" name="nickname" value="{{ config.basic.nickname | join(',') }}">
     <input type="hidden" name="superusers" value="{{ config.basic.superusers | join(',') }}">
+    <input type="hidden" name="plugin_repo_url" value="{{ config.web.plugin_repo_url }}">
+    <input type="hidden" name="plugin_repo_token" value="{{ config.web.plugin_repo_token }}">
     <div class="alert info">以下配置在服务重启后生效：日志保留、会话有效期、调度器参数与安全策略。</div>
     <div class="form-grid">
       <div class="form-row">

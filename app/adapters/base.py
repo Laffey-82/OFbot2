@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import ssl
 from abc import ABC, abstractmethod
 from typing import Any
-
-import httpx
 
 from app.core.bus import get_bus
 from app.core.commands import command_registry
@@ -12,6 +9,7 @@ from app.core.events import (
     GroupMessageReceived,
     PrivateMessageReceived,
 )
+from app.core.http import make_http_client
 from app.core.logger import get_logger
 from app.core.messages import (
     GroupMessageEvent,
@@ -23,12 +21,7 @@ from app.core.messages import (
 
 logger = get_logger(__name__)
 
-_SHARED_SSL_CONTEXT = ssl.create_default_context()
-
-
-def make_http_client(timeout: float = 15.0) -> httpx.AsyncClient:
-    """构建带共享 SSL 上下文的异步客户端（避免重复加载系统证书）。"""
-    return httpx.AsyncClient(timeout=timeout, verify=_SHARED_SSL_CONTEXT)
+__all__ = ["BotClient", "ProtocolAdapter", "make_http_client"]
 
 
 class ProtocolAdapter(ABC):

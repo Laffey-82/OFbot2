@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}插件市场 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>插件市场</h1>
+    <div class="sub">从本仓库内置插件仓库或远程注册表安装社区插件</div>
+  </div>
+  <div class="page-actions">
+    <span class="badge info">数据源：{{ mode }}</span>
+    {% if repo_url %}<span class="badge" title="{{ repo_url }}">{{ '已配置 Token' if has_token else '未配置 Token' }}</span>{% endif %}
+  </div>
+</div>
+
+{% if request.query_params.get("error") %}<div class="alert error">{{ request.query_params.get("error") }}</div>{% endif %}
+{% if request.query_params.get("msg") %}<div class="alert success">{{ request.query_params.get("msg") }}</div>{% endif %}
+
+{% if error %}
+<div class="alert warning">
+  <strong>无法读取插件仓库：</strong>{{ error }}
+  <div class="muted" style="margin-top:6px">
+    本地目录模式无需网络；远程仓库（私有）需在「配置」页填写 plugin_repo_token。
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head">
+    <h2>可用插件</h2>
+    <div class="search-box">
+      <input data-table-filter="plugin-repo-grid" placeholder="搜索插件…">
+    </div>
+  </div>
+  {% if plugins %}
+  <div class="grid-2">
+    {% for plugin in plugins %}
+    <div class="card" data-row>
+      <div class="card-head">
+        <h3>{{ plugin.name }}
+          {% if plugin.version %}<span class="badge info">{{ plugin.version }}</span>{% endif %}
+          {% if plugin.category %}<span class="badge">{{ plugin.category }}</span>{% endif %}
+        </h3>
+        {% if plugin.id in installed %}
+        <span class="badge success">已安装</span>
+        {% endif %}
+      </div>
+      <p class="muted" style="margin:4px 0">{{ plugin.description or '（无说明）' }}</p>
+      <p class="muted" style="font-size:12px">作者：{{ plugin.author or '未知' }}</p>
+      {% if plugin.id not in installed %}
+      <form method="post" action="/plugins/repo/install" class="js-ajax" style="margin-top:10px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
+        <div class="form-row">
+          <input name="target_name" placeholder="安装名（可选，默认同插件名）" style="max-width:220px">
+        </div>
+        <button type="submit" class="small" data-confirm="安装即执行插件代码，确认来源可信后安装 {{ plugin.name }}？">安装</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">插件仓库为空或暂不可用。</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>使用说明</h2></div>
+  <ul style="padding-left:18px;margin:8px 0">
+    <li>安装即代码执行：仅安装可信来源的插件；安装器会校验清单并拒绝路径穿越。</li>
+    <li>安装后默认<strong>不启用</strong>，请到「插件」页启用，并在「监听环境」页按群控制功能开关。</li>
+    <li>本地目录模式直接读取仓库内 <code>plugin-repo/</code>；远程模式请在「配置」页填写仓库地址（私有仓库需 Token）。</li>
+    <li>插件投稿方式见 <a href="/docs/view/plugin-repo">插件仓库说明</a>。</li>
+  </ul>
+</div>
+{% endblock %}
