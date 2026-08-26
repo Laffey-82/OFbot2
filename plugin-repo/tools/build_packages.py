@@ -24,6 +24,17 @@ PACKAGES_DIR = REPO_DIR / "packages"
 REGISTRY_PATH = REPO_DIR / "registry.json"
 
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+")
+_TEXT_SUFFIXES = {
+    ".py",
+    ".json",
+    ".md",
+    ".txt",
+    ".yml",
+    ".yaml",
+    ".toml",
+    ".cfg",
+    ".ini",
+}
 
 
 def discover_plugins() -> list[tuple[str, Path]]:
@@ -79,7 +90,11 @@ def build_zip(category: str, plugin_dir: Path, owner: str, repo: str, branch: st
             info.compress_type = zipfile.ZIP_STORED
             info.external_attr = 0o600 << 16
             info.create_system = 3
-            archive.writestr(info, file_path.read_bytes())
+            data = file_path.read_bytes()
+            if file_path.suffix.lower() in _TEXT_SUFFIXES:
+                # 统一 LF，避免 Windows 检出 CRLF 导致跨平台产物不一致
+                data = data.replace(b"\r\n", b"\n")
+            archive.writestr(info, data)
     return {
         "id": name,
         "name": name,
@@ -107,6 +122,7 @@ def build_registry(owner: str, repo: str, branch: str) -> list[dict]:
     REGISTRY_PATH.write_text(
         json.dumps(registry, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     return entries
 
