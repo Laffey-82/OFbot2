@@ -19,6 +19,7 @@ from app.core.cache import TTLCache
 from app.core.commands import CommandRegistry
 from app.core.events import PluginFailed, PluginLoaded, PluginUnloaded
 from app.core.logger import get_logger
+from app.core.parsing import ParamSpec, SubcommandSpec
 from app.core.permissions import PermissionManager
 from app.core.plugin_tasks import PluginTaskEntry, PluginTaskRegistry
 from app.core.scopes import ScopePolicyService, feature_key, resolve_scope
@@ -42,6 +43,8 @@ class DeclaredCommand(BaseModel):
     rate_limit: str | None = None
     priority: int = 10
     block: bool = True
+    params: list[ParamSpec] = Field(default_factory=list)
+    subcommands: list[SubcommandSpec] = Field(default_factory=list)
 
 
 class DeclaredTask(BaseModel):
@@ -506,6 +509,8 @@ class PluginManager:
                     feature_id=key,
                     usage=declared.usage,
                     examples=list(declared.examples),
+                    params=list(declared.params),
+                    subcommands=list(declared.subcommands),
                 )
             for declared in feature.tasks:
                 self._register_manifest_task(loaded, feature, declared, key)

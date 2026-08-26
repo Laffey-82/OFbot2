@@ -136,6 +136,12 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                     "rate_limit": command.rate_limit or "",
                     "usage": command.usage,
                     "examples": command.examples,
+                    "params": [
+                        param.model_dump() for param in command.params
+                    ],
+                    "subcommands": [
+                        sub.model_dump() for sub in command.subcommands
+                    ],
                     "plugin": command.plugin_name or "未归属",
                 }
             )
@@ -195,6 +201,12 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                     "rate_limit": command.rate_limit or "",
                     "usage": command.usage,
                     "examples": " ｜ ".join(command.examples),
+                    "params": " ".join(
+                        f"{param.name}:{param.type}" for param in command.params
+                    ),
+                    "subcommands": " ".join(
+                        sub.name for sub in command.subcommands
+                    ),
                     "plugin": command.plugin_name or "未归属",
                 }
             )
@@ -221,6 +233,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             "rate_limit",
             "usage",
             "examples",
+            "params",
+            "subcommands",
             "plugin",
         ]
         writer = csv.DictWriter(buffer, fieldnames=fieldnames)

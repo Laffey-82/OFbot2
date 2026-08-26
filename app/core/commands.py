@@ -14,6 +14,13 @@ from app.core.events import (
 )
 from app.core.logger import get_logger
 from app.core.messages import Message, MessageEvent
+from app.core.parsing import (
+    ParamSpec,
+    SubcommandSpec,
+    bind_params,
+    build_usage,
+    resolve_subcommand,
+)
 from app.core.permissions import permission_manager
 from app.core.scopes import resolve_scope
 from app.core.security import (
@@ -49,6 +56,8 @@ class CommandContext:
     feature_id: str = ""
     scope: str = ""
     connection_id: str = ""
+    subcommand: str = ""
+    params: dict[str, Any] | None = None
     raw_event: Any = None
 
 
@@ -67,6 +76,8 @@ class Command:
     feature_id: str = ""
     usage: str = ""
     examples: list[str] = field(default_factory=list)
+    params: list[ParamSpec] = field(default_factory=list)
+    subcommands: list[SubcommandSpec] = field(default_factory=list)
 
 
 class CommandRegistry:
@@ -110,6 +121,8 @@ class CommandRegistry:
         feature_id: str = "",
         usage: str = "",
         examples: Iterable[str] | None = None,
+        params: Iterable[ParamSpec] | None = None,
+        subcommands: Iterable[SubcommandSpec] | None = None,
     ) -> Callable[[CommandHandler], CommandHandler]:
         def decorator(func: CommandHandler) -> CommandHandler:
             self.register(
@@ -126,10 +139,34 @@ class CommandRegistry:
                 feature_id=feature_id,
                 usage=usage,
                 examples=list(examples or []),
+                params=self._coerce_params(params),
+                subcommands=self._coerce_subcommands(subcommands),
             )
             return func
 
         return decorator
+
+    @staticmethod
+    def _coerce_params(
+        params: Iterable[ParamSpec | dict] | None,
+    ) -> list[ParamSpec]:
+        return [
+            ParamSpec.model_validate(item)
+            if isinstance(item, dict)
+            else item
+            for item in (params or [])
+        ]
+
+    @staticmethod
+    def _coerce_subcommands(
+        subcommands: Iterable[SubcommandSpec | dict] | None,
+    ) -> list[SubcommandSpec]:
+        return [
+            SubcommandSpec.model_validate(item)
+            if isinstance(item, dict)
+            else item
+            for item in (subcommands or [])
+        ]
 
     def register(
         self,
@@ -147,6 +184,8 @@ class CommandRegistry:
         feature_id: str = "",
         usage: str = "",
         examples: Iterable[str] | None = None,
+        params: Iterable[ParamSpec] | None = None,
+        subcommands: Iterable[SubcommandSpec] | None = None,
     ) -> Command:
         command = Command(
             name=name,
@@ -162,6 +201,8 @@ class CommandRegistry:
             feature_id=feature_id,
             usage=usage,
             examples=list(examples or []),
+            params=self._coerce_params(params),
+            subcommands=self._coerce_subcommands(subcommands),
         )
         self._commands[name] = command
         if plugin_name:
@@ -405,6 +446,60 @@ class CommandRegistry:
             )
             return command.block
 
+        bound_params: dict[str, Any] | None = None
+        subcommand_name = ""
+        if command.params or command.subcommands:
+            parse_error = ""
+            parse_target = ""
+            if command.subcommands:
+                subcommand_name, sub_args, parse_error = resolve_subcommand(
+                    args, command.subcommands
+                )
+                if not parse_error:
+                    sub = next(
+                        (
+                            item
+                            for item in command.subcommands
+                            if item.name == subcommand_name
+                        ),
+                        None,
+                    )
+                    params = sub.params if sub is not None else []
+                    bound_params, parse_error = bind_params(sub_args, params)
+                    parse_target = subcommand_name
+            else:
+                bound_params, parse_error = bind_params(args, command.params)
+                parse_target = command.name
+            if parse_error:
+                reason = f"参数错误（{parse_target}）"
+                bus.dispatch(
+                    CommandRejected(
+                        bot_id=getattr(event, "bot_id", ""),
+                        self_id=getattr(event, "self_id", ""),
+                        user_id=user_id,
+                        group_id=group_id,
+                        command_name=command.name,
+                        reason=parse_error,
+                    )
+                )
+                audit_logger.record(
+                    "command.rejected",
+                    user_id,
+                    target=command.name,
+                    success=False,
+                    detail={"reason": parse_error, "scope": scope},
+                )
+                prefix = (self.command_start or ["/"])[0]
+                usage_text = command.usage or build_usage(
+                    command.name, command.params, command.subcommands
+                )
+                if usage_text.startswith("/"):
+                    usage_text = prefix + usage_text[1:]
+                await event.reply(
+                    f"【参数错误】{parse_error}\n用法：{usage_text}"
+                )
+                return command.block
+
         context = CommandContext(
             command_name=command.name,
             args=args,
@@ -413,6 +508,8 @@ class CommandRegistry:
             feature_id=command.feature_id,
             scope=scope,
             connection_id=connection_id,
+            subcommand=subcommand_name,
+            params=bound_params,
             raw_event=event,
         )
         try:

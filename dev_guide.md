@@ -356,6 +356,52 @@ ofbot2 workflow run <id>           # 立即运行流程
 - 完整字段参考见 `docs/PLUGIN_MANIFEST.md`；`ofbot2 plugin check <name>` 可在加载前校验。
 - 运行时 `ctx.commands.command()` / `ctx.subscribe()` / `ctx.scheduler` 仍可用，作为动态注册逃生通道（不入功能矩阵）。
 
+## 参数与子命令（分段命令）
+
+命令可在 `plugin.json` 声明参数与子命令，框架自动分词、类型转换与校验，无需手写字符串解析：
+
+```json
+{
+  "commands": [{
+    "name": "greet",
+    "handler": "handlers.greet_command",
+    "permission": "bot.command",
+    "params": [],
+    "subcommands": [
+      {
+        "name": "hello",
+        "aliases": ["你好"],
+        "description": "中文问候",
+        "params": [
+          {"name": "target", "type": "string", "default": "世界", "description": "问候对象"},
+          {"name": "count", "type": "int", "default": 1, "description": "重复次数"}
+        ]
+      },
+      {
+        "name": "world",
+        "description": "世界问候",
+        "params": []
+      }
+    ]
+  }]
+}
+```
+
+```python
+async def greet_command(event, args, command_ctx) -> None:
+    if command_ctx.subcommand == "hello":
+        params = command_ctx.params or {}
+        await event.reply(f"你好，{params['target']} × {params['count']}")
+```
+
+解析规则：
+
+- 参数类型：`string` / `int` / `float` / `bool`；支持 `choices` 限定取值、`required` 必填、`default` 默认值。
+- 位置参数与 `key=value` 命名参数混用；含空格的参数用引号包裹（如 `/echo "hello world"`）。
+- 未声明 `params` / `subcommands` 的命令，`args` 保持原始字符串（与旧插件完全兼容）。
+- 参数错误自动回复「【参数错误】原因 + 用法」，不进入处理器；`command_ctx.params` 为解析后的字典，`command_ctx.subcommand` 为命中的子命令名。
+- Web「命令速查」页与 `/help <命令>` 会自动展示参数与子命令。
+
 ## 监听环境与作用域
 
 框架按「监听环境」管理策略：群消息 → `group:<id>`，私聊 → `private:*`（单一私聊环境，不做逐人控制）。

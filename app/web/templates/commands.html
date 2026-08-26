@@ -74,7 +74,17 @@
             {% for example in row.examples %}{{ command_prefix }}{{ example[1:] if example.startswith('/') else example }}{% if not loop.last %} ｜ {% endif %}{% endfor %}
           </div>
           {% endif %}
-          {% if not row.usage and not row.examples %}<span class="muted">—</span>{% endif %}
+          {% if row.subcommands %}
+          <div class="muted" style="font-size:12px">子命令：
+            {% for sub in row.subcommands %}<span class="badge">{{ sub.name }}</span>{% endfor %}
+          </div>
+          {% endif %}
+          {% if row.params %}
+          <div class="muted" style="font-size:12px">参数：
+            {% for param in row.params %}<span class="badge">{{ param.name }}:{{ param.type }}{{ '（必填）' if param.required else '' }}</span>{% endfor %}
+          </div>
+          {% endif %}
+          {% if not row.usage and not row.examples and not row.params and not row.subcommands %}<span class="muted">—</span>{% endif %}
         </td>
         <td>{{ row.description or '（未填写说明）' }}</td>
         <td title="{{ row.permission_desc }}">

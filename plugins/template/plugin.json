@@ -36,8 +36,53 @@
           "description": "连通性测试，返回 pong 与参数（模板插件示例）",
           "usage": "/ping [内容]",
           "examples": ["/ping", "/ping 你好"],
+          "params": [
+            {
+              "name": "content",
+              "type": "string",
+              "required": false,
+              "default": "",
+              "description": "要回显的内容"
+            }
+          ],
           "cooldown": 3,
           "rate_limit": "10/minute"
+        },
+        {
+          "name": "greet",
+          "aliases": ["问候"],
+          "handler": "handlers.greet_command",
+          "permission": "template.ping",
+          "description": "子命令示例：hello 问候 / world 世界",
+          "subcommands": [
+            {
+              "name": "hello",
+              "aliases": ["你好"],
+              "description": "中文问候",
+              "params": [
+                {
+                  "name": "target",
+                  "type": "string",
+                  "required": false,
+                  "default": "世界",
+                  "description": "问候对象"
+                }
+              ]
+            },
+            {
+              "name": "world",
+              "description": "世界问候",
+              "params": [
+                {
+                  "name": "count",
+                  "type": "int",
+                  "required": false,
+                  "default": 1,
+                  "description": "重复次数"
+                }
+              ]
+            }
+          ]
         }
       ],
       "tasks": [

@@ -50,8 +50,42 @@
 | `description` | 帮助展示说明 |
 | `usage` | 用法示例文案 |
 | `examples` | 示例数组，帮助详情展示 |
+| `params` | 参数声明数组（见下），框架自动解析与校验 |
+| `subcommands` | 子命令声明数组（见下），支持分段命令 |
 | `cooldown` / `rate_limit` | 冷却秒数 / 限流规格 |
 | `priority` / `block` | 优先级 / 命中后是否阻断其他处理器 |
+
+#### params（参数声明）
+
+```json
+{
+  "name": "count",
+  "type": "int",              // string | int | float | bool
+  "required": false,
+  "default": 1,
+  "description": "重复次数",
+  "choices": ["a", "b"]
+}
+```
+
+- 支持位置参数与 `key=value` 命名参数；值可用引号包裹含空格的字符串。
+- 类型转换失败、缺少必填参数、多余参数或超出 `choices` 时，框架自动回复「参数错误 + 用法」。
+- 未提供 `usage` 时，用法由声明自动生成（如 `/greet world [count=1]`）。
+
+#### subcommands（子命令 / 分段命令）
+
+```json
+{
+  "name": "hello",
+  "aliases": ["你好"],
+  "description": "中文问候",
+  "params": [ ... ]
+}
+```
+
+- 声明子命令后，第一段参数作为子命令名匹配（支持别名），其余参数绑定到该子命令的 `params`。
+- 未知子命令或缺失子命令时自动回复可用列表与用法。
+- 处理器通过 `command_ctx.subcommand` 与 `command_ctx.params` 读取解析结果。
 
 ### tasks
 

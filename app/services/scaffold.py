@@ -91,6 +91,15 @@ class ScaffoldService:
                 "usage": "/demo [内容]",
                 "examples": ["/demo 你好"],
                 "cooldown": 2,
+                "params": [
+                    {
+                        "name": "content",
+                        "type": "string",
+                        "required": False,
+                        "default": "",
+                        "description": "要回显的内容",
+                    }
+                ],
             }
         ]
         tasks = []
@@ -170,8 +179,10 @@ class ScaffoldService:
             "",
             "",
             "async def demo_command(event: MessageEvent, args: Message, command_ctx) -> None:",
+            "    params = getattr(command_ctx, 'params', None) or {}",
+            "    content = params.get('content') or args.extract_plain_text().strip()",
             '    greeting = _ctx.config.get("greeting", "你好")',
-            '    await event.reply(f"{greeting}，收到：{args.extract_plain_text() or \'（空）\'}")',
+            '    await event.reply(f"{greeting}，收到：{content or \'（空）\'}")',
         ]
         if with_listener:
             handler_parts += [

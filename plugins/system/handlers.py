@@ -9,6 +9,7 @@ from uuid import uuid4
 from sqlalchemy import func, select
 
 from app.core.messages import Message, MessageEvent
+from app.core.parsing import build_usage
 from app.core.plugin import PluginContext
 from app.db.models import Task, TaskRun
 
@@ -103,6 +104,18 @@ async def help_command(
             lines.append("别名：" + " / ".join(sorted(target.aliases)))
         if target.usage:
             lines.append(f"用法：{_render_usage(target.usage)}")
+        elif target.params or target.subcommands:
+            lines.append(
+                f"用法：{_prefix()}"
+                f"{build_usage(target.name, target.params, target.subcommands)}"
+            )
+        if target.subcommands:
+            sub_lines = []
+            for sub in target.subcommands:
+                sub_lines.append(
+                    f"{sub.name}（{sub.description or '无说明'}）"
+                )
+            lines.append("子命令：" + " ｜ ".join(sub_lines))
         if target.examples:
             lines.append("示例：" + " ｜ ".join(_render_examples(target.examples)))
         if target.permission:

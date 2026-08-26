@@ -88,6 +88,110 @@ async def test_unknown_command_hint_uses_active_prefix() -> None:
 
 
 @pytest.mark.asyncio
+async def test_declared_params_parsed_and_validated() -> None:
+    """声明参数后，框架自动解析类型/必填/命名参数，错误时回复用法。"""
+    registry = CommandRegistry()
+    registry.set_command_start(["/"])
+    registry.set_security(SecurityPolicy())
+    permission_manager.upsert_principal("1", role="superadmin", scopes={"*"})
+
+    captured: dict = {}
+
+    async def handler(event, args, command_ctx) -> None:
+        captured["params"] = command_ctx.params
+        await event.reply("ok")
+
+    registry.register(
+        "add",
+        handler,
+        permission="bot.command",
+        plugin_name="test",
+        params=[
+            {
+                "name": "count",
+                "type": "int",
+                "required": True,
+            },
+            {
+                "name": "label",
+                "type": "string",
+                "default": "x",
+            },
+        ],
+    )
+
+    event = make_event("/add 5 你好")
+    assert await registry.handle_message(event) is True
+    assert captured["params"] == {"count": 5, "label": "你好"}
+
+    event_bad = make_event("/add abc")
+    assert await registry.handle_message(event_bad) is True
+    assert event_bad.replies and "参数错误" in event_bad.replies[0]
+    assert "需要整数" in event_bad.replies[0]
+    assert "用法" in event_bad.replies[0]
+
+    event_missing = make_event("/add")
+    assert await registry.handle_message(event_missing) is True
+    assert event_missing.replies and "缺少必填参数" in event_missing.replies[0]
+    await get_bus().stop(clear=True)
+    reset_bus()
+
+
+@pytest.mark.asyncio
+async def test_subcommand_dispatch() -> None:
+    """分段命令：第一段作为子命令，其余参数绑定到子命令参数。"""
+    registry = CommandRegistry()
+    registry.set_command_start(["/"])
+    registry.set_security(SecurityPolicy())
+    permission_manager.upsert_principal("1", role="superadmin", scopes={"*"})
+
+    captured: dict = {}
+
+    async def handler(event, args, command_ctx) -> None:
+        captured["sub"] = command_ctx.subcommand
+        captured["params"] = command_ctx.params
+        await event.reply("ok")
+
+    registry.register(
+        "greet",
+        handler,
+        permission="bot.command",
+        plugin_name="test",
+        subcommands=[
+            {
+                "name": "hello",
+                "aliases": ["你好"],
+                "params": [
+                    {"name": "target", "type": "string", "default": "世界"}
+                ],
+            },
+            {
+                "name": "world",
+                "params": [
+                    {"name": "count", "type": "int", "default": 1}
+                ],
+            },
+        ],
+    )
+
+    event = make_event("/greet 你好 小明")
+    assert await registry.handle_message(event) is True
+    assert captured["sub"] == "hello"
+    assert captured["params"] == {"target": "小明"}
+
+    event2 = make_event("/greet world 3")
+    assert await registry.handle_message(event2) is True
+    assert captured["sub"] == "world"
+    assert captured["params"] == {"count": 3}
+
+    event3 = make_event("/greet nope")
+    assert await registry.handle_message(event3) is True
+    assert event3.replies and "未知子命令" in event3.replies[0]
+    await get_bus().stop(clear=True)
+    reset_bus()
+
+
+@pytest.mark.asyncio
 async def test_command_registry_runs_handler() -> None:
     registry = CommandRegistry()
     registry.set_command_start(["/"])
