@@ -9,17 +9,6 @@ from app.core.config import load_settings
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _count_routes(routes) -> int:
-    """递归统计路由数（兼容 FastAPI 0.137+ 的嵌套路由器树）。"""
-    total = 0
-    for route in routes:
-        total += 1
-        nested = getattr(route, "routes", None)
-        if nested:
-            total += _count_routes(nested)
-    return total
-
-
 def test_version_consistency() -> None:
     """版本号单一来源：app.__version__ 与 pyproject 一致，静态资源版本用模板变量。"""
     import tomllib
@@ -163,10 +152,12 @@ def test_all_page_routers_build() -> None:
         audit_ops,
         executions_ops,
     ]
+    total_routes = 0
     for module in builders:
         router = module.build_router(
             app=app, settings=settings, templates=templates
         )
         assert router.routes, f"{module.__name__} 未注册任何路由"
+        total_routes += len(router.routes)
         app.include_router(router)
-    assert _count_routes(app.routes) > 30
+    assert total_routes > 30
