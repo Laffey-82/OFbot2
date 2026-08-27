@@ -40,6 +40,13 @@ def apply_security_settings(settings: Settings) -> None:
     command_registry.set_security(policy)
 
 
+def safe_zip_arcname(name: str) -> str:
+    """zip 打包安全归档名：去除路径分隔与 .. 段，防 zip-slip。"""
+    cleaned = str(name or "").replace("\\", "/").lstrip("/")
+    parts = [part for part in cleaned.split("/") if part not in ("", ".", "..")]
+    return "/".join(parts) or "file"
+
+
 def nav_active(request: Any, path: str) -> str:
     """侧边栏菜单高亮：精确匹配或子页面前缀匹配。"""
     current = request.url.path

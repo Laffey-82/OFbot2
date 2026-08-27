@@ -214,12 +214,11 @@ class MiraiAdapter(BaseAdapter):
                     {"type": "Plain", "text": segment.data.get("text", "")}
                 )
             elif segment.type == "at":
-                chain.append(
-                    {
-                        "type": "At",
-                        "target": int(segment.data.get("user_id", 0) or 0),
-                    }
-                )
+                try:
+                    target = int(segment.data.get("user_id", 0) or 0)
+                except (TypeError, ValueError):
+                    target = 0
+                chain.append({"type": "At", "target": target})
             elif segment.type == "image":
                 chain.append(
                     {

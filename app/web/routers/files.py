@@ -33,7 +33,7 @@ from app.web.deps import (
     require_admin,
     require_csrf,
 )
-from app.web.helpers import flash_redirect, render_markdown_light
+from app.web.helpers import flash_redirect, render_markdown_light, safe_zip_arcname
 
 logger = get_logger(__name__)
 
@@ -82,7 +82,10 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         service = app.state.services.get("files")
         if service is None:
             raise HTTPException(status_code=404, detail="file service unavailable")
-        path = service.resolve(name)
+        try:
+            path = service.resolve(name)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="file not found")
         if not path.exists():
             raise HTTPException(status_code=404, detail="file not found")
         return FileResponse(path)
@@ -96,7 +99,10 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         service = app.state.services.get("files")
         if service is None:
             raise HTTPException(status_code=404, detail="files unavailable")
-        path = service.resolve(name)
+        try:
+            path = service.resolve(name)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="file not found")
         if not path.exists():
             raise HTTPException(status_code=404, detail="file not found")
         try:
@@ -106,8 +112,9 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                     {"ok": False, "detail": "二进制文件无法预览"}
                 )
             content = data.decode("utf-8", errors="replace")
-        except Exception as exc:
-            return JSONResponse({"ok": False, "detail": str(exc)})
+        except Exception:
+            logger.exception("file preview failed: %s", name)
+            return JSONResponse({"ok": False, "detail": "读取失败"})
         html_content = ""
         if path.name.lower().endswith(".md"):
             html_content = render_markdown_light(content)
@@ -182,7 +189,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         buffer = BytesIO()
         with ZipFile(buffer, "w", ZIP_DEFLATED) as archive:
             for name, path in resolved:
-                archive.write(path, arcname=name)
+                archive.write(path, arcname=safe_zip_arcname(name))
         audit_logger.record(
             "files.bulk_downloaded",
             user.username,

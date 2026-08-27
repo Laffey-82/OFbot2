@@ -158,9 +158,20 @@ def create_app(
 
         @app.websocket(reverse_path)
         async def reverse_ws(
-            websocket: WebSocket, _handler: Any = reverse_handler
+            websocket: WebSocket, _path: str = reverse_path
         ) -> None:
-            await _handler(websocket)
+            # 动态查找当前 handler：连接热重载后仍指向最新适配器
+            manager = getattr(app.state, "connection_manager", None)
+            handler = None
+            if manager is not None:
+                for route_path, route_handler in manager.reverse_routes:
+                    if route_path == _path:
+                        handler = route_handler
+                        break
+            if handler is None:
+                await websocket.close()
+                return
+            await handler(websocket)
 
     for http_path, http_handler in http_routes or []:
 

@@ -42,6 +42,7 @@ from app.web.export_jobs import (
 )
 from app.web.helpers import (
     flash_redirect,
+    safe_zip_arcname,
 )
 
 logger = get_logger(__name__)
@@ -413,7 +414,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         buffer = BytesIO()
         with ZipFile(buffer, "w", ZIP_DEFLATED) as archive:
             for name, path in resolved:
-                archive.write(path, arcname=name)
+                archive.write(path, arcname=safe_zip_arcname(name))
         audit_logger.record(
             "export.bulk_downloaded",
             user.username,

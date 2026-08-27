@@ -237,6 +237,12 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         group_id = group_id.strip()
         if not group_id:
             return flash_redirect("/scopes", error="请填写群号")
+        import re
+
+        if not re.fullmatch(r"\d{1,20}", group_id):
+            return flash_redirect("/scopes", error="群号格式无效（仅数字，1-20 位）")
+        if len(settings.runtime.scopes) >= 1000:
+            return flash_redirect("/scopes", error="监听环境数量已达上限（1000）")
         from app.core.scopes import scope_for_group
 
         policy.ensure_scope(scope_for_group(group_id))

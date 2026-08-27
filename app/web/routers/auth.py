@@ -80,6 +80,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             5.0, max(0.0, float(settings.security.login_failure_delay_seconds))
         )
         state = _login_states.setdefault(username, _LoginState())
+        if len(_login_states) > 10000:
+            _login_states.pop(next(iter(_login_states)), None)
         now = time.time()
         if state.locked_until and now < state.locked_until:
             audit_logger.record(

@@ -315,22 +315,36 @@ class OneBotAdapter(BaseAdapter):
         return Message(raw_message)
 
     def _parse_cq(self, text: str) -> Message:
+        def unescape(value: str) -> str:
+            return (
+                value.replace("&#91;", "[")
+                .replace("&#93;", "]")
+                .replace("&#44;", ",")
+                .replace("&amp;", "&")
+            )
+
         segments: list[MessageSegment] = []
         pattern = re.compile(r"\[CQ:([a-zA-Z0-9_-]+),([^\]]+)\]")
         pos = 0
         for match in pattern.finditer(text):
             if match.start() > pos:
-                segments.append(MessageSegment("text", {"text": text[pos : match.start()]}))
+                segments.append(
+                    MessageSegment(
+                        "text", {"text": unescape(text[pos : match.start()])}
+                    )
+                )
             cq_type = match.group(1)
             data = {}
             for part in match.group(2).split(","):
                 if "=" in part:
                     key, value = part.split("=", 1)
-                    data[key.strip()] = value.strip()
+                    data[key.strip()] = unescape(value.strip())
             segments.append(MessageSegment(cq_type, data))
             pos = match.end()
         if pos < len(text):
-            segments.append(MessageSegment("text", {"text": text[pos:]}))
+            segments.append(
+                MessageSegment("text", {"text": unescape(text[pos:])})
+            )
         return Message.from_segments(segments)
 
     async def send_group_message(

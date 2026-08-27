@@ -96,6 +96,7 @@ class ConnectionManager:
         self.adapters = []
         self.tasks = {}
         self.adopt(adapters)
+        self.collect_reverse_routes()
         self.start_all()
 
     def connected_ids(self) -> list[str]:

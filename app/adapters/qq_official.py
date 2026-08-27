@@ -43,6 +43,7 @@ class OfficialQQAdapter(BaseAdapter):
         self.self_id = settings.self_id
         self._ws: Any = None
         self._http: httpx.AsyncClient | None = None
+        self._heartbeat_task: asyncio.Task | None = None
         self.api_base = (
             settings.api_base or "https://api.sgroup.qq.com"
         ).rstrip("/")
@@ -71,6 +72,15 @@ class OfficialQQAdapter(BaseAdapter):
 
     async def stop(self) -> None:
         self._running = False
+        if self._heartbeat_task is not None:
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+            self._heartbeat_task = None
         self.bot_client.status[self.bot_id] = "disconnected"
         try:
             get_bus().dispatch(
@@ -122,16 +132,18 @@ class OfficialQQAdapter(BaseAdapter):
                     }
                 )
             )
-            heartbeat_task: asyncio.Task | None = None
             try:
                 await self.recv_loop(ws, self._handle_raw_frame, self.bot_id)
             finally:
-                if heartbeat_task is not None:
-                    heartbeat_task.cancel()
+                if self._heartbeat_task is not None:
+                    self._heartbeat_task.cancel()
                     try:
-                        await heartbeat_task
+                        await self._heartbeat_task
+                    except asyncio.CancelledError:
+                        pass
                     except Exception:
                         pass
+                    self._heartbeat_task = None
 
     async def _handle_raw_frame(self, raw: str) -> None:
         data = json.loads(raw)
@@ -141,7 +153,9 @@ class OfficialQQAdapter(BaseAdapter):
                 data.get("d", {}).get("heartbeat_interval", 30000)
                 or 30000
             )
-            asyncio.create_task(
+            if self._heartbeat_task is not None:
+                self._heartbeat_task.cancel()
+            self._heartbeat_task = asyncio.create_task(
                 self._heartbeat_loop(
                     self._ws, max(1, int(interval) / 1000)
                 )
