@@ -2,6 +2,8 @@
 
 ## 方式一：pip 安装（推荐小白）
 
+> 当前 PyPI 发布暂未启用，`pip install ofbot2` 尚不可用；请使用方式二（Git 克隆）安装。
+
 ```bash
 pip install ofbot2
 ```

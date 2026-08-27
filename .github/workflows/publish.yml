@@ -1,8 +1,9 @@
 name: Publish to PyPI
 
 on:
-  push:
-    tags: ["v*"]
+  # 暂不自动发布：仅在仓库所有者手动触发时运行。
+  # 启用后改为 push tags: ["v*"] 即可随版本自动发布。
+  workflow_dispatch:
 
 permissions:
   contents: read
