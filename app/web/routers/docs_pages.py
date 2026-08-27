@@ -13,7 +13,6 @@ from fastapi import (
 )
 from fastapi.responses import (
     HTMLResponse,
-    PlainTextResponse,
 )
 
 from app.core.config import Settings
@@ -50,13 +49,6 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         return templates.TemplateResponse(
             request, "docs.html", {"request": request, "user": user}
         )
-
-    @router.get("/docs/{name}", response_class=PlainTextResponse)
-    async def docs_file(name: str) -> PlainTextResponse:
-        path = PROJECT_ROOT / _DOC_MAPPING.get(name, "")
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="document not found")
-        return PlainTextResponse(path.read_text(encoding="utf-8"))
 
     @router.get("/docs/view/{name}", response_class=HTMLResponse)
     async def docs_view(

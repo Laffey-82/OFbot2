@@ -709,15 +709,31 @@ async def run(settings: Settings) -> None:
     try:
         await server.serve()
     finally:
-        await connection_manager.stop_all()
-        for plugin_name in list(plugin_manager.loaded):
-            await plugin_manager.unload_plugin(plugin_name)
-        scheduler.shutdown(wait=False)
-        await background.stop()
         try:
-            await asyncio.wait_for(get_bus().stop(clear=True), timeout=2)
+            await connection_manager.stop_all()
+        except Exception:
+            logger.exception("connection cleanup failed")
+        for plugin_name in list(plugin_manager.loaded):
+            try:
+                await plugin_manager.unload_plugin(plugin_name)
+            except Exception:
+                logger.exception("plugin unload failed: %s", plugin_name)
+        scheduler.shutdown(wait=False)
+        try:
+            await background.stop()
+        except Exception:
+            logger.exception("background worker stop failed")
+        # bubus stop() 在高 pending 时可能同步阻塞事件循环（asyncio 超时无效），
+        # 用独立线程定时器兜底强制退出，保证进程必然结束。
+        from app.core.bus import arm_hard_exit
+
+        hard_exit = arm_hard_exit(6.0)
+        try:
+            await asyncio.wait_for(get_bus().stop(clear=True), timeout=4)
         except Exception:
             logger.warning("event bus did not stop cleanly")
+        finally:
+            hard_exit.cancel()
 
 
 async def main(config_path: str | None = None) -> None:

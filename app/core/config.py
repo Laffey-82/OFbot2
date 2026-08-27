@@ -159,6 +159,7 @@ class WebSettings(BaseModel):
     port: int = 8000
     secret: str = ""
     session_ttl_seconds: int = 60 * 60 * 8
+    cookie_secure: bool = False
     api_keys: list[str] = Field(default_factory=list)
     plugin_repo_url: str = ""
     plugin_repo_token: str = ""

@@ -69,6 +69,8 @@ def remove_record_type(settings: Settings, name: str) -> None:
 
 
 class FieldSchema:
+    _NAME_BLOCKED: frozenset[str] = frozenset({"/", "\\", ".."})
+
     def __init__(
         self,
         name: str,
@@ -77,23 +79,41 @@ class FieldSchema:
         default: Any = None,
         description: str = "",
     ) -> None:
+        self._validate_name(name)
         self.name = name
         self.field_type = field_type
         self.required = required
         self.default = default
         self.description = description
 
+    @classmethod
+    def _validate_name(cls, name: str) -> None:
+        if not name or not isinstance(name, str):
+            raise ValueError("字段名不能为空")
+        if any(part in name for part in cls._NAME_BLOCKED):
+            raise ValueError("字段名不能包含 / \\ 或 ..")
+
 
 class RecordTypeSchema:
+    _NAME_BLOCKED: frozenset[str] = frozenset({"/", "\\", ".."})
+
     def __init__(
         self,
         name: str,
         fields: list[FieldSchema] | None = None,
         description: str = "",
     ) -> None:
+        self._validate_name(name)
         self.name = name
         self.fields = fields or []
         self.description = description
+
+    @classmethod
+    def _validate_name(cls, name: str) -> None:
+        if not name or not isinstance(name, str):
+            raise ValueError("记录类型名不能为空")
+        if any(part in name for part in cls._NAME_BLOCKED):
+            raise ValueError("记录类型名不能包含 / \\ 或 ..")
 
     def validate(self, data: dict[str, Any]) -> dict[str, Any]:
         result: dict[str, Any] = {}

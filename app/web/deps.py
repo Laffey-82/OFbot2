@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 from datetime import UTC, timedelta
 from typing import Any
 
@@ -13,8 +14,9 @@ SESSION_COOKIE = "ofbot2_session"
 
 
 class SessionManager:
-    def __init__(self, ttl_seconds: int) -> None:
+    def __init__(self, ttl_seconds: int, *, secure: bool = False) -> None:
         self.ttl_seconds = ttl_seconds
+        self.secure = secure
 
     async def create_session(
         self, request: Request, response: Response, user_id: int
@@ -38,6 +40,7 @@ class SessionManager:
             max_age=self.ttl_seconds,
             httponly=True,
             samesite="lax",
+            secure=self.secure,
         )
         return csrf_token
 
@@ -128,5 +131,7 @@ async def require_api_key(
     allowed = settings.web.api_keys or []
     if not allowed:
         return
-    if x_api_key is None or x_api_key not in allowed:
+    if x_api_key is None or not any(
+        hmac.compare_digest(x_api_key, key) for key in allowed
+    ):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid api key")

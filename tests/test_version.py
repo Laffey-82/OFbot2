@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_version_single_source_consistent() -> None:
     with (ROOT / "pyproject.toml").open("rb") as file:
         pyproject = tomllib.load(file)
-    assert pyproject["project"]["version"] == app.__version__ == "1.0.0"
+    assert pyproject["project"]["version"] == app.__version__
 
 
 def test_version_format() -> None:
@@ -34,7 +34,9 @@ def test_main_changelog_single_version_line() -> None:
     """主 CHANGELOG 只保留 1.x 版本线，3.x/2.x 标题不得回潮。"""
     changelog = (ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
     headings = re.findall(r"^## v(\d+)\.", changelog, re.MULTILINE)
-    assert headings == ["1"], f"主 CHANGELOG 出现非 1.x 版本标题：{headings}"
+    assert headings and all(
+        major == "1" for major in headings
+    ), f"主 CHANGELOG 出现非 1.x 版本标题：{headings}"
 
 
 def test_archived_v3_changelog_complete() -> None:

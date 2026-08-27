@@ -61,14 +61,14 @@ class BackupService:
         """解析备份目录并校验，防止路径穿越。"""
         target = (self.backup_dir / name).resolve()
         base = self.backup_dir.resolve()
-        if not target.is_dir() or not str(target).startswith(str(base)):
+        if not target.is_dir() or not target.is_relative_to(base):
             raise ValueError("invalid backup name")
         return target
 
     def resolve_file(self, name: str, relative_path: str) -> Path:
         base = self.resolve_backup(name)
         target = (base / relative_path).resolve()
-        if not str(target).startswith(str(base)):
+        if not target.is_relative_to(base):
             raise ValueError("path escapes backup")
         return target
 

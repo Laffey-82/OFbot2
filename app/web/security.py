@@ -7,12 +7,21 @@ from datetime import UTC, datetime
 
 
 class PasswordHasher:
+    ITERATIONS = 600_000
+
     def hash_password(self, password: str) -> str:
         salt = secrets.token_bytes(16)
         digest = hashlib.pbkdf2_hmac(
-            "sha256", password.encode("utf-8"), salt, 200_000
+            "sha256", password.encode("utf-8"), salt, self.ITERATIONS
         )
-        return f"pbkdf2_sha256$200000${salt.hex()}${digest.hex()}"
+        return f"pbkdf2_sha256${self.ITERATIONS}${salt.hex()}${digest.hex()}"
+
+    def needs_upgrade(self, encoded: str) -> bool:
+        try:
+            _, iterations, _, _ = encoded.split("$", 3)
+            return int(iterations) < self.ITERATIONS
+        except Exception:
+            return False
 
     def verify_password(self, password: str, encoded: str) -> bool:
         try:
@@ -42,4 +51,3 @@ def utcnow() -> datetime:
 
 
 password_hasher = PasswordHasher()
-

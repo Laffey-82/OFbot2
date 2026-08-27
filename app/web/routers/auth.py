@@ -94,6 +94,15 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         verified = user is not None and password_hasher.verify_password(
             password, user.password_hash
         )
+        if verified and user is not None and password_hasher.needs_upgrade(
+            user.password_hash
+        ):
+            user.password_hash = password_hasher.hash_password(password)
+            async with session_factory()() as session:
+                account = await session.get(WebAccount, user.id)
+                if account is not None:
+                    account.password_hash = user.password_hash
+                    await session.commit()
         if not verified:
             if delay > 0:
                 await asyncio.sleep(delay)

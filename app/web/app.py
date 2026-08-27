@@ -53,7 +53,10 @@ def create_app(
     app.state.settings = settings
     app.state.started_at = time.time()
     app.state.plugin_manager = plugin_manager
-    app.state.session_manager = SessionManager(settings.web.session_ttl_seconds)
+    app.state.session_manager = SessionManager(
+        settings.web.session_ttl_seconds,
+        secure=settings.web.cookie_secure,
+    )
     app.state.services = {}
     app.state.export_jobs: dict[str, dict[str, Any]] = {}
     app.state.adapter_test_history: dict[str, list[dict[str, Any]]] = {}

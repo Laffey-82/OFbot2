@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from typing import Any
 
@@ -15,6 +16,13 @@ from app.db.models import AuditLog, ExportJob
 from app.web.helpers import _parse_date_range
 
 logger = get_logger(__name__)
+
+
+def sanitize_export_name(value: str, max_len: int = 80) -> str:
+    """导出文件名消毒：仅保留安全字符，防止路径穿越。"""
+    cleaned = re.sub(r"[^A-Za-z0-9_\-\u4e00-\u9fff]", "_", str(value or ""))
+    cleaned = cleaned.strip("._")
+    return cleaned[:max_len] or "export"
 
 
 def _export_job_from_row(row: Any) -> dict[str, Any]:
@@ -60,7 +68,9 @@ async def _run_export_job(
         job["total"] = len(rows)
         job["done"] = len(rows)
         job["message"] = "写入文件…"
-        name = f"records_{record_type}_{int(time.time())}"
+        name = (
+            f"records_{sanitize_export_name(record_type)}_{int(time.time())}"
+        )
         if fmt == "json":
             export_service.export_json(rows, name)
         elif fmt == "csv":
