@@ -1,7 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "ofbot2"
-version = "3.6.0"
+version = "1.0.0"
 description = "Extensible plugin-based bot framework with QQNT Red and OneBot adapters"
+readme = "readme.md"
+license = { file = "LICENSE" }
+authors = [{ name = "OFbot 2 Contributors" }]
+keywords = ["qq", "bot", "onebot", "napcat", "plugin", "chat"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: Chat",
+]
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.129.0",
@@ -21,6 +41,12 @@ dependencies = [
     "qrcode>=7.4.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Laffey-82/OFbot2"
+Repository = "https://github.com/Laffey-82/OFbot2"
+Documentation = "https://github.com/Laffey-82/OFbot2/tree/main/docs"
+Changelog = "https://github.com/Laffey-82/OFbot2/blob/main/docs/CHANGELOG.md"
+
 [project.scripts]
 ofbot2 = "app.cli:main"
 
@@ -31,6 +57,20 @@ dev = [
     "httpx>=0.27.0",
     "ruff>=0.16.0",
 ]
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "plugins*", "ofbot2*"]
+exclude = ["tests*", "examples*", "plugin-repo*", "docs*", "scripts*", "deploy*"]
+
+[tool.setuptools.package-data]
+app = ["web/templates/*.html", "web/static/*", "web/static/**/*"]
+"plugins.system" = ["plugin.json"]
+"plugins.template" = ["plugin.json"]
+"plugins.example_ai" = ["plugin.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

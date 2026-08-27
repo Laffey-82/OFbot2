@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}插件 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.plugins.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>插件管理</h1>
+    <h1>{{ t_('page.plugins.heading') }}</h1>
     <div class="sub">已加载插件列表，支持重载、卸载与配置</div>
   </div>
   <div class="page-actions">
@@ -78,7 +78,7 @@
             {% if plugin.state == "unloaded" %}
             <form method="post" action="/plugins/{{ plugin.name }}/load" style="display:inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="small">启用</button>
+              <button class="small">{{ t_('btn.enable') }}</button>
             </form>
             {% else %}
             <form method="post" action="/plugins/{{ plugin.name }}/reload" style="display:inline">

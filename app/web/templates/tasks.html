@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}定时任务 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.tasks.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>定时任务</h1>
+    <h1>{{ t_('page.tasks.title') }}</h1>
     <div class="sub">interval / cron 任务管理，任务状态与执行历史</div>
   </div>
 </div>
@@ -97,14 +97,14 @@
         <td>
           <div class="actions">
             <button type="button" class="small" data-task-run="{{ task.task_id }}" data-message="{{ task.params.get('message', '') }}" title="立即执行一次">立即运行</button>
-            <button type="button" class="small secondary" data-task-edit="{{ task.task_id }}" data-name="{{ task.name }}" data-type="{{ task.type }}" data-interval="{{ task.interval_seconds or '' }}" data-cron="{{ task.cron_expression or '' }}" data-group="{{ task.params.get('group_id', '') }}" data-message="{{ task.params.get('message', '') }}" data-params='{{ task.params | tojson }}' data-enabled="{{ '1' if task.enabled else '0' }}">编辑</button>
+            <button type="button" class="small secondary" data-task-edit="{{ task.task_id }}" data-name="{{ task.name }}" data-type="{{ task.type }}" data-interval="{{ task.interval_seconds or '' }}" data-cron="{{ task.cron_expression or '' }}" data-group="{{ task.params.get('group_id', '') }}" data-message="{{ task.params.get('message', '') }}" data-params='{{ task.params | tojson }}' data-enabled="{{ '1' if task.enabled else '0' }}">{{ t_('btn.edit') }}</button>
             <form method="post" action="/tasks/{{ task.task_id }}/toggle" style="display:inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="small secondary">{{ '禁用' if task.enabled else '启用' }}</button>
             </form>
             <form method="post" action="/tasks/{{ task.task_id }}/remove" style="display:inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="small danger" data-confirm="确定删除任务 {{ task.name }}？">删除</button>
+              <button class="small danger" data-confirm="确定删除任务 {{ task.name }}？">{{ t_('btn.delete') }}</button>
             </form>
           </div>
         </td>
@@ -244,7 +244,7 @@
     </div>
     <div class="form-actions">
       <button type="submit">执行</button>
-      <button type="button" class="secondary" data-close-dialog>取消</button>
+      <button type="button" class="secondary" data-close-dialog>{{ t_('btn.cancel') }}</button>
     </div>
   </form>
 </dialog>
@@ -301,8 +301,8 @@
       <label class="switch-inline"><input type="checkbox" id="task-edit-enabled" name="enabled" value="on" checked> 启用</label>
     </div>
     <div class="form-actions">
-      <button type="submit">保存</button>
-      <button type="button" class="secondary" data-close-dialog>取消</button>
+      <button type="submit">{{ t_('btn.save') }}</button>
+      <button type="button" class="secondary" data-close-dialog>{{ t_('btn.cancel') }}</button>
     </div>
   </form>
 </dialog>

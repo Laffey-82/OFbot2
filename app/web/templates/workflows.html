@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}流程引擎 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.workflows.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>自动化流程</h1>
+    <h1>{{ t_('page.workflows.heading') }}</h1>
     <div class="sub">触发器 → 步骤（动作 + 参数），组合框架能力完成自动化</div>
   </div>
 </div>
@@ -147,7 +147,7 @@
             <button type="button" class="small secondary" data-dry-run="{{ workflow.id }}" data-csrf="{{ csrf_token }}">干跑校验</button>
             <form method="post" action="/workflows/{{ workflow.id }}/delete" class="js-ajax">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="small danger" data-confirm="确定删除流程 {{ workflow.name }}？">删除</button>
+              <button class="small danger" data-confirm="确定删除流程 {{ workflow.name }}？">{{ t_('btn.delete') }}</button>
             </form>
             {% if not workflow.enabled %}
             <form method="post" action="/workflows/{{ workflow.id }}/enable" class="js-ajax">

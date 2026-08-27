@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}状态机 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.state_machines.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>状态机</h1>
+    <h1>{{ t_('page.state_machines.title') }}</h1>
     <div class="sub">通用状态流转定义，业务流转由插件声明</div>
   </div>
 </div>
@@ -41,7 +41,7 @@
       <h3><span class="badge info">{{ machine.name }}</span></h3>
       <form method="post" action="/state-machines/{{ machine.name }}/delete" class="js-ajax">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button class="small danger" data-confirm="确定删除状态机 {{ machine.name }}？">删除</button>
+        <button class="small danger" data-confirm="确定删除状态机 {{ machine.name }}？">{{ t_('btn.delete') }}</button>
       </form>
     </div>
     <div class="machine-graph" data-transitions='{{ machine.transitions | tojson }}'></div>

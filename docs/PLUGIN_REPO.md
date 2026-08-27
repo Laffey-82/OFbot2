@@ -46,7 +46,7 @@ plugin-repo/
   tools/build_packages.py     # 打包与校验脚本
 ```
 
-官方插件：`dice`、`welcome`、`keyword_reply`、`schedule_message`、`signin`、`todo`、`announcement`、`points`、`poll`、`random_choice`（见 `plugin-repo/plugins/`）。投稿流程：
+官方插件（25 个，见 `plugin-repo/plugins/`）：`dice`、`welcome`、`keyword_reply`、`schedule_message`、`signin`、`todo`、`announcement`、`points`、`poll`、`random_choice`、`calc`、`lottery`、`qrcode`、`timestamp`、`commission`、`duty`、`order`、`backup`、`export`、`stats`、`audit_viewer`、`health_check`、`system_status`、`anti_spam`、`reminder`。投稿流程：
 
 1. 在 `plugin-repo/plugins/<分类>/<插件名>/` 创建包式插件（参考 `dice`、`welcome` 与 [PLUGIN_MANIFEST.md](PLUGIN_MANIFEST.md)）。
 2. 本地校验并构建：
@@ -60,7 +60,7 @@ py plugin-repo/tools/build_packages.py
 
 投稿规范详见 [plugin-repo/CONTRIBUTING.md](../plugin-repo/CONTRIBUTING.md)。
 
-## 注册表元数据（v3.6.0 起）
+## 注册表元数据（v1.0.0 起）
 
 `registry.json` 条目由构建脚本自动生成，除基础字段外包含：
 

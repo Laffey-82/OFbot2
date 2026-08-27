@@ -1,0 +1,44 @@
+{
+  "name": "commission",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "分账比例计算",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["commission.use"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "打手": {"type": "number", "default": 0.68, "description": "打手比例"},
+      "接单人": {"type": "number", "default": 0.18, "description": "接单人比例"},
+      "OF": {"type": "number", "default": 0.09, "description": "平台比例"},
+      "应急公款": {"type": "number", "default": 0.05, "description": "应急公款比例"}
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "calc",
+      "label": "分账计算",
+      "description": "按金额计算各方分成",
+      "enable_on_default": true,
+      "manage_permission": "commission.admin",
+      "commands": [
+        {
+          "name": "commission",
+          "aliases": ["分账"],
+          "handler": "handlers.commission_command",
+          "permission": "commission.use",
+          "description": "按配置比例计算分账金额",
+          "usage": "/commission <金额>",
+          "examples": ["/commission 100"],
+          "cooldown": 2,
+          "rate_limit": "20/minute"
+        }
+      ]
+    }
+  ]
+}

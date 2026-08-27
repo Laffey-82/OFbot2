@@ -1,0 +1,36 @@
+{
+  "name": "health_check",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "健康检查命令",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["health_check.view"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "health",
+      "label": "健康检查",
+      "description": "查看适配器连接状态",
+      "enable_on_default": true,
+      "manage_permission": "health_check.admin",
+      "commands": [
+        {
+          "name": "health",
+          "aliases": ["健康"],
+          "handler": "handlers.health_command",
+          "permission": "health_check.view",
+          "description": "健康检查：适配器连接状态",
+          "usage": "/health",
+          "examples": ["/health"],
+          "cooldown": 5,
+          "rate_limit": "10/minute"
+        }
+      ]
+    }
+  ]
+}

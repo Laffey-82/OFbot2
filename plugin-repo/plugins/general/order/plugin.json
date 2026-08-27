@@ -1,0 +1,35 @@
+{
+  "name": "order",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "简化订单管理（JSON 存储）",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["order.use", "order.manage"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "order",
+      "label": "订单管理",
+      "description": "订单增删改查示例（通用记录的轻量替代）",
+      "enable_on_default": true,
+      "manage_permission": "order.admin",
+      "commands": [
+        {
+          "name": "order",
+          "handler": "handlers.order_command",
+          "permission": "order.use",
+          "description": "订单管理：add / list / done / delete",
+          "usage": "/order add <信息> <价格> ｜ /order list ｜ /order done|delete <id>",
+          "examples": ["/order add 代打 50", "/order list", "/order done a1b2c3d4"],
+          "cooldown": 2,
+          "rate_limit": "20/minute"
+        }
+      ]
+    }
+  ]
+}

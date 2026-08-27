@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}文件中心 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.files.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>文件中心</h1>
+    <h1>{{ t_('page.files.title') }}</h1>
     <div class="sub">媒体与附件文件管理，内容哈希去重</div>
   </div>
 </div>
@@ -70,7 +70,7 @@
             {% endif %}
             <form method="post" action="/files/{{ file.name }}/delete" class="js-ajax">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="small danger" data-confirm="确定删除文件 {{ file.name }}？">删除</button>
+              <button class="small danger" data-confirm="确定删除文件 {{ file.name }}？">{{ t_('btn.delete') }}</button>
             </form>
           </div>
         </td>

@@ -1,0 +1,36 @@
+{
+  "name": "backup",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "手动创建数据备份",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["backup.run"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "backup",
+      "label": "数据备份",
+      "description": "一键备份配置与数据库",
+      "enable_on_default": true,
+      "manage_permission": "backup.admin",
+      "commands": [
+        {
+          "name": "backup",
+          "aliases": ["备份"],
+          "handler": "handlers.backup_command",
+          "permission": "backup.run",
+          "description": "创建一份配置与数据库备份",
+          "usage": "/backup",
+          "examples": ["/backup"],
+          "cooldown": 60,
+          "rate_limit": "4/hour"
+        }
+      ]
+    }
+  ]
+}

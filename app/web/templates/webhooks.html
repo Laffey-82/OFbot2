@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Webhook - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.webhooks.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>Webhook 管理</h1>
+    <h1>{{ t_('page.webhooks.heading') }}</h1>
     <div class="sub">外部系统通过 Webhook 触发自动化流程，可发送测试事件验证链路</div>
   </div>
 </div>
@@ -67,7 +67,7 @@
             <form method="post" action="/webhooks/remove" class="js-ajax">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="name" value="{{ name }}">
-              <button class="small danger" data-confirm="确定删除 Webhook {{ name }}？">删除</button>
+              <button class="small danger" data-confirm="确定删除 Webhook {{ name }}？">{{ t_('btn.delete') }}</button>
             </form>
           </div>
         </td>
@@ -105,7 +105,7 @@
     </div>
     <div class="form-actions">
       <button type="submit">发送</button>
-      <button type="button" class="secondary" data-close-dialog>取消</button>
+      <button type="button" class="secondary" data-close-dialog>{{ t_('btn.cancel') }}</button>
     </div>
   </form>
 </dialog>

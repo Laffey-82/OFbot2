@@ -1,0 +1,25 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install build backend
+        run: pip install build
+      - name: Build distributions
+        run: python -m build
+      - name: Publish to PyPI
+        # 优先受信发布（OIDC）；仓库配置了 PYPI_TOKEN secret 时自动回退。
+        uses: pypa/gh-action-pypi-publish@release/v1

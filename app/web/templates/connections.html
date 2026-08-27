@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}连接中心 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.connections.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>连接中心</h1>
+    <h1>{{ t_('page.connections.title') }}</h1>
     <div class="sub">多协议多账号接入，健康度实时评分</div>
   </div>
 </div>
@@ -85,7 +85,7 @@
         <td>
           <form method="post" action="/connections/{{ name }}/reconnect" class="js-ajax">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="small secondary" data-confirm="确定重连适配器 {{ name }}？">重连</button>
+            <button class="small secondary" data-confirm="确定重连适配器 {{ name }}？">{{ t_('btn.reconnect') }}</button>
           </form>
           <form method="post" action="/connections/{{ name }}/test" class="js-ajax">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -147,7 +147,7 @@
           </form>
           <form method="post" action="/connections/{{ conn.id }}/delete" class="inline-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="small danger" data-confirm="删除连接 {{ conn.id }}？">删除</button>
+            <button class="small danger" data-confirm="删除连接 {{ conn.id }}？">{{ t_('btn.delete') }}</button>
           </form>
         </td>
       </tr>

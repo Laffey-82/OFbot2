@@ -1,0 +1,36 @@
+{
+  "name": "reminder",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "延迟提醒：N 秒后发送提醒",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["reminder.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "remind",
+      "label": "延迟提醒",
+      "description": "设置 N 秒后向本群发送提醒",
+      "enable_on_default": true,
+      "manage_permission": "reminder.admin",
+      "commands": [
+        {
+          "name": "remind",
+          "aliases": ["提醒"],
+          "handler": "handlers.remind_command",
+          "permission": "reminder.use",
+          "description": "N 秒后发送提醒内容",
+          "usage": "/remind <秒数> <提醒内容>",
+          "examples": ["/remind 60 该喝水了"],
+          "cooldown": 5,
+          "rate_limit": "10/minute"
+        }
+      ]
+    }
+  ]
+}

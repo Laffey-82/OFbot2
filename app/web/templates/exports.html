@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}导出中心 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.exports.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>导出中心</h1>
+    <h1>{{ t_('page.exports.title') }}</h1>
     <div class="sub">从通用记录或审计日志生成导出文件，插件与流程也可生成</div>
   </div>
 </div>
@@ -133,7 +133,7 @@
         <td>
           <form method="post" action="/exports/{{ file.name }}/delete" class="js-ajax">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="small danger" data-confirm="确定删除导出文件 {{ file.name }}？">删除</button>
+            <button class="small danger" data-confirm="确定删除导出文件 {{ file.name }}？">{{ t_('btn.delete') }}</button>
           </form>
         </td>
       </tr>

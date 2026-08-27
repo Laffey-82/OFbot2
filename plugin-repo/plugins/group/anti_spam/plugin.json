@@ -1,0 +1,36 @@
+{
+  "name": "anti_spam",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "简单防刷屏提醒",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "limit": {"type": "integer", "default": 5, "description": "窗口内消息数上限"},
+      "window": {"type": "number", "default": 10, "description": "统计窗口秒数"}
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "guard",
+      "label": "防刷屏",
+      "description": "窗口内消息超限时提醒",
+      "enable_on_default": false,
+      "manage_permission": "anti_spam.admin",
+      "listeners": [
+        {
+          "event": "GroupMessageReceived",
+          "handler": "handlers.on_group_message",
+          "description": "按用户滑动窗口计数"
+        }
+      ]
+    }
+  ]
+}

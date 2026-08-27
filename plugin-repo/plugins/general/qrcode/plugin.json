@@ -1,0 +1,36 @@
+{
+  "name": "qrcode",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "生成二维码图片",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["qrcode.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "qrcode",
+      "label": "二维码",
+      "description": "将文本生成二维码图片",
+      "enable_on_default": true,
+      "manage_permission": "qrcode.admin",
+      "commands": [
+        {
+          "name": "qrcode",
+          "aliases": ["二维码"],
+          "handler": "handlers.qrcode_command",
+          "permission": "qrcode.use",
+          "description": "生成二维码图片文件",
+          "usage": "/qrcode <内容>",
+          "examples": ["/qrcode https://example.com"],
+          "cooldown": 5,
+          "rate_limit": "10/minute"
+        }
+      ]
+    }
+  ]
+}

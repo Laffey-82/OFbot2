@@ -27,6 +27,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
     _DOC_MAPPING = {
         "readme": "readme.md",
         "quickstart": "docs/QUICKSTART.md",
+        "install": "docs/INSTALL.md",
+        "tutorial": "docs/TUTORIAL.md",
         "dev": "docs/DEVELOPMENT.md",
         "api": "docs/API.md",
         "presets": "docs/PRESETS.md",

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}告警规则 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.alerts.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>告警规则</h1>
+    <h1>{{ t_('page.alerts.title') }}</h1>
     <div class="sub">事件 → 通知群，用于监控运行状态</div>
   </div>
 </div>
@@ -156,7 +156,7 @@
         <td><span class="badge {{ 'success' if rule.enabled else 'warning' }}">{{ '启用' if rule.enabled else '禁用' }}</span></td>
         <td>
           <div class="actions">
-            <button type="button" class="small secondary" data-edit-alert="{{ rule.name }}" data-event="{{ rule.event }}" data-target="{{ rule.target_group }}" data-private="{{ rule.target_private }}" data-keyword="{{ rule.keyword }}" data-interval="{{ rule.min_interval_seconds }}">编辑</button>
+            <button type="button" class="small secondary" data-edit-alert="{{ rule.name }}" data-event="{{ rule.event }}" data-target="{{ rule.target_group }}" data-private="{{ rule.target_private }}" data-keyword="{{ rule.keyword }}" data-interval="{{ rule.min_interval_seconds }}">{{ t_('btn.edit') }}</button>
             <form method="post" action="/alerts/toggle" class="js-ajax">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="name" value="{{ rule.name }}">
@@ -164,12 +164,12 @@
             </form>
             <form method="post" action="/alerts/{{ rule.name }}/test" class="js-ajax">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="small secondary" title="向该规则的通知目标发送一条测试消息">测试</button>
+              <button class="small secondary" title="向该规则的通知目标发送一条测试消息">{{ t_('btn.test') }}</button>
             </form>
             <form method="post" action="/alerts/remove" class="js-ajax">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="name" value="{{ rule.name }}">
-              <button class="small danger" data-confirm="确定删除告警规则 {{ rule.name }}？">删除</button>
+              <button class="small danger" data-confirm="确定删除告警规则 {{ rule.name }}？">{{ t_('btn.delete') }}</button>
             </form>
           </div>
         </td>
@@ -287,8 +287,8 @@
       <input id="alert-edit-interval" name="min_interval_seconds" type="number" min="0" value="0">
     </div>
     <div class="form-actions">
-      <button type="submit">保存</button>
-      <button type="button" class="secondary" data-close-dialog>取消</button>
+      <button type="submit">{{ t_('btn.save') }}</button>
+      <button type="button" class="secondary" data-close-dialog>{{ t_('btn.cancel') }}</button>
     </div>
   </form>
 </dialog>

@@ -62,6 +62,8 @@ py scripts/e2e_smoke.py
 | 文档 | 说明 |
 | --- | --- |
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | 3 分钟上手：连接 → 插件 → 功能开关 |
+| [docs/INSTALL.md](docs/INSTALL.md) | 三种安装方式：pip / Git / Docker |
+| [docs/TUTORIAL.md](docs/TUTORIAL.md) | 从零写第一个插件（10 分钟教程） |
 | [docs/CONNECTIONS.md](docs/CONNECTIONS.md) | QQ 接入方案总览、能力矩阵与图文步骤 |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 插件开发指南（声明式规范、能力 API、CLI） |
 | [docs/PLUGIN_MANIFEST.md](docs/PLUGIN_MANIFEST.md) | `plugin.json` 全字段参考与校验错误对照 |
@@ -187,4 +189,4 @@ GitHub Actions 会在每次 push / PR 自动运行上述检查。
 
 ## 更新记录
 
-版本里程碑见 [docs/CHANGELOG.md](docs/CHANGELOG.md)，逐条历史见 [docs/CHANGELOG_FULL.md](docs/CHANGELOG_FULL.md)。
+版本里程碑见 [docs/CHANGELOG.md](docs/CHANGELOG.md)，v2 老历史见 [docs/archive/CHANGELOG_v2.md](docs/archive/CHANGELOG_v2.md)。

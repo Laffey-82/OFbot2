@@ -5,7 +5,6 @@ import asyncio
 import functools
 import re
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import uvicorn
@@ -35,6 +34,7 @@ from app.core.logger import (
     setup_logging,
 )
 from app.core.observability import get_system_metrics
+from app.core.paths import runtime_root
 from app.core.permissions import permission_manager
 from app.core.plugin import PluginManager
 from app.core.plugin_tasks import PluginTaskRegistry
@@ -81,7 +81,7 @@ from app.services.webhook import WebhookService
 from app.services.workflow import WorkflowEngine
 from app.services.workflow_templates import WorkflowTemplateService
 
-ROOT = Path(__file__).resolve().parent
+ROOT = runtime_root()
 logger = get_logger(__name__)
 
 async def run(settings: Settings) -> None:
@@ -721,7 +721,7 @@ async def run(settings: Settings) -> None:
 
 
 async def main(config_path: str | None = None) -> None:
-    settings = load_settings(config_path)
+    settings = load_settings(config_path or (ROOT / "config.yaml"))
     setup_logging(settings.basic.log_level)
     removed = prune_log_files(
         settings.basic.log_retention_days, settings.basic.log_max_files

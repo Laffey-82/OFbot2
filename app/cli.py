@@ -5,11 +5,12 @@ import asyncio
 import importlib.util
 import sys
 import time
-from pathlib import Path
 
 import httpx
 
-ROOT = Path(__file__).resolve().parents[1]
+from app.core.paths import runtime_root
+
+ROOT = runtime_root()
 
 
 def _settings():

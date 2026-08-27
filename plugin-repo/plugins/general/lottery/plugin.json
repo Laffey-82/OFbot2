@@ -1,0 +1,35 @@
+{
+  "name": "lottery",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "从候选名单中随机抽取一项",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["lottery.draw"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "draw",
+      "label": "随机抽取",
+      "description": "多个选项随机抽一个",
+      "enable_on_default": true,
+      "manage_permission": "lottery.admin",
+      "commands": [
+        {
+          "name": "lottery",
+          "handler": "handlers.lottery_command",
+          "permission": "lottery.draw",
+          "description": "从候选名单中随机抽取",
+          "usage": "/lottery <选项1> <选项2> ...",
+          "examples": ["/lottery 奶茶 火锅 烧烤"],
+          "cooldown": 3,
+          "rate_limit": "10/minute"
+        }
+      ]
+    }
+  ]
+}

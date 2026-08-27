@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}记录中心 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.records.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>记录中心</h1>
+    <h1>{{ t_('page.records.title') }}</h1>
     <div class="sub">通用数据模型：注册记录类型并管理数据，业务字段由插件定义</div>
   </div>
 </div>
@@ -72,7 +72,7 @@
         <td>
           <form method="post" action="/records/types/{{ type.name }}/delete" class="js-ajax">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="small danger" data-confirm="确定删除记录类型 {{ type.name }}？已有记录将保留但不再校验。">删除</button>
+            <button class="small danger" data-confirm="确定删除记录类型 {{ type.name }}？已有记录将保留但不再校验。">{{ t_('btn.delete') }}</button>
           </form>
         </td>
       </tr>
@@ -141,10 +141,10 @@
         <td>
           <div class="actions">
             <button type="button" class="small secondary" data-view-record="{{ record.id }}" data-type="{{ record.record_type }}" data-data='{{ record.data | tojson }}' data-created="{{ record.created_at }}" data-updated="{{ record.updated_at }}">查看</button>
-            <button type="button" class="small secondary" data-edit-record="{{ record.id }}" data-type="{{ record.record_type }}" data-data='{{ record.data | tojson }}'>编辑</button>
+            <button type="button" class="small secondary" data-edit-record="{{ record.id }}" data-type="{{ record.record_type }}" data-data='{{ record.data | tojson }}'>{{ t_('btn.edit') }}</button>
             <form method="post" action="/records/{{ record.id }}/delete" class="js-ajax">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="small danger" data-confirm="确定删除记录 #{{ record.id }}？">删除</button>
+              <button class="small danger" data-confirm="确定删除记录 #{{ record.id }}？">{{ t_('btn.delete') }}</button>
             </form>
             {% set machine = machine_transitions.get(record.record_type) %}
             {% if machine %}
@@ -194,8 +194,8 @@
       <textarea id="edit-record-data" name="data_json" rows="6" required></textarea>
     </div>
     <div class="form-actions">
-      <button type="submit">保存</button>
-      <button type="button" class="secondary" data-close-dialog>取消</button>
+      <button type="submit">{{ t_('btn.save') }}</button>
+      <button type="button" class="secondary" data-close-dialog>{{ t_('btn.cancel') }}</button>
     </div>
   </form>
 </dialog>

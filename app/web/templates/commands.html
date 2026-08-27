@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}命令速查 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.commands.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>命令速查</h1>
+    <h1>{{ t_('page.commands.title') }}</h1>
     <div class="sub">框架与插件注册的全部机器人命令，共 {{ rows | length }} 条</div>
   </div>
   <div class="page-actions">

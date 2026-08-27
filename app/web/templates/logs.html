@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}日志 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.logs.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>运行日志</h1>
+    <h1>{{ t_('page.logs.title') }}</h1>
     <div class="sub">查看 logs/ 目录下的运行日志（尾部 {{ lines }} 行）· 进程级日志自动保留 {{ log_retention_days }} 天 / 最多 {{ log_max_files }} 个</div>
   </div>
 </div>
@@ -30,7 +30,7 @@
     </div>
     <div class="form-actions">
       <button type="submit">查看</button>
-      <button type="button" class="secondary" id="log-refresh-btn">刷新</button>
+      <button type="button" class="secondary" id="log-refresh-btn">{{ t_('btn.refresh') }}</button>
       <label class="switch-inline">
         <input type="checkbox" id="log-autorefresh"> 自动刷新（5 秒）
       </label>

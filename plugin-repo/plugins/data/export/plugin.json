@@ -1,0 +1,36 @@
+{
+  "name": "export",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "数据导出为 CSV/JSON",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["export.run"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "export",
+      "label": "数据导出",
+      "description": "把 JSON 存储导出为 CSV/JSON 文件",
+      "enable_on_default": true,
+      "manage_permission": "export.admin",
+      "commands": [
+        {
+          "name": "export",
+          "aliases": ["导出"],
+          "handler": "handlers.export_command",
+          "permission": "export.run",
+          "description": "导出插件 JSON 数据为 csv 或 json",
+          "usage": "/export [csv|json]",
+          "examples": ["/export", "/export csv"],
+          "cooldown": 10,
+          "rate_limit": "10/minute"
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}流程运行详情 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.workflow_run.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>流程运行详情</h1>
+    <h1>{{ t_('page.workflow_run.title') }}</h1>
     <div class="sub">运行 #{{ run.id }} · {{ workflow.name if workflow else '已删除流程' }}</div>
   </div>
   <div class="page-actions">

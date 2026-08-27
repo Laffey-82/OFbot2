@@ -1,0 +1,43 @@
+{
+  "name": "stats",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "群消息与活跃用户统计",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["stats.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "stats",
+      "label": "消息统计",
+      "description": "监听群消息并统计消息数与活跃用户",
+      "enable_on_default": true,
+      "manage_permission": "stats.admin",
+      "commands": [
+        {
+          "name": "stats",
+          "aliases": ["统计"],
+          "handler": "handlers.stats_command",
+          "permission": "stats.use",
+          "description": "查看本群消息数与活跃用户数",
+          "usage": "/stats",
+          "examples": ["/stats"],
+          "cooldown": 5,
+          "rate_limit": "10/minute"
+        }
+      ],
+      "listeners": [
+        {
+          "event": "GroupMessageReceived",
+          "handler": "handlers.on_group_message",
+          "description": "统计群消息"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "audit_viewer",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "查看最近审计日志",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["audit_viewer.view"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "viewer",
+      "label": "审计查看",
+      "description": "展示最近审计动作",
+      "enable_on_default": true,
+      "manage_permission": "audit_viewer.admin",
+      "commands": [
+        {
+          "name": "audit",
+          "aliases": ["审计"],
+          "handler": "handlers.audit_command",
+          "permission": "audit_viewer.view",
+          "description": "查看最近 10 条审计日志",
+          "usage": "/audit",
+          "examples": ["/audit"],
+          "cooldown": 5,
+          "rate_limit": "10/minute"
+        }
+      ]
+    }
+  ]
+}

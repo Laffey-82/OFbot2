@@ -1,0 +1,36 @@
+{
+  "name": "timestamp",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "时间戳与日期互相转换",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["timestamp.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "convert",
+      "label": "时间戳转换",
+      "description": "时间戳 ↔ 日期时间",
+      "enable_on_default": true,
+      "manage_permission": "timestamp.admin",
+      "commands": [
+        {
+          "name": "timestamp",
+          "aliases": ["时间戳"],
+          "handler": "handlers.timestamp_command",
+          "permission": "timestamp.use",
+          "description": "时间戳转日期，或日期转时间戳",
+          "usage": "/timestamp <时间戳或日期时间>",
+          "examples": ["/timestamp 1700000000", "/timestamp 2026-08-27 10:00:00"],
+          "cooldown": 2,
+          "rate_limit": "20/minute"
+        }
+      ]
+    }
+  ]
+}

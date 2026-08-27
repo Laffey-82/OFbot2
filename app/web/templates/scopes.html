@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}监听环境 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.scopes.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>监听环境</h1>
+    <h1>{{ t_('page.scopes.title') }}</h1>
     <div class="sub">每个群 / 私聊独立控制功能开关、权限、黑名单与账号绑定</div>
   </div>
 </div>
@@ -102,7 +102,7 @@
     {% if scope.key != global_group and scope.key != private_scope %}
     <form method="post" action="/scopes/{{ scope.key }}/remove" class="inline-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button class="small danger" data-confirm="删除该监听环境及全部覆盖设置？">删除</button>
+      <button class="small danger" data-confirm="删除该监听环境及全部覆盖设置？">{{ t_('btn.delete') }}</button>
     </form>
     {% endif %}
   </div>
@@ -119,7 +119,7 @@
           </option>
           {% endfor %}
         </select>
-        <button type="submit">保存</button>
+        <button type="submit">{{ t_('btn.save') }}</button>
       </form>
     </div>
     <div>
@@ -130,7 +130,7 @@
           <option value="off" {{ 'selected' if not scope.entry.silent_deny }}>回复友好提示</option>
           <option value="on" {{ 'selected' if scope.entry.silent_deny }}>静默忽略</option>
         </select>
-        <button type="submit">保存</button>
+        <button type="submit">{{ t_('btn.save') }}</button>
       </form>
     </div>
   </div>
@@ -173,7 +173,7 @@
           <option value="deny">拒绝</option>
           <option value="default">跟随全局</option>
         </select>
-        <button type="submit">保存</button>
+        <button type="submit">{{ t_('btn.save') }}</button>
       </form>
       {% if scope.entry.permissions %}
       <table>

@@ -3,6 +3,38 @@
   "updated_at": "2026-08-27",
   "plugins": [
     {
+      "id": "backup",
+      "name": "backup",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "手动创建数据备份",
+      "author": "OFbot 2",
+      "category": "data",
+      "dependencies": {},
+      "tags": [
+        "data"
+      ],
+      "released_at": "",
+      "checksum": "ae95f86da1d51bb77815be0e543192ff30dd4e134e37c4627ef4726450304cd4",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/backup.zip"
+    },
+    {
+      "id": "export",
+      "name": "export",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "数据导出为 CSV/JSON",
+      "author": "OFbot 2",
+      "category": "data",
+      "dependencies": {},
+      "tags": [
+        "data"
+      ],
+      "released_at": "",
+      "checksum": "ad7243c78d34ff7929bb326d4af0d2c35c1f3565cb29f7f5cdf9aa921fcf4252",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/export.zip"
+    },
+    {
       "id": "schedule_message",
       "name": "schedule_message",
       "api_version": 1,
@@ -19,6 +51,70 @@
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/schedule_message.zip"
     },
     {
+      "id": "stats",
+      "name": "stats",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "群消息与活跃用户统计",
+      "author": "OFbot 2",
+      "category": "data",
+      "dependencies": {},
+      "tags": [
+        "data"
+      ],
+      "released_at": "",
+      "checksum": "7877444634ef86f4ed2eb6f4f26e88ba027c4adf1ac737bb073cbde162ff2b41",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/stats.zip"
+    },
+    {
+      "id": "audit_viewer",
+      "name": "audit_viewer",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "查看最近审计日志",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "f2aac5fc626d2af2bcf53b1f8190a8133eb3d0124c14eea48b68d8ac02014669",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/audit_viewer.zip"
+    },
+    {
+      "id": "calc",
+      "name": "calc",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "安全计算器：四则运算与幂/取模",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "4ba9b993dc31c3ad74a27644921b14c90523f2dd9b2cc3d4f3f1a9cb0f013283",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/calc.zip"
+    },
+    {
+      "id": "commission",
+      "name": "commission",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "分账比例计算",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "ee2e9211c0c952ac8b9ef97c0287d915d768f6dac33d8f56474184fedb3cbfaf",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/commission.zip"
+    },
+    {
       "id": "dice",
       "name": "dice",
       "api_version": 1,
@@ -33,6 +129,70 @@
       "released_at": "",
       "checksum": "d9bcb11055606a581c39b22d0772185099d0794d7d386c96c550d44c3c4aa797",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/dice.zip"
+    },
+    {
+      "id": "duty",
+      "name": "duty",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "值班排班：添加与查看",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "dfa5f68be01e6017642b45a185c1f8b169f65981af9931c4f5c43aaa24bfe0fe",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/duty.zip"
+    },
+    {
+      "id": "health_check",
+      "name": "health_check",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "健康检查命令",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "f577237e1aee9c78fcdb5789ee8f39983b2f9f79c7dc52bd7fdd8e8c1c87dc5a",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/health_check.zip"
+    },
+    {
+      "id": "lottery",
+      "name": "lottery",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "从候选名单中随机抽取一项",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "913d3e9b1119c98d1af443883c9594f1774db3a5913a1b152883a523a69c93b1",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/lottery.zip"
+    },
+    {
+      "id": "order",
+      "name": "order",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "简化订单管理（JSON 存储）",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "7dbdfa4715867efbea91bc83a1b293b27e89839a5a1b9075a7a94c7b7c2f4028",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/order.zip"
     },
     {
       "id": "points",
@@ -67,6 +227,22 @@
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/poll.zip"
     },
     {
+      "id": "qrcode",
+      "name": "qrcode",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "生成二维码图片",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "dbb021c78f76ee8c9c5692b2f54f51e7d9fc1e6dcf93599a8de3370da333f9ff",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/qrcode.zip"
+    },
+    {
       "id": "random_choice",
       "name": "random_choice",
       "api_version": 1,
@@ -83,6 +259,22 @@
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/random_choice.zip"
     },
     {
+      "id": "reminder",
+      "name": "reminder",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "延迟提醒：N 秒后发送提醒",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "4d3cca7f16a519f3e2eb3b8ae8cc2d33fdef5a1203e54acaf94110ad4f561ce7",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/reminder.zip"
+    },
+    {
       "id": "signin",
       "name": "signin",
       "api_version": 1,
@@ -97,6 +289,38 @@
       "released_at": "",
       "checksum": "76521b3dab00474542031a0c9abc8bb1ab499e81e136760478deac49d29b647d",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/signin.zip"
+    },
+    {
+      "id": "system_status",
+      "name": "system_status",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "系统状态命令",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "6f7622a1bcaa09a1ee228cc42ce1388a103081c3e099f146723437b24de099ac",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/system_status.zip"
+    },
+    {
+      "id": "timestamp",
+      "name": "timestamp",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "时间戳与日期互相转换",
+      "author": "OFbot 2",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "2eaf81fda99b31535ddcb09f1515dc25dc2d6bfa0f55ddbbfdcc3dd4f7a2cfeb",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/timestamp.zip"
     },
     {
       "id": "todo",
@@ -129,6 +353,22 @@
       "released_at": "",
       "checksum": "b33c0c49ffa82bea25b33880d2165d3362dffe52c0bd3afa07e0b6512a8c868e",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/announcement.zip"
+    },
+    {
+      "id": "anti_spam",
+      "name": "anti_spam",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "简单防刷屏提醒",
+      "author": "OFbot 2",
+      "category": "group",
+      "dependencies": {},
+      "tags": [
+        "group"
+      ],
+      "released_at": "",
+      "checksum": "b9716276725794d6089f9402be4d571c6b8b008af4fbd8bd5b431abb3983ba28",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/anti_spam.zip"
     },
     {
       "id": "keyword_reply",

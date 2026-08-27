@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}备份 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.backups.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>数据备份</h1>
+    <h1>{{ t_('page.backups.title') }}</h1>
     <div class="sub">SQLite 数据库与配置文件备份 · 自动备份：<span class="badge {{ 'success' if auto_backup_enabled else 'warning' }}">{{ '启用（每 ' ~ backup_interval_hours ~ ' 小时）' if auto_backup_enabled else '关闭' }}</span>{% if last_auto_backup %} · 上次自动备份：{{ last_auto_backup }}{% endif %}</div>
   </div>
   <div class="page-actions">
@@ -89,7 +89,7 @@
             </form>
             <form method="post" action="/backups/{{ item.name }}/delete" class="js-ajax">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="small danger" data-confirm="确定删除备份 {{ item.name }}？该操作不可恢复。">删除</button>
+              <button class="small danger" data-confirm="确定删除备份 {{ item.name }}？该操作不可恢复。">{{ t_('btn.delete') }}</button>
             </form>
           </div>
         </td>

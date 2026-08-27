@@ -257,6 +257,21 @@ async def test_plugin_repo_seed_plugins_load(tmp_path) -> None:
         "points",
         "poll",
         "random_choice",
+        "calc",
+        "lottery",
+        "qrcode",
+        "timestamp",
+        "commission",
+        "duty",
+        "order",
+        "backup",
+        "export",
+        "stats",
+        "audit_viewer",
+        "health_check",
+        "system_status",
+        "anti_spam",
+        "reminder",
     }
     scheduler = SchedulerService()
     manager = PluginManager(

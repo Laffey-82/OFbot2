@@ -1,0 +1,36 @@
+{
+  "name": "duty",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "值班排班：添加与查看",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["duty.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "duty",
+      "label": "值班排班",
+      "description": "基于 JSON 存储的简单排班表",
+      "enable_on_default": true,
+      "manage_permission": "duty.admin",
+      "commands": [
+        {
+          "name": "duty",
+          "aliases": ["值班"],
+          "handler": "handlers.duty_command",
+          "permission": "duty.use",
+          "description": "值班管理：add 添加 / list 查看",
+          "usage": "/duty add <日期> <姓名> ｜ /duty list",
+          "examples": ["/duty add 2026-08-28 张三", "/duty list"],
+          "cooldown": 2,
+          "rate_limit": "20/minute"
+        }
+      ]
+    }
+  ]
+}

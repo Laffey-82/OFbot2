@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}文档 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.docs.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>文档</h1>
+    <h1>{{ t_('page.docs.title') }}</h1>
     <div class="sub">使用说明与开发指南</div>
   </div>
 </div>
@@ -18,6 +18,16 @@
     <h3>3 分钟上手</h3>
     <p class="muted">连接 → 插件 → 功能开关三步走</p>
     <a class="btn secondary" href="/docs/view/quickstart">查看</a>
+  </div>
+  <div class="card">
+    <h3>安装指南</h3>
+    <p class="muted">pip / Git / Docker 三种安装方式</p>
+    <a class="btn secondary" href="/docs/view/install">查看</a>
+  </div>
+  <div class="card">
+    <h3>插件教程</h3>
+    <p class="muted">从零写第一个插件（10 分钟）</p>
+    <a class="btn secondary" href="/docs/view/tutorial">查看</a>
   </div>
   <div class="card">
     <h3>开发指南</h3>

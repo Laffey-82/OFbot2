@@ -1,0 +1,5 @@
+include LICENSE readme.md
+include config.example.yaml
+recursive-include app/web/templates *.html
+recursive-include app/web/static *
+recursive-include plugins */plugin.json

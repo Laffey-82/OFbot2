@@ -17,11 +17,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest pytest-asyncio ruff
       - name: Compile
-        run: python -m compileall app plugins main.py tests scripts
+        run: python -m compileall app plugins ofbot2 main.py tests scripts
       - name: Lint
-        run: ruff check app plugins main.py tests scripts plugin-repo/tools
+        run: ruff check app plugins ofbot2 main.py tests scripts plugin-repo/tools
       - name: Test
         run: python -m pytest -q
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build --wheel
+      - name: Install wheel and smoke test
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install --no-deps dist/*.whl
+          /tmp/venv/bin/ofbot2 version
+          /tmp/venv/bin/python -m ofbot2 version
   audit:
     runs-on: ubuntu-latest
     steps:

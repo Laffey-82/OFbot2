@@ -1,0 +1,36 @@
+{
+  "name": "system_status",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "系统状态命令",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["system_status.view"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "status",
+      "label": "系统状态",
+      "description": "展示已加载插件数量",
+      "enable_on_default": true,
+      "manage_permission": "system_status.admin",
+      "commands": [
+        {
+          "name": "system",
+          "aliases": ["系统状态"],
+          "handler": "handlers.system_command",
+          "permission": "system_status.view",
+          "description": "系统状态：已加载插件",
+          "usage": "/system",
+          "examples": ["/system"],
+          "cooldown": 5,
+          "rate_limit": "10/minute"
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}账户 - OFbot 2{% endblock %}
+{% block title %}{{ t_('page.account.title') }} - OFbot 2{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>修改密码</h1>
+    <h1>{{ t_('page.account.heading') }}</h1>
     <div class="sub">定期更换密码可提高后台安全性</div>
   </div>
 </div>
@@ -25,7 +25,7 @@
       <label for="new-password">新密码（至少 6 位）</label>
       <input id="new-password" type="password" name="new_password" minlength="6" autocomplete="new-password" required>
     </div>
-    <div class="form-actions"><button type="submit">保存</button></div>
+    <div class="form-actions"><button type="submit">{{ t_('btn.save') }}</button></div>
   </form>
 </div>
 
@@ -76,7 +76,7 @@
           <form method="post" action="/account/accounts/remove" class="inline-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="account_id" value="{{ account.id }}">
-            <button class="small danger" data-confirm="确定删除账户 {{ account.username }}？">删除</button>
+            <button class="small danger" data-confirm="确定删除账户 {{ account.username }}？">{{ t_('btn.delete') }}</button>
           </form>
           {% else %}
           <span class="badge">当前账户</span>
