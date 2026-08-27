@@ -252,7 +252,10 @@ DEFAULT_CONFIG = {
         "secret": "",
         "session_ttl_seconds": 28800,
         "api_keys": [],
-        "plugin_repo_url": "",
+        "plugin_repo_url": (
+            "https://raw.githubusercontent.com/Laffey-82/OFbot2/"
+            "main/plugin-repo/registry.json"
+        ),
         "plugin_repo_token": "",
         "cpu_threshold": 80,
         "memory_threshold": 85,

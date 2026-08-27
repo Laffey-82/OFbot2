@@ -181,6 +181,7 @@ async def test_web_plugin_market_page_and_install(tmp_path) -> None:
     _make_local_repo(repo_dir)
 
     settings = load_settings()
+    settings.web.plugin_repo_url = ""  # 本地目录模式（默认配置已指向公开 URL）
     settings.config_path = str(tmp_path / "config.yaml")
     settings.database.url = (
         f"sqlite+aiosqlite:///{(tmp_path / 'test.db').as_posix()}"
@@ -329,6 +330,7 @@ async def test_plugin_repo_install_replace_and_update_flag(tmp_path) -> None:
     assert any((plugins_dir / ".trash").glob("demo-*"))
 
     settings = load_settings()
+    settings.web.plugin_repo_url = ""  # 本地目录模式
     settings.config_path = str(tmp_path / "config.yaml")
     settings.database.url = (
         f"sqlite+aiosqlite:///{(tmp_path / 'test.db').as_posix()}"

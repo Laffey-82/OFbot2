@@ -6,8 +6,8 @@ OFbot 2 在主仓库内置了插件仓库 `plugin-repo/`，用于存放插件开
 
 | 模式 | 触发条件 | 说明 |
 | --- | --- | --- |
-| 本地目录模式（默认） | `web.plugin_repo_url` 为空 | 直接扫描仓库内 `plugin-repo/registry.json` 与 `packages/*.zip`，完全离线可用 |
-| URL 模式 | 配置 `web.plugin_repo_url` | 拉取远程注册表（默认指向本仓库 raw 地址）；私有仓库需配置 `web.plugin_repo_token` |
+| 本地目录模式 | `web.plugin_repo_url` 为空 | 直接扫描仓库内 `plugin-repo/registry.json` 与 `packages/*.zip`，完全离线可用 |
+| URL 模式（默认，推荐） | 默认指向本仓库公开 raw 地址 | 拉取远程注册表与插件包；仓库已公开，**无需 Token**（仅接入私有仓库时才需 `web.plugin_repo_token`） |
 
 配置位置：Web「配置」页 → 基础配置 → 插件仓库地址 / 插件仓库 Token；或直接编辑 `config.yaml`：
 
