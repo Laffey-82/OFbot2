@@ -24,6 +24,22 @@ logger = get_logger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+def apply_security_settings(settings: Settings) -> None:
+    """把配置中的安全字段重建为运行中的 SecurityPolicy（即时生效）。"""
+    from app.core.commands import command_registry
+    from app.core.security import SecurityPolicy
+
+    policy = SecurityPolicy(
+        max_message_length=settings.security.max_message_length,
+        max_arg_length=settings.security.max_arg_length,
+        default_cooldown_seconds=settings.security.default_cooldown_seconds,
+        rate_limit_default=settings.security.rate_limit_default,
+        sensitive_words=settings.security.sensitive_words,
+        blocked_users=settings.security.blocked_users,
+    )
+    command_registry.set_security(policy)
+
+
 def nav_active(request: Any, path: str) -> str:
     """侧边栏菜单高亮：精确匹配或子页面前缀匹配。"""
     current = request.url.path

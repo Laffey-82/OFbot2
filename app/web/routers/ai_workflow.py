@@ -440,9 +440,23 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                 condition = json.loads(condition_json)
                 if isinstance(condition, (dict, list)):
                     definition["condition"] = condition
-            await engine.create(name, definition)
+            workflow = await engine.create(name, definition)
         except Exception:
             return RedirectResponse("/workflows?error=1", status_code=303)
+        scheduler = getattr(app.state, "scheduler", None)
+        if scheduler:
+            trigger = definition.get("trigger", {})
+            if trigger.get("type") == "schedule" and trigger.get("cron"):
+                try:
+                    import functools
+
+                    scheduler.add_cron_job(
+                        functools.partial(engine.execute, workflow.id),
+                        job_id=f"workflow-{workflow.id}",
+                        cron_expression=trigger["cron"],
+                    )
+                except Exception:
+                    pass
         return flash_redirect("/workflows", message=f"流程 {name} 已创建")
 
     @router.post("/workflows/{workflow_id}/run")
@@ -471,6 +485,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         from app.db.base import session_factory
         from app.db.models import Workflow
 
+        engine = app.state.services.get("workflow")
         async with session_factory()() as session:
             workflow = await session.get(Workflow, workflow_id)
             if workflow is None:
@@ -480,6 +495,21 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             definition.pop("auto_disabled", None)
             workflow.definition = definition
             await session.commit()
+        scheduler = getattr(app.state, "scheduler", None)
+        if scheduler:
+            trigger = workflow.definition.get("trigger", {})
+            if trigger.get("type") == "schedule" and trigger.get("cron"):
+                try:
+                    import functools
+
+                    if engine is not None:
+                        scheduler.add_cron_job(
+                            functools.partial(engine.execute, workflow_id),
+                            job_id=f"workflow-{workflow_id}",
+                            cron_expression=trigger["cron"],
+                        )
+                except Exception:
+                    pass
         audit_logger.record(
             "workflow.enabled",
             user.username,

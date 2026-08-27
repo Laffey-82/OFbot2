@@ -153,6 +153,15 @@ class WorkflowEngine:
             await session.commit()
             await session.refresh(run)
 
+        if not workflow.enabled:
+            async with session_factory()() as session:
+                run = await session.get(WorkflowRun, run.id)
+                if run is not None:
+                    run.status = "skipped"
+                    run.result = {"reason": "workflow disabled"}
+                    await session.commit()
+            return run
+
         context = context or {}
         result: dict[str, Any] = {"steps": []}
         try:

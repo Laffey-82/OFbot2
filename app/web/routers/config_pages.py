@@ -214,6 +214,9 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         permission_manager.apply_superusers(settings.basic.superusers)
         command_registry.set_command_start(settings.basic.command_start)
         command_registry.set_command_sep(settings.basic.command_sep)
+        from app.web.helpers import apply_security_settings
+
+        apply_security_settings(settings)
         set_log_level(log_level)
         audit_logger.record(
             "config.updated",
