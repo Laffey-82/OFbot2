@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.2（2026-08）— 解析与命令健壮性
+
+- 参数分词保留反斜杠（Windows 路径不再被吞），引号分组语义不变，未闭合引号降级与旧行为一致。
+- 子命令支持点分 token（`/order.add.info` → 子命令 `add` + 参数 `info`）。
+- 命令冲突检测：加载时命令名/别名被其他插件占用即 `PluginFailed` 并给出冲突插件名；`plugin check` 增加跨插件冲突检查。
+- help 长消息改用 `split_message` 分片（换行感知）。
+- 框架回复兜底 `_safe_reply`：`event.reply` 未绑定/未实现时记录警告而非抛 TypeError。
+
 ## v1.0.1（2026-08）— 安全与关闭健壮性
 
 - 事件总线关闭兜底：bubus `stop()` 在高 pending 事件时可能同步阻塞事件循环（asyncio 超时无效），新增独立线程定时器强制退出，保证进程必然结束。

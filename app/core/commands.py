@@ -35,6 +35,24 @@ logger = get_logger(__name__)
 CommandHandler = Callable[[MessageEvent, Message, "CommandContext"], Awaitable[Any]]
 
 
+async def _safe_reply(event: MessageEvent, text: str) -> None:
+    """回复兜底：event.reply 未绑定时记录警告而非抛 TypeError。"""
+    reply = getattr(event, "reply", None)
+    if not callable(reply):
+        logger.warning(
+            "event.reply 未绑定，无法回复：%s", str(text)[:120]
+        )
+        return
+    try:
+        result = reply(text)
+        if hasattr(result, "__await__"):
+            await result
+    except NotImplementedError:
+        logger.warning(
+            "event.reply 未实现，无法回复：%s", str(text)[:120]
+        )
+
+
 def _strip_at_self(text: str, self_id: str = "") -> str:
     """剥离 @bot 前缀与 at 占位（官方机器人仅收 @ 消息时使用）。"""
     text = text.strip()
@@ -245,6 +263,16 @@ class CommandRegistry:
                 self._by_plugin[plugin_name].add(alias)
         return command
 
+    def check_conflict(
+        self, name: str, aliases: set[str], owner: str
+    ) -> str | None:
+        """返回与 name/aliases 冲突的其他插件名；无冲突返回 None。"""
+        for candidate in {name, *aliases}:
+            command = self._commands.get(candidate)
+            if command is not None and command.plugin_name and command.plugin_name != owner:
+                return command.plugin_name
+        return None
+
     def unregister_plugin(self, plugin_name: str) -> int:
         names = self._by_plugin.pop(plugin_name, set())
         for name in names:
@@ -301,11 +329,13 @@ class CommandRegistry:
                 suggestions = self.suggest(command_name)
                 if suggestions:
                     hint = "、".join(f"{prefix}{name}" for name in suggestions)
-                    await event.reply(
+                    await _safe_reply(
+                        event,
                         f"未找到命令 {prefix}{command_name}，是否想用 {hint}？发送 {prefix}help 查看全部命令"
                     )
                 else:
-                    await event.reply(
+                    await _safe_reply(
+                        event,
                         f"未找到命令 {prefix}{command_name}，发送 {prefix}help 查看全部命令"
                     )
             return False
@@ -364,7 +394,7 @@ class CommandRegistry:
                         reason=validation_error,
                     )
                 )
-                await event.reply(f"【×】{validation_error}")
+                await _safe_reply(event, f"【×】{validation_error}")
                 return command.block
             if (
                 command.feature_id
@@ -398,11 +428,13 @@ class CommandRegistry:
                     and self.scope_policy.silent_deny(scope)
                 ):
                     if scope.startswith("group:"):
-                        await event.reply(
+                        await _safe_reply(
+                            event,
                             "【未开启】该功能在本群未开启，如需使用请联系群管理员"
                         )
                     else:
-                        await event.reply(
+                        await _safe_reply(
+                            event,
                             "【未开启】该功能当前未开启，如需使用请联系管理员"
                         )
                 return command.block
@@ -420,7 +452,7 @@ class CommandRegistry:
                         reason=reason,
                     )
                 )
-                await event.reply(f"【×】{reason}")
+                await _safe_reply(event, f"【×】{reason}")
                 return command.block
             rate_spec = (
                 parse_rate_limit(command.rate_limit)
@@ -441,7 +473,7 @@ class CommandRegistry:
                         reason=reason,
                     )
                 )
-                await event.reply(f"【×】{reason}")
+                await _safe_reply(event, f"【×】{reason}")
                 return command.block
 
         if command.rules and self.rules is not None:
@@ -498,7 +530,8 @@ class CommandRegistry:
                 success=False,
                 detail={"reason": reason, "scope": scope},
             )
-            await event.reply(
+            await _safe_reply(
+                event,
                 "【权限不足】该命令需要管理员权限，请联系群管理员"
             )
             return command.block
@@ -552,7 +585,8 @@ class CommandRegistry:
                 )
                 if usage_text.startswith("/"):
                     usage_text = prefix + usage_text[1:]
-                await event.reply(
+                await _safe_reply(
+                    event,
                     f"【参数错误】{parse_error}\n用法：{usage_text}"
                 )
                 return command.block
@@ -631,7 +665,7 @@ class CommandRegistry:
                     command_name=command.name,
                     success=False,
                 )
-            await event.reply("【×】命令执行失败，请稍后再试")
+            await _safe_reply(event, "【×】命令执行失败，请稍后再试")
         return command.block
 
     def get_commands(self, plugin_name: str | None = None) -> list[Command]:

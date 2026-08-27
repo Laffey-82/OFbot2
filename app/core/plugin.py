@@ -523,6 +523,13 @@ class PluginManager:
             features[key] = feature
             for declared in feature.commands:
                 handler = self.resolve_dotted(loaded.module, declared.handler)
+                conflict = self.commands.check_conflict(
+                    declared.name, set(declared.aliases), name
+                )
+                if conflict is not None:
+                    raise ValueError(
+                        f"命令 /{declared.name} 与插件 {conflict} 冲突（命令名/别名已被占用）"
+                    )
                 self.commands.register(
                     declared.name,
                     handler,

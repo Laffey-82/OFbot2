@@ -142,11 +142,11 @@ async def help_command(
         if len(items) > 8:
             lines.append(f"…{plugin} 共 {len(items)} 条")
     text = "\n".join(lines)
-    if len(text) > 1800:
-        for start in range(0, len(text), 1800):
-            await event.reply(text[start : start + 1800])
-        return
-    await event.reply(text)
+    from app.services.preset_utils import split_message
+
+    chunks = split_message(text, limit=1800)
+    for chunk in chunks:
+        await event.reply(chunk)
 
 
 async def about_command(

@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import shlex
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -37,14 +36,32 @@ _FALSE_TOKENS = {"false", "no", "off", "0", "否", "关"}
 
 
 def tokenize_args(text: str) -> list[str]:
-    """按空白分词，支持单引号/双引号包裹含空格的参数。"""
+    """按空白分词，支持单引号/双引号包裹，反斜杠原样保留（Windows 路径安全）。"""
     if not text or not text.strip():
         return []
-    try:
-        return shlex.split(text, posix=True)
-    except ValueError:
-        # 引号未闭合时降级为简单分词
+    tokens: list[str] = []
+    current: list[str] = []
+    in_single = False
+    in_double = False
+    for char in text:
+        if char == "'" and not in_double:
+            in_single = not in_single
+            continue
+        if char == '"' and not in_single:
+            in_double = not in_double
+            continue
+        if char.isspace() and not in_single and not in_double:
+            if current:
+                tokens.append("".join(current))
+                current = []
+            continue
+        current.append(char)
+    if in_single or in_double:
+        # 未闭合引号：按普通空白分词（引号作为字面量），与旧行为一致
         return text.split()
+    if current:
+        tokens.append("".join(current))
+    return tokens
 
 
 def _coerce(token: str, param: ParamSpec) -> tuple[Any, str | None]:
@@ -142,11 +159,22 @@ def resolve_subcommand(
         available = " / ".join(item.name for item in subcommands)
         return None, "", f"缺少子命令，可用：{available}"
     first = tokens[0].lower()
+
+    def names_of(sub: SubcommandSpec) -> set[str]:
+        return {sub.name.lower(), *(alias.lower() for alias in sub.aliases)}
+
     for sub in subcommands:
-        names = {sub.name.lower(), *(alias.lower() for alias in sub.aliases)}
-        if first in names:
+        if first in names_of(sub):
             rest = " ".join(tokens[1:])
             return sub.name, rest, None
+    # 支持点分 token：/order.add.info → 子命令 add + 参数 info
+    for sep in (".", "·"):
+        if sep in tokens[0]:
+            head, _, tail = tokens[0].partition(sep)
+            for sub in subcommands:
+                if head.lower() in names_of(sub):
+                    rest = (tail + (" " + " ".join(tokens[1:]) if tokens[1:] else "")).strip()
+                    return sub.name, rest, None
     available = " / ".join(item.name for item in subcommands)
     return None, "", f"未知子命令 {tokens[0]}，可用：{available}"
 

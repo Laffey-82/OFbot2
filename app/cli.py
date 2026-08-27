@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import importlib.util
+import logging
 import sys
 import time
 
@@ -11,6 +12,7 @@ import httpx
 from app.core.paths import runtime_root
 
 ROOT = runtime_root()
+logger = logging.getLogger("app.cli")
 
 
 def _settings():
@@ -179,6 +181,35 @@ def _plugin_check(args: argparse.Namespace) -> int:
         errors.append(f"目录名 {args.name} 与清单 name {manifest.name} 不一致")
     if manifest.api_version != PLUGIN_API_VERSION:
         errors.append(f"api_version {manifest.api_version} 不受支持")
+    # 跨插件命令冲突检测：扫描 plugins/ 下其他插件的声明
+    declared_commands: dict[str, set[str]] = {}
+    plugins_dir = ROOT / "plugins"
+    if plugins_dir.exists():
+        for manifest_path in sorted(plugins_dir.glob("*/plugin.json")):
+            if manifest_path.parent.name == args.name:
+                continue
+            try:
+                other = PluginManifest.model_validate_json(
+                    manifest_path.read_text(encoding="utf-8")
+                )
+            except Exception as exc:
+                logger.warning("跳过无法解析的插件清单 %s：%s", manifest_path, exc)
+                continue
+            for feature in other.effective_features():
+                for command in feature.commands:
+                    declared_commands.setdefault(
+                        manifest_path.parent.name, set()
+                    ).add(command.name)
+                    declared_commands[manifest_path.parent.name].update(
+                        command.aliases
+                    )
+    for feature in manifest.effective_features():
+        for command in feature.commands:
+            for other_plugin, names in declared_commands.items():
+                if command.name in names or set(command.aliases) & names:
+                    errors.append(
+                        f"命令 /{command.name} 与插件 {other_plugin} 冲突"
+                    )
     rule_registry = RuleRegistry()
     unknown_rules = []
     for feature in manifest.effective_features():
