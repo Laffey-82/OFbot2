@@ -15,7 +15,7 @@ jobs:
       - name: Extract changelog section
         run: |
           awk -v tag="$GITHUB_REF_NAME" '
-            /^## v/ { if (in_section) exit; if ($0 ~ "^## " tag) { in_section = 1; print } next }
+            /^## / { if (in_section) exit; if ($0 ~ "^## " tag) { in_section = 1; print } next }
             in_section { print }
           ' docs/CHANGELOG.md > release_notes.md
       - uses: softprops/action-gh-release@v3

@@ -189,4 +189,4 @@ GitHub Actions 会在每次 push / PR 自动运行上述检查。
 
 ## 更新记录
 
-版本里程碑见 [docs/CHANGELOG.md](docs/CHANGELOG.md)，v2 老历史见 [docs/archive/CHANGELOG_v2.md](docs/archive/CHANGELOG_v2.md)。
+版本里程碑见 [docs/CHANGELOG.md](docs/CHANGELOG.md)，v2 / v3 预发布历史见 [docs/archive/](docs/archive/)（`CHANGELOG_v2.md`、`CHANGELOG_v3.md`）。
