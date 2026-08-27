@@ -24,7 +24,11 @@ from app.core.logger import get_logger
 from app.core.security import audit_logger
 from app.db.base import session_factory
 from app.db.models import AlertEvent, WebAccount
-from app.services.alerts import persist_alert_rules
+from app.services.alerts import (
+    BUILTIN_ALERT_TEMPLATES,
+    install_alert_template,
+    persist_alert_rules,
+)
 from app.web.deps import (
     get_csrf_token,
     get_current_user,
@@ -171,6 +175,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                 "request": request,
                 "user": user,
                 "rules": rules,
+                "templates": BUILTIN_ALERT_TEMPLATES,
                 "events": event_rows,
                 "filter_rule": rule,
                 "filter_event": event,
@@ -313,6 +318,33 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             )
             persist_alert_rules(settings, service)
         return flash_redirect("/alerts", message=f"告警规则 {name} 已添加")
+
+    @router.post("/alerts/install-template")
+    async def alerts_install_template(
+        request: Request,
+        user: WebAccount = Depends(require_admin),
+        name: str = Form(...),
+        csrf: None = Depends(require_csrf),
+    ) -> RedirectResponse:
+        service = app.state.services.get("alerts")
+        if service is None:
+            return flash_redirect("/alerts", error="告警服务未初始化")
+        try:
+            created = install_alert_template(service, name)
+        except KeyError as exc:
+            return flash_redirect("/alerts", error=str(exc))
+        persist_alert_rules(settings, service)
+        audit_logger.record(
+            "alert.template_installed",
+            user.username,
+            target=name,
+            success=True,
+        )
+        if created:
+            return flash_redirect(
+                "/alerts", message=f"告警模板 {name} 已安装"
+            )
+        return flash_redirect("/alerts", error=f"告警规则 {name} 已存在")
 
     @router.post("/alerts/remove")
     async def alerts_remove(

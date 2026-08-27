@@ -53,9 +53,19 @@
 
 <div class="card">
   <div class="card-head">
-    <h2>示例规则</h2>
-    <span class="muted" style="font-size:12.5px">点击预填下方表单，确认后提交</span>
+    <h2>内置模板</h2>
+    <span class="muted" style="font-size:12.5px">一键安装标准告警规则</span>
   </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    {% for template in templates %}
+    <form method="post" action="/alerts/install-template" class="js-ajax">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="name" value="{{ template.name }}">
+      <button type="submit" class="small secondary" title="{{ template.description }}">{{ template.name }}</button>
+    </form>
+    {% endfor %}
+  </div>
+  <p class="muted" style="font-size:12.5px;margin-bottom:0">快捷预填（提交前可改参数）：</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button type="button" class="small secondary" data-alert-preset='{"name":"任务失败通知","event":"task.failed","keyword":""}'>任务失败</button>
     <button type="button" class="small secondary" data-alert-preset='{"name":"适配器断开通知","event":"adapter_disconnected","keyword":""}'>适配器断开</button>

@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.5.0（2026-08）— 稳定与性能（OneBot 生态 / 沙箱审计参照）
+
+### 协议契约测试矩阵
+
+- 新增 `tests/test_protocol_matrix.py`：OneBot v11/v12、Red、Satori、Mirai、官方机器人的假服务端参数化测试，覆盖握手、收发、消息归一化、鉴权失败、notice 分发（GroupPoke）与媒体段。
+- `docs/CONNECTIONS.md` 升级为「能力 × 实现」矩阵，标注各协议的能力差异。
+
+### 性能基准
+
+- 新增 `scripts/benchmark.py`：全链路（解析 → 作用域 → 规则 → 参数绑定 → handler → 回复）吞吐与 P50/P95、长消息分片、后台任务队列饱和；报告归档 `docs/benchmarks/v3.5.0.md`。
+- 新增 `split_message()` 通用长消息分片工具（1800 字符阈值、优先换行切分）。
+- 已知约束：bubus 事件总线在大量 pending 事件（约 30-50 个并发突发）时存在库级竞态，且 `stop()` 在高积压时会挂起；基准已隔离总线测量框架链路，生产路径适配器收包天然串行（每次消息 2-4 个事件）。
+
+### 可观测与部署
+
+- trace_id 链路贯穿：`BotClient.handle_bot_event` 生成并注入异步上下文，日志增加 `trace=...` 字段，`CommandContext.trace_id` 供插件读取；AI 调用与出站发送自动继承。
+- 告警模板库：内置 6 个标准模板（连接断开 / 任务失败 / 流程失败 / CPU / 内存 / Agent 工具失败），Web 告警页一键安装，自愈中心联动保留。
+- Docker 多架构构建支持（amd64/arm64）、非 root 运行、健康检查；compose 增加命名卷、日志轮转、仅本机端口；新增 `deploy/ofbot2.service` systemd 单元示例。
+
+### 插件安全审计
+
+- `PluginInstaller.audit_zip()`：安装前静态检查文件白名单 / 数量 / 体积、网络库引用、代码执行模式、secret 直赋、循环发送风控；审计记录持久化到 `plugins/.audit/`。
+- CLI：`ofbot2 plugin install` 安装前打印审计摘要；新增 `ofbot2 plugin audit [zip] [--name]`。
+
 ## v3.4.0（2026-08）— 能力深化（NoneBot2 / Koishi / LangBot 参照）
 
 ### 响应规则（NoneBot2 Rule 轻量版）

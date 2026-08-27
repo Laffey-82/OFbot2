@@ -15,7 +15,7 @@ from app.core.events import (
     PrivateMessageReceived,
 )
 from app.core.http import make_http_client
-from app.core.logger import get_logger
+from app.core.logger import get_logger, set_trace_id
 from app.core.messages import (
     GroupMessageEvent,
     Message,
@@ -274,32 +274,37 @@ class BotClient:
         return ok
 
     async def handle_bot_event(self, event: MessageEvent) -> bool:
-        self._bump(event.bot_id, "received")
-        if isinstance(event, GroupMessageEvent) and self.whitelist_service is not None:
-            if not self.whitelist_service.contains(event.group_id):
-                logger.debug("group message filtered by whitelist: %s", event.group_id)
-                return False
-        if isinstance(event, GroupMessageEvent):
-            get_bus().dispatch(
-                GroupMessageReceived(
-                    bot_id=event.bot_id,
-                    self_id=event.self_id,
-                    message_id=event.message_id,
-                    user_id=event.user_id,
-                    group_id=event.group_id,
-                    message=event.message.extract_plain_text(),
-                    raw_event=event.raw_event,
+        trace_id = set_trace_id()
+        try:
+            event.trace_id = trace_id
+            self._bump(event.bot_id, "received")
+            if isinstance(event, GroupMessageEvent) and self.whitelist_service is not None:
+                if not self.whitelist_service.contains(event.group_id):
+                    logger.debug("group message filtered by whitelist: %s", event.group_id)
+                    return False
+            if isinstance(event, GroupMessageEvent):
+                get_bus().dispatch(
+                    GroupMessageReceived(
+                        bot_id=event.bot_id,
+                        self_id=event.self_id,
+                        message_id=event.message_id,
+                        user_id=event.user_id,
+                        group_id=event.group_id,
+                        message=event.message.extract_plain_text(),
+                        raw_event=event.raw_event,
+                    )
                 )
-            )
-        elif isinstance(event, PrivateMessageEvent):
-            get_bus().dispatch(
-                PrivateMessageReceived(
-                    bot_id=event.bot_id,
-                    self_id=event.self_id,
-                    message_id=event.message_id,
-                    user_id=event.user_id,
-                    message=event.message.extract_plain_text(),
-                    raw_event=event.raw_event,
+            elif isinstance(event, PrivateMessageEvent):
+                get_bus().dispatch(
+                    PrivateMessageReceived(
+                        bot_id=event.bot_id,
+                        self_id=event.self_id,
+                        message_id=event.message_id,
+                        user_id=event.user_id,
+                        message=event.message.extract_plain_text(),
+                        raw_event=event.raw_event,
+                    )
                 )
-            )
-        return await command_registry.handle_message(event)
+            return await command_registry.handle_message(event)
+        finally:
+            set_trace_id("")

@@ -1,3 +1,5 @@
+"""事件总线封装：bubus EventBus 单例。"""
+
 from __future__ import annotations
 
 from bubus import EventBus

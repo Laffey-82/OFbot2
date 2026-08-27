@@ -5,32 +5,51 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ofbot2:latest
     container_name: ofbot_2
     restart: unless-stopped
     ports:
-      - "8000:8000"  # Web管理界面端口
+      - "127.0.0.1:8000:8000"  # Web 管理界面（默认仅本机可访问）
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-      - ./logs:/app/logs
-      - ./data:/app/data
-      - ./plugins:/app/plugins
+      - ofbot_logs:/app/logs
+      - ofbot_data:/app/data
+      - ofbot_plugins:/app/plugins
     environment:
       - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - ofbot_network
 
-  # 可选：添加Napcat服务（如果需要在Docker中运行Napcat）
+  # 可选：NapCat 反向 WS 模式（9090 端口暴露给宿主机 QQNT 环境）
   # napcat:
   #   image: napcat/napcat:latest
   #   container_name: napcat
   #   restart: unless-stopped
   #   ports:
-  #     - "9090:9090"  # Napcat反向WS端口
+  #     - "9090:9090"
   #   volumes:
   #     - ./napcat_config:/app/config
+  #     - ./napcat_qq:/root/.config/QQ
   #   networks:
   #     - ofbot_network
 
 networks:
   ofbot_network:
     driver: bridge
+
+volumes:
+  ofbot_logs:
+  ofbot_data:
+  ofbot_plugins:

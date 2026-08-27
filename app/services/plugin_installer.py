@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import time
 import zipfile
 from pathlib import Path
+from typing import Any
 
 from app.core.logger import get_logger
 from app.core.plugin import PLUGIN_API_VERSION
@@ -12,6 +14,49 @@ from app.core.plugin import PLUGIN_API_VERSION
 logger = get_logger(__name__)
 
 _PLUGIN_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_NETWORK_IMPORTS = (
+    "httpx",
+    "aiohttp",
+    "requests",
+    "urllib",
+    "socket",
+    "websockets",
+    "http.client",
+    "fastapi",
+)
+_EXEC_PATTERNS = (
+    "eval(",
+    "exec(",
+    "subprocess",
+    "os.system",
+    "shutil.rmtree",
+    "__import__",
+    "pickle.loads",
+)
+_SECRET_PATTERNS = ("api_key", "access_token", "secret", "password")
+_SEND_METHODS = ("send_group_message", "send_private_message", "send_message")
+_ALLOWED_EXTENSIONS = {
+    ".py",
+    ".json",
+    ".yml",
+    ".yaml",
+    ".md",
+    ".txt",
+    ".html",
+    ".svg",
+    ".css",
+    ".js",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".ico",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".csv",
+}
 
 
 def validate_plugin_name(name: str) -> str:
@@ -29,8 +74,139 @@ class PluginInstaller:
         self.plugins_dir = Path(plugins_dir)
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
 
-    def install_zip(self, archive_path: str | Path) -> Path:
+    def audit_zip(self, archive_path: str | Path) -> dict[str, Any]:
+        """安装前安全审计：文件白名单、网络访问、执行、secret、发送频率。"""
         archive_path = Path(archive_path)
+        checks: list[dict[str, Any]] = []
+        file_count = 0
+        total_size = 0
+        py_sources: list[str] = []
+        with zipfile.ZipFile(archive_path) as archive:
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                file_count += 1
+                total_size += info.file_size
+                name = info.filename.rsplit("/", 1)[-1]
+                suffix = Path(name).suffix.lower()
+                if suffix not in _ALLOWED_EXTENSIONS:
+                    checks.append(
+                        {
+                            "level": "warn",
+                            "check": "file.extension",
+                            "detail": f"文件 {info.filename} 扩展名 {suffix or '(无)'} 不在白名单",
+                        }
+                    )
+                if suffix == ".py":
+                    py_sources.append(info.filename)
+            if file_count > 200:
+                checks.append(
+                    {
+                        "level": "warn",
+                        "check": "file.count",
+                        "detail": f"文件数量 {file_count} 超过 200，注意检查",
+                    }
+                )
+            if total_size > 20 * 1024 * 1024:
+                checks.append(
+                    {
+                        "level": "warn",
+                        "check": "file.size",
+                        "detail": f"包体积 {total_size // 1024} KB 超过 20 MB",
+                    }
+                )
+            for name in py_sources:
+                try:
+                    source = archive.read(name).decode("utf-8", errors="replace")
+                except Exception as exc:
+                    logger.warning("读取插件源码失败 %s：%s", name, exc)
+                    continue
+                lowered = source.lower()
+                for module in _NETWORK_IMPORTS:
+                    if re.search(
+                        rf"^\s*(import|from)\s+{re.escape(module)}",
+                        source,
+                        re.MULTILINE,
+                    ):
+                        checks.append(
+                            {
+                                "level": "info",
+                                "check": "network.access",
+                                "detail": f"{name} 引用了网络库 {module}",
+                            }
+                        )
+                for pattern in _EXEC_PATTERNS:
+                    if pattern in lowered:
+                        checks.append(
+                            {
+                                "level": "warn",
+                                "check": "code.execution",
+                                "detail": f"{name} 包含 {pattern}",
+                            }
+                        )
+                for pattern in _SECRET_PATTERNS:
+                    if pattern in lowered and re.search(
+                        rf"\b{re.escape(pattern)}\b\s*[=:]\s*['\"\d{{]",
+                        source,
+                    ):
+                        checks.append(
+                            {
+                                "level": "info",
+                                "check": "secret.handling",
+                                "detail": f"{name} 直接赋值 {pattern}，建议改用 config_schema 配置",
+                            }
+                        )
+                if any(method in source for method in _SEND_METHODS):
+                    if re.search(r"(while\s+True|for\s+.*in\s+range)", source) and "sleep" not in lowered:
+                        checks.append(
+                            {
+                                "level": "warn",
+                                "check": "rate.risk",
+                                "detail": f"{name} 存在循环发送且未发现 sleep，注意风控",
+                            }
+                        )
+        warnings = sum(1 for item in checks if item["level"] == "warn")
+        infos = sum(1 for item in checks if item["level"] == "info")
+        return {
+            "file_count": file_count,
+            "total_size": total_size,
+            "warnings": warnings,
+            "infos": infos,
+            "checks": checks[:50],
+        }
+
+    def save_audit(self, name: str, report: dict[str, Any]) -> Path:
+        audit_dir = self.plugins_dir / ".audit"
+        audit_dir.mkdir(parents=True, exist_ok=True)
+        path = audit_dir / f"{name}-{int(time.time())}.json"
+        path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return path
+
+    def read_audits(self, name: str | None = None) -> list[dict[str, Any]]:
+        audit_dir = self.plugins_dir / ".audit"
+        if not audit_dir.exists():
+            return []
+        reports: list[dict[str, Any]] = []
+        for path in sorted(audit_dir.glob("*.json"), reverse=True):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (ValueError, json.JSONDecodeError):
+                logger.warning("跳过损坏的审计记录 %s", path.name)
+                continue
+            if name is None or data.get("plugin") == name:
+                reports.append(data)
+        return reports
+
+    def install_zip(
+        self, archive_path: str | Path, *, audit: bool = True
+    ) -> Path:
+        archive_path = Path(archive_path)
+        audit_report: dict[str, Any] | None = None
+        if audit:
+            audit_report = self.audit_zip(archive_path)
         with zipfile.ZipFile(archive_path) as archive:
             names = archive.namelist()
             manifest_name = next(
@@ -75,6 +251,10 @@ class PluginInstaller:
             except Exception:
                 shutil.rmtree(target)
                 raise
+        if audit_report is not None:
+            audit_report["plugin"] = plugin_name
+            audit_report["installed_at"] = time.time()
+            self.save_audit(plugin_name, audit_report)
         logger.info("plugin installed: %s", plugin_name)
         return target
 

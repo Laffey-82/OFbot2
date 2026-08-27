@@ -3,13 +3,44 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import uuid
+from contextvars import ContextVar
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
-LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+LOG_FORMAT = (
+    "%(asctime)s | %(levelname)s | %(name)s | trace=%(trace_id)s | %(message)s"
+)
 
 _configured = False
+
+trace_id_var: ContextVar[str] = ContextVar("trace_id", default="")
+
+
+def set_trace_id(value: str | None = None) -> str:
+    """设置当前异步上下文的链路 ID；None 生成新 ID，空串清除。"""
+    if value is None:
+        value = uuid.uuid4().hex[:12]
+        trace_id_var.set(value)
+        return value
+    if value == "":
+        trace_id_var.set("")
+        return ""
+    trace_id_var.set(value)
+    return value
+
+
+def get_trace_id() -> str:
+    return trace_id_var.get()
+
+
+class TraceIdFilter(logging.Filter):
+    """向日志记录注入当前上下文 trace_id。"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.trace_id = trace_id_var.get() or "-"
+        return True
 
 
 def _ensure_log_dir() -> Path:
@@ -68,10 +99,12 @@ def setup_logging(level: str = "INFO", *, file_level: str = "DEBUG") -> None:
     root_logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     formatter = logging.Formatter(LOG_FORMAT)
+    trace_filter = TraceIdFilter()
 
     console = logging.StreamHandler(sys.stdout)
     console.setLevel(getattr(logging, level.upper(), logging.INFO))
     console.setFormatter(formatter)
+    console.addFilter(trace_filter)
     root_logger.addHandler(console)
 
     log_dir = _ensure_log_dir()
@@ -83,6 +116,7 @@ def setup_logging(level: str = "INFO", *, file_level: str = "DEBUG") -> None:
     )
     file_handler.setLevel(getattr(logging, file_level.upper(), logging.DEBUG))
     file_handler.setFormatter(formatter)
+    file_handler.addFilter(trace_filter)
     root_logger.addHandler(file_handler)
 
     _configured = True

@@ -355,8 +355,43 @@ def _plugin_repo_install(args: argparse.Namespace) -> int:
 def _plugin_install(args: argparse.Namespace) -> None:
     from app.services.plugin_installer import PluginInstaller
 
-    target = PluginInstaller(ROOT / "plugins").install_zip(args.zip)
+    installer = PluginInstaller(ROOT / "plugins")
+    report = installer.audit_zip(args.zip)
+    print(
+        f"安全审计：{report['file_count']} 个文件，"
+        f"警告 {report['warnings']} 项，提示 {report['infos']} 项"
+    )
+    for item in report["checks"]:
+        print(f"  [{item['level'].upper()}] {item['check']}: {item['detail']}")
+    if report["warnings"]:
+        print("提示：存在警告项，请确认插件来源可信后继续安装。")
+    target = installer.install_zip(args.zip, audit=False)
     print(f"插件已安装: {target}")
+
+
+def _plugin_audit(args: argparse.Namespace) -> int:
+    from app.services.plugin_installer import PluginInstaller
+
+    installer = PluginInstaller(ROOT / "plugins")
+    if args.zip:
+        report = installer.audit_zip(args.zip)
+        print(
+            f"安全审计：{report['file_count']} 个文件，"
+            f"警告 {report['warnings']} 项，提示 {report['infos']} 项"
+        )
+        for item in report["checks"]:
+            print(f"  [{item['level'].upper()}] {item['check']}: {item['detail']}")
+        return 0
+    reports = installer.read_audits(args.name)
+    if not reports:
+        print(f"未找到插件 {args.name} 的审计记录（安装时自动生成）")
+        return 1
+    for report in reports[-3:]:
+        print(
+            f"{report.get('plugin')} 安装于 {report.get('installed_at', '')}: "
+            f"警告 {report.get('warnings', 0)}，提示 {report.get('infos', 0)}"
+        )
+    return 0
 
 
 def _plugin_list(args: argparse.Namespace) -> None:
@@ -578,6 +613,13 @@ def build_parser() -> argparse.ArgumentParser:
     install = plugin_sub.add_parser("install", help="安装插件 zip")
     install.add_argument("zip", help="zip 路径")
     install.set_defaults(func=_plugin_install)
+
+    audit = plugin_sub.add_parser(
+        "audit", help="安全审计 zip 或查看已安装插件审计记录"
+    )
+    audit.add_argument("zip", nargs="?", default=None, help="待审计的 zip 路径")
+    audit.add_argument("--name", default=None, help="查看该插件的审计记录")
+    audit.set_defaults(func=_plugin_audit)
 
     plugin_sub.add_parser("list", help="列出已安装插件").set_defaults(
         func=_plugin_list

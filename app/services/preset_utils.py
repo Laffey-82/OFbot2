@@ -32,6 +32,30 @@ def render_card(title: str, lines: Iterable[str]) -> str:
     return f"{title}\n{'-' * 18}\n{body}"
 
 
+def split_message(text: str, limit: int = 1800) -> list[str]:
+    """长消息按 1800 字符阈值分片，优先在换行处切分，避免截断。"""
+    text = str(text or "")
+    limit = max(200, int(limit))
+    if len(text) <= limit:
+        return [text] if text else []
+    chunks: list[str] = []
+    remainder = text
+    while len(remainder) > limit:
+        head = remainder[:limit]
+        cut = head.rfind("\n")
+        if cut <= limit // 2:
+            cut = head.rfind(" ")
+        if cut <= limit // 2:
+            cut = limit
+        else:
+            cut += 1
+        chunks.append(remainder[:cut].rstrip())
+        remainder = remainder[cut:].lstrip()
+    if remainder:
+        chunks.append(remainder)
+    return chunks
+
+
 def format_money(value: float) -> str:
     return f"¥{value:.2f}"
 

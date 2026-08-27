@@ -18,6 +18,23 @@ OFbot 2 支持多连接并存：一个实例可同时接入多套协议 / 多个
 
 > **媒体能力**：除官方机器人外，各协议发送均透传完整消息段（文本 / @ / 图片 / 语音 / 视频 / 文件 / 表情 / 引用 / 合并转发 / JSON）；官方机器人当前仅支持文本（官方 API 限制）。
 
+## 能力 × 实现矩阵（v3.5.0 起）
+
+| 能力 | OneBot v11 | OneBot v12 | Red | Satori | Mirai | 官方 API v2 |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: |
+| 正向 WS | ✅ | ✅ | ✅ | ✅ | — | ✅（Gateway） |
+| 反向 WS | ✅ | ✅ | — | — | ✅ | — |
+| HTTP 事件上报 | ✅ | ✅ | — | — | ✅（轮询） | — |
+| 群消息收发 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅（仅 @） |
+| 私聊消息 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅（C2C） |
+| 媒体段透传 | ✅ | ✅ | ✅ | ✅ | ✅ | ❌（仅文本） |
+| 事件细分（poke/文件/撤回） | ✅ | ✅ | 部分 | 部分 | 部分 | ❌ |
+| 多账号并存 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 心跳 / 断线重连 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 官方能力矩阵 | NapCat / LLOneBot / OpenShamrock | Lagrange.OneBot | Chronocat 旧版 | Chronocat 新版 / Lagrange.Satori | mirai-api-http | QQ 开放平台 |
+
+> 协议契约测试矩阵见 `tests/test_protocol_matrix.py`：每个协议均有假服务端覆盖握手、收发、归一化、鉴权失败、notice 分发与媒体段。
+
 ## 快速开始（推荐：NapCat OneBot v11 反向 WS）
 
 1. 部署 NapCat（Windows / Linux / macOS），登录一个 QQ 号。

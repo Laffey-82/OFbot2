@@ -15,6 +15,78 @@ from app.db.models import AlertEvent
 
 logger = get_logger(__name__)
 
+BUILTIN_ALERT_TEMPLATES: list[dict[str, Any]] = [
+    {
+        "name": "连接断开",
+        "event": "adapter_disconnected",
+        "keyword": "",
+        "description": "任一协议适配器断开连接时告警",
+    },
+    {
+        "name": "任务失败",
+        "event": "task.auto_disabled",
+        "keyword": "",
+        "description": "定时任务连续失败被自动停用时告警",
+    },
+    {
+        "name": "流程失败",
+        "event": "workflow.failed",
+        "keyword": "",
+        "description": "自动化流程运行失败时告警",
+    },
+    {
+        "name": "CPU 过高",
+        "event": "metric.cpu_high",
+        "keyword": "",
+        "description": "CPU 使用率超过配置阈值时告警",
+    },
+    {
+        "name": "内存过高",
+        "event": "metric.memory_high",
+        "keyword": "",
+        "description": "内存使用率超过配置阈值时告警",
+    },
+    {
+        "name": "Agent 工具失败",
+        "event": "agent.tool_failed",
+        "keyword": "",
+        "description": "Agent 工具调用失败时告警",
+    },
+]
+
+
+def install_alert_template(service: AlertService, name: str) -> bool:
+    """按模板创建规则（已存在同名规则时跳过），返回是否新建。"""
+    template = next(
+        (item for item in BUILTIN_ALERT_TEMPLATES if item["name"] == name),
+        None,
+    )
+    if template is None:
+        raise KeyError(f"告警模板不存在：{name}")
+    if any(rule.name == name for rule in service.rules):
+        return False
+    service.add_rule(
+        name=str(template["name"]),
+        event=str(template["event"]),
+        keyword=str(template["keyword"]),
+    )
+    return True
+
+
+def install_default_alerts(
+    service: AlertService, names: list[str] | None = None
+) -> int:
+    """安装指定（或全部）内置告警模板，返回新建数量。"""
+    targets = names or [item["name"] for item in BUILTIN_ALERT_TEMPLATES]
+    installed = 0
+    for name in targets:
+        try:
+            if install_alert_template(service, name):
+                installed += 1
+        except KeyError:
+            continue
+    return installed
+
 
 def persist_alert_rules(settings: Settings, service: Any) -> None:
     """将告警规则持久化到 settings.plugin_configs（供 Web / REST 使用）。"""

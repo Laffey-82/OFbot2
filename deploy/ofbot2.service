@@ -1,0 +1,25 @@
+[Unit]
+Description=OFbot 2 QQ Bot Framework
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ofbot
+Group=ofbot
+WorkingDirectory=/opt/ofbot2
+Environment=PYTHONUNBUFFERED=1
+Environment=TZ=Asia/Shanghai
+ExecStart=/usr/bin/python3 /opt/ofbot2/main.py
+Restart=on-failure
+RestartSec=5
+RuntimeMaxSec=0
+# 安全加固
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/ofbot2/data /opt/ofbot2/logs /opt/ofbot2/plugins /opt/ofbot2/config.yaml
+
+[Install]
+WantedBy=multi-user.target

@@ -12,7 +12,7 @@ from app.core.events import (
     CommandParsed,
     CommandRejected,
 )
-from app.core.logger import get_logger
+from app.core.logger import get_logger, get_trace_id
 from app.core.messages import Message, MessageEvent
 from app.core.parsing import (
     ParamSpec,
@@ -60,6 +60,7 @@ class CommandContext:
     subcommand: str = ""
     params: dict[str, Any] | None = None
     session: Any = None
+    trace_id: str = ""
     raw_event: Any = None
 
 
@@ -575,6 +576,7 @@ class CommandRegistry:
                 if command.session and self.session_manager is not None
                 else None
             ),
+            trace_id=get_trace_id(),
             raw_event=event,
         )
         try:
