@@ -55,6 +55,8 @@ class ConnectionSettings(BaseModel):
     secret: str = ""
     self_id: str = ""
     reconnect_interval: float = 3.0
+    reconnect_max_seconds: float = 60.0
+    reconnect_max_attempts: int = 0
     extra: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("id")

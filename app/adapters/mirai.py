@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from app.adapters.base import BotClient, ProtocolAdapter, make_http_client
+from app.adapters.base import BaseAdapter, BotClient, make_http_client
 from app.core.bus import get_bus
 from app.core.config import ConnectionSettings
 from app.core.events import BotDisconnected
@@ -24,15 +24,14 @@ from app.core.messages import (
 logger = get_logger(__name__)
 
 
-class MiraiAdapter(ProtocolAdapter):
+class MiraiAdapter(BaseAdapter):
     def __init__(
         self, settings: ConnectionSettings, bot_id: str, bot_client: BotClient
     ) -> None:
+        super().__init__(settings, bot_client)
         self.settings = settings
         self.bot_id = bot_id
-        self.bot_client = bot_client
         self.self_id = settings.self_id
-        self._running = False
         self._session_key = ""
         self._http: httpx.AsyncClient | None = None
         self.api_base = settings.api_base or f"http://{settings.host}:{settings.port}"
@@ -44,26 +43,18 @@ class MiraiAdapter(ProtocolAdapter):
         return self._http
 
     async def start(self) -> None:
-        self._running = True
+        await self.run_reconnect_loop(self._connect_loop, self.bot_id)
+
+    async def _connect_loop(self) -> None:
+        await self._ensure_session()
+        self.bot_client.status[self.bot_id] = "connected"
+        self.bot_client.details[self.bot_id] = {
+            "self_id": self.self_id,
+            "connected_at": time.time(),
+        }
         while self._running:
-            try:
-                await self._ensure_session()
-                self.bot_client.status[self.bot_id] = "connected"
-                self.bot_client.details[self.bot_id] = {
-                    "self_id": self.self_id,
-                    "connected_at": time.time(),
-                }
-                while self._running:
-                    await self._poll_once()
-                    await asyncio.sleep(0.5)
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.warning("mirai connection failed: %s", exc)
-                self.bot_client.status[self.bot_id] = "disconnected"
-                self._session_key = ""
-            if self._running:
-                await asyncio.sleep(self.settings.reconnect_interval)
+            await self._poll_once()
+            await asyncio.sleep(0.5)
 
     async def test(self) -> tuple[bool, str]:
         try:
@@ -234,6 +225,22 @@ class MiraiAdapter(ProtocolAdapter):
                     {
                         "type": "Image",
                         "path": segment.data.get("file", ""),
+                    }
+                )
+            elif segment.type in {"voice", "record"}:
+                chain.append(
+                    {
+                        "type": "Voice",
+                        "path": segment.data.get("file", "")
+                        or segment.data.get("url", ""),
+                    }
+                )
+            elif segment.type == "file":
+                chain.append(
+                    {
+                        "type": "File",
+                        "path": segment.data.get("file", ""),
+                        "name": segment.data.get("name", ""),
                     }
                 )
             elif segment.type == "reply":

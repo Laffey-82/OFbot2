@@ -11,30 +11,45 @@ from app.core.logger import get_logger
 logger = get_logger(__name__)
 
 
+class AIServiceError(Exception):
+    """AI 能力不可用或不支持时的明确错误。"""
+
+
 class AIProvider:
     name = "base"
+    supported_methods: frozenset[str] = frozenset({"chat"})
 
     async def chat(self, messages: list[dict[str, str]], **kwargs: Any) -> str:
         raise NotImplementedError
 
     async def embeddings(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
-        raise NotImplementedError
+        raise AIServiceError(f"Provider {self.name} 不支持 embeddings")
 
     async def image(self, prompt: str, **kwargs: Any) -> str:
-        raise NotImplementedError
+        raise AIServiceError(f"Provider {self.name} 不支持 image")
 
     async def speech_to_text(self, audio: bytes, **kwargs: Any) -> str:
-        raise NotImplementedError
+        raise AIServiceError(f"Provider {self.name} 不支持 speech_to_text")
 
     async def text_to_speech(self, text: str, **kwargs: Any) -> bytes:
-        raise NotImplementedError
+        raise AIServiceError(f"Provider {self.name} 不支持 text_to_speech")
 
     async def ocr(self, image: bytes, **kwargs: Any) -> str:
-        raise NotImplementedError
+        raise AIServiceError(f"Provider {self.name} 不支持 ocr")
+
+    def supports(self, method: str) -> bool:
+        return method in self.supported_methods
 
 
 class OpenAIChatProvider(AIProvider):
     name = "openai"
+    supported_methods = frozenset({
+        "chat",
+        "embeddings",
+        "image",
+        "speech_to_text",
+        "text_to_speech",
+    })
 
     def __init__(
         self, *, base_url: str, api_key: str, model: str, client: httpx.AsyncClient | None = None
@@ -62,9 +77,77 @@ class OpenAIChatProvider(AIProvider):
             if self._client is None:
                 await client.aclose()
 
+    async def embeddings(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
+        client = self._client or httpx.AsyncClient(timeout=60)
+        try:
+            response = await client.post(
+                f"{self.base_url}/embeddings",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={"model": self.model, "input": texts, **kwargs},
+            )
+            response.raise_for_status()
+            data = response.json()
+            return [
+                item.get("embedding", [])
+                for item in sorted(data.get("data", []), key=lambda x: x.get("index", 0))
+            ]
+        finally:
+            if self._client is None:
+                await client.aclose()
+
+    async def image(self, prompt: str, **kwargs: Any) -> str:
+        client = self._client or httpx.AsyncClient(timeout=120)
+        try:
+            response = await client.post(
+                f"{self.base_url}/images/generations",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={"model": self.model, "prompt": prompt, **kwargs},
+            )
+            response.raise_for_status()
+            data = response.json()
+            item = (data.get("data") or [{}])[0]
+            return str(
+                item.get("url")
+                or item.get("b64_json")
+                or ""
+            )
+        finally:
+            if self._client is None:
+                await client.aclose()
+
+    async def speech_to_text(self, audio: bytes, **kwargs: Any) -> str:
+        client = self._client or httpx.AsyncClient(timeout=120)
+        try:
+            response = await client.post(
+                f"{self.base_url}/audio/transcriptions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                data={"model": self.model, **kwargs},
+                files={"file": ("audio.bin", audio, "application/octet-stream")},
+            )
+            response.raise_for_status()
+            return str(response.json().get("text", ""))
+        finally:
+            if self._client is None:
+                await client.aclose()
+
+    async def text_to_speech(self, text: str, **kwargs: Any) -> bytes:
+        client = self._client or httpx.AsyncClient(timeout=120)
+        try:
+            response = await client.post(
+                f"{self.base_url}/audio/speech",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={"model": self.model, "input": text, **kwargs},
+            )
+            response.raise_for_status()
+            return response.content
+        finally:
+            if self._client is None:
+                await client.aclose()
+
 
 class OllamaProvider(AIProvider):
     name = "ollama"
+    supported_methods = frozenset({"chat", "embeddings"})
 
     def __init__(
         self, *, base_url: str, model: str, client: httpx.AsyncClient | None = None
@@ -82,6 +165,25 @@ class OllamaProvider(AIProvider):
             )
             response.raise_for_status()
             return response.json().get("message", {}).get("content", "")
+        finally:
+            if self._client is None:
+                await client.aclose()
+
+    async def embeddings(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
+        client = self._client or httpx.AsyncClient(timeout=120)
+        try:
+            response = await client.post(
+                f"{self.base_url}/api/embed",
+                json={"model": self.model, "input": texts, **kwargs},
+            )
+            response.raise_for_status()
+            data = response.json()
+            embeddings = data.get("embeddings")
+            if embeddings:
+                return [list(item) for item in embeddings]
+            # 兼容旧版 /api/embeddings 单条响应
+            legacy = data.get("embedding")
+            return [list(legacy)] if legacy else []
         finally:
             if self._client is None:
                 await client.aclose()
@@ -169,24 +271,10 @@ class GeminiProvider(AIProvider):
 
 class MockAIProvider(AIProvider):
     name = "mock"
+    supported_methods = frozenset({"chat"})
 
     async def chat(self, messages: list[dict[str, str]], **kwargs: Any) -> str:
         return f"mock: {messages[-1].get('content', '')}"
-
-    async def embeddings(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
-        return [[0.1] * 8 for _ in texts]
-
-    async def image(self, prompt: str, **kwargs: Any) -> str:
-        return f"mock-image:{prompt}"
-
-    async def speech_to_text(self, audio: bytes, **kwargs: Any) -> str:
-        return "mock speech text"
-
-    async def text_to_speech(self, text: str, **kwargs: Any) -> bytes:
-        return b"mock audio"
-
-    async def ocr(self, image: bytes, **kwargs: Any) -> str:
-        return "mock ocr text"
 
 
 class AIService:
@@ -235,6 +323,12 @@ class AIService:
         self, image: bytes, provider: str | None = None, **kwargs: Any
     ) -> str:
         return await self._provider(provider).ocr(image, **kwargs)
+
+    def matrix(self) -> dict[str, list[str]]:
+        return {
+            name: sorted(provider.supported_methods)
+            for name, provider in sorted(self.providers.items())
+        }
 
 
 class AgentRunner:

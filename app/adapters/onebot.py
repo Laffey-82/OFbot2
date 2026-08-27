@@ -10,7 +10,7 @@ import httpx
 import websockets
 from fastapi import WebSocket
 
-from app.adapters.base import BotClient, ProtocolAdapter, make_http_client
+from app.adapters.base import BaseAdapter, BotClient, make_http_client
 from app.core.bus import get_bus
 from app.core.config import ConnectionSettings, OneBotSettings
 from app.core.events import BotDisconnected
@@ -26,19 +26,17 @@ from app.core.messages import (
 logger = get_logger(__name__)
 
 
-class OneBotAdapter(ProtocolAdapter):
+class OneBotAdapter(BaseAdapter):
     def __init__(
         self,
         settings: OneBotSettings | ConnectionSettings,
         bot_id: str,
         bot_client: BotClient,
     ) -> None:
+        super().__init__(settings, bot_client)
         self.settings = settings
         self.bot_id = bot_id
-        self.bot_client = bot_client
         self.self_id = ""
-        self._reconnects = 0
-        self._running = False
         self._ws: Any = None
         self._reverse_connections: list[Any] = []
         self._http: httpx.AsyncClient | None = None
@@ -67,17 +65,7 @@ class OneBotAdapter(ProtocolAdapter):
                     "mode": "http",
                 }
             return
-        self._running = True
-        while self._running:
-            try:
-                await self._connect_forward()
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.warning("onebot forward connection failed: %s", exc)
-                self.bot_client.status[self.bot_id] = "disconnected"
-            if self._running:
-                await asyncio.sleep(3)
+        await self.run_reconnect_loop(self._connect_forward, self.bot_id)
 
     async def test(self) -> tuple[bool, str]:
         """尝试连接验证配置：正向 WS 握手 / HTTP 调 get_login_info。"""
@@ -143,8 +131,7 @@ class OneBotAdapter(ProtocolAdapter):
                 "connected_at": time.time(),
                 "reconnects": self._reconnects,
             }
-            async for raw in ws:
-                await self._handle_raw(raw)
+            await self.recv_loop(ws, self._handle_raw, self.bot_id)
 
     async def handle_reverse_ws(self, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -183,32 +170,7 @@ class OneBotAdapter(ProtocolAdapter):
         if post_type == "message":
             await self._handle_message(data)
         elif post_type in {"notice", "request"}:
-            from app.core.bus import get_bus
-            from app.core.events import NoticeReceived, RequestReceived
-
-            if post_type == "notice":
-                get_bus().dispatch(
-                    NoticeReceived(
-                        bot_id=self.bot_id,
-                        self_id=self.self_id,
-                        notice_type=data.get("notice_type", ""),
-                        user_id=str(data.get("user_id", "")),
-                        group_id=str(data.get("group_id", "")),
-                        raw_event=data,
-                    )
-                )
-            else:
-                get_bus().dispatch(
-                    RequestReceived(
-                        bot_id=self.bot_id,
-                        self_id=self.self_id,
-                        request_type=data.get("request_type", ""),
-                        user_id=str(data.get("user_id", "")),
-                        group_id=str(data.get("group_id", "")),
-                        flag=data.get("flag", ""),
-                        raw_event=data,
-                    )
-                )
+            await self._handle_notice_or_request(data)
 
     async def _handle_raw(self, raw: str) -> None:
         try:
@@ -221,32 +183,75 @@ class OneBotAdapter(ProtocolAdapter):
         if post_type == "message":
             await self._handle_message(data)
         elif post_type in {"notice", "request"}:
-            from app.core.bus import get_bus
-            from app.core.events import NoticeReceived, RequestReceived
+            await self._handle_notice_or_request(data)
 
-            if post_type == "notice":
-                get_bus().dispatch(
-                    NoticeReceived(
-                        bot_id=self.bot_id,
-                        self_id=self.self_id,
-                        notice_type=data.get("notice_type", ""),
-                        user_id=str(data.get("user_id", "")),
-                        group_id=str(data.get("group_id", "")),
-                        raw_event=data,
-                    )
+    async def _handle_notice_or_request(self, data: dict[str, Any]) -> None:
+        from app.core.bus import get_bus
+        from app.core.events import RequestReceived
+
+        post_type = data.get("post_type")
+        if post_type == "notice":
+            self._dispatch_notice(data)
+        elif post_type == "request":
+            get_bus().dispatch(
+                RequestReceived(
+                    bot_id=self.bot_id,
+                    self_id=self.self_id,
+                    request_type=data.get("request_type", ""),
+                    user_id=str(data.get("user_id", "")),
+                    group_id=str(data.get("group_id", "")),
+                    flag=data.get("flag", ""),
+                    raw_event=data,
                 )
-            else:
-                get_bus().dispatch(
-                    RequestReceived(
-                        bot_id=self.bot_id,
-                        self_id=self.self_id,
-                        request_type=data.get("request_type", ""),
-                        user_id=str(data.get("user_id", "")),
-                        group_id=str(data.get("group_id", "")),
-                        flag=data.get("flag", ""),
-                        raw_event=data,
-                    )
+            )
+
+    def _dispatch_notice(self, data: dict[str, Any]) -> None:
+        """按 notice_type 分发细分事件：戳一戳 / 群文件上传 / 撤回。"""
+        from app.core.bus import get_bus
+        from app.core.events import (
+            FileUploaded,
+            GroupPoke,
+            MessageRecalled,
+            NoticeReceived,
+        )
+
+        notice_type = data.get("notice_type", "")
+        common = {
+            "bot_id": self.bot_id,
+            "self_id": self.self_id,
+            "notice_type": notice_type,
+            "user_id": str(data.get("user_id", "")),
+            "group_id": str(data.get("group_id", "")),
+            "operator_id": str(data.get("operator_id", "")),
+            "target_id": str(data.get("target_id", "")),
+            "file_name": "",
+            "file_size": 0,
+            "raw_event": data,
+        }
+        if notice_type == "poke":
+            get_bus().dispatch(GroupPoke(**common))
+        elif notice_type == "group_upload":
+            file_info = data.get("file", {}) or {}
+            common["file_name"] = str(file_info.get("name", ""))
+            try:
+                common["file_size"] = int(file_info.get("size", 0) or 0)
+            except (TypeError, ValueError):
+                common["file_size"] = 0
+            get_bus().dispatch(FileUploaded(**common))
+        elif notice_type in {"group_recall", "friend_recall"}:
+            get_bus().dispatch(
+                MessageRecalled(
+                    bot_id=self.bot_id,
+                    self_id=self.self_id,
+                    message_id=str(data.get("message_id", "")),
+                    user_id=str(data.get("user_id", "")),
+                    group_id=str(data.get("group_id", "")),
+                    operator_id=str(data.get("operator_id", "")),
+                    raw_event=data,
                 )
+            )
+        else:
+            get_bus().dispatch(NoticeReceived(**common))
 
     async def _handle_message(self, data: dict[str, Any]) -> None:
         message_type = data.get("message_type")
@@ -332,34 +337,76 @@ class OneBotAdapter(ProtocolAdapter):
         self, group_id: str, message: str | Message | MessageSegment
     ) -> bool:
         return await self._send_action(
-            "send_group_msg", {"group_id": int(group_id), "message": self._to_cq(message)}
+            "send_group_msg",
+            {"group_id": int(group_id), "message": self._to_array(message)},
         )
 
     async def send_private_message(
         self, user_id: str, message: str | Message | MessageSegment
     ) -> bool:
         return await self._send_action(
-            "send_private_msg", {"user_id": int(user_id), "message": self._to_cq(message)}
+            "send_private_msg",
+            {"user_id": int(user_id), "message": self._to_array(message)},
         )
 
-    def _to_cq(self, message: str | Message | MessageSegment) -> str:
+    def _to_array(self, message: str | Message | MessageSegment) -> list[dict[str, Any]]:
+        """统一消息段 → OneBot v11 消息数组（规避 CQ 码转义问题）。"""
         if isinstance(message, MessageSegment):
             message = Message.from_segments([message])
         elif isinstance(message, str):
             message = Message.text(message)
-        parts: list[str] = []
+        parts: list[dict[str, Any]] = []
         for segment in message.segments:
-            if segment.type == "text":
-                parts.append(segment.data.get("text", ""))
-            elif segment.type == "at":
-                parts.append(f"[CQ:at,qq={segment.data.get('user_id', '')}]")
-            elif segment.type == "image":
-                parts.append(f"[CQ:image,file={segment.data.get('file', '')}]")
-            elif segment.type == "reply":
-                parts.append(f"[CQ:reply,id={segment.data.get('message_id', '')}]")
-            else:
-                parts.append(str(segment))
-        return "".join(parts)
+            item = self._segment_to_onebot(segment)
+            if item is not None:
+                parts.append(item)
+        if not parts:
+            parts.append({"type": "text", "data": {"text": ""}})
+        return parts
+
+    @staticmethod
+    def _segment_to_onebot(segment: MessageSegment) -> dict[str, Any] | None:
+        stype = segment.type
+        data = segment.data
+        if stype == "text":
+            return {"type": "text", "data": {"text": data.get("text", "")}}
+        if stype == "at":
+            return {"type": "at", "data": {"qq": str(data.get("user_id", ""))}}
+        if stype == "image":
+            return {
+                "type": "image",
+                "data": {"file": data.get("file") or data.get("url", "")},
+            }
+        if stype in {"voice", "record"}:
+            return {
+                "type": "record",
+                "data": {"file": data.get("file") or data.get("url", "")},
+            }
+        if stype == "video":
+            return {
+                "type": "video",
+                "data": {"file": data.get("file") or data.get("url", "")},
+            }
+        if stype == "file":
+            return {"type": "file", "data": {"file": data.get("file", "")}}
+        if stype == "face":
+            return {"type": "face", "data": {"id": data.get("id", 0)}}
+        if stype == "reply":
+            return {
+                "type": "reply",
+                "data": {"id": data.get("message_id", "")},
+            }
+        if stype == "forward":
+            return {"type": "forward", "data": {"id": data.get("id", "")}}
+        if stype == "markdown":
+            return {
+                "type": "markdown",
+                "data": {"content": data.get("content", "")},
+            }
+        if stype == "json":
+            return {"type": "json", "data": {"data": data.get("data", {})}}
+        logger.warning("onebot v11 未知消息段类型：%s", stype)
+        return {"type": stype, "data": dict(data)}
 
     async def _send_action(self, action: str, params: dict[str, Any]) -> bool:
         if self._is_http():

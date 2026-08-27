@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 import websockets
 
-from app.adapters.base import BotClient, ProtocolAdapter, make_http_client
+from app.adapters.base import BaseAdapter, BotClient, make_http_client
 from app.core.bus import get_bus
 from app.core.config import ConnectionSettings
 from app.core.events import BotDisconnected
@@ -33,16 +33,14 @@ C2C_MESSAGE_CREATE = "C2C_MESSAGE_CREATE"
 GROUP_AND_C2C_EVENT = "GROUP_AND_C2C_EVENT"
 
 
-class OfficialQQAdapter(ProtocolAdapter):
+class OfficialQQAdapter(BaseAdapter):
     def __init__(
         self, settings: ConnectionSettings, bot_id: str, bot_client: BotClient
     ) -> None:
+        super().__init__(settings, bot_client)
         self.settings = settings
         self.bot_id = bot_id
-        self.bot_client = bot_client
         self.self_id = settings.self_id
-        self._running = False
-        self._reconnects = 0
         self._ws: Any = None
         self._http: httpx.AsyncClient | None = None
         self.api_base = (
@@ -58,17 +56,7 @@ class OfficialQQAdapter(ProtocolAdapter):
         return f"QQBot {self.settings.app_id}.{self.settings.token}"
 
     async def start(self) -> None:
-        self._running = True
-        while self._running:
-            try:
-                await self._connect_loop()
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.warning("qq official gateway failed: %s", exc)
-                self.bot_client.status[self.bot_id] = "disconnected"
-            if self._running:
-                await asyncio.sleep(self.settings.reconnect_interval)
+        await self.run_reconnect_loop(self._connect_loop, self.bot_id)
 
     async def test(self) -> tuple[bool, str]:
         try:
@@ -136,19 +124,7 @@ class OfficialQQAdapter(ProtocolAdapter):
             )
             heartbeat_task: asyncio.Task | None = None
             try:
-                async for raw in ws:
-                    data = json.loads(raw)
-                    op = data.get("op")
-                    if op == 10:
-                        interval = (
-                            data.get("d", {}).get("heartbeat_interval", 30000)
-                            or 30000
-                        )
-                        heartbeat_task = asyncio.create_task(
-                            self._heartbeat_loop(ws, max(1, int(interval) / 1000))
-                        )
-                    elif op == 0:
-                        await self._handle_event(data.get("d", {}))
+                await self.recv_loop(ws, self._handle_raw_frame, self.bot_id)
             finally:
                 if heartbeat_task is not None:
                     heartbeat_task.cancel()
@@ -156,6 +132,22 @@ class OfficialQQAdapter(ProtocolAdapter):
                         await heartbeat_task
                     except Exception:
                         pass
+
+    async def _handle_raw_frame(self, raw: str) -> None:
+        data = json.loads(raw)
+        op = data.get("op")
+        if op == 10:
+            interval = (
+                data.get("d", {}).get("heartbeat_interval", 30000)
+                or 30000
+            )
+            asyncio.create_task(
+                self._heartbeat_loop(
+                    self._ws, max(1, int(interval) / 1000)
+                )
+            )
+        elif op == 0:
+            await self._handle_event(data.get("d", {}))
 
     async def _heartbeat_loop(self, ws: Any, interval: float) -> None:
         while self._running:

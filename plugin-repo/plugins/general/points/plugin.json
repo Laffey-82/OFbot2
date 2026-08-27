@@ -1,0 +1,58 @@
+{
+  "name": "points",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "积分：查询与发放（基于通用记录）",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["points.view", "points.admin"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "points",
+      "label": "积分",
+      "description": "积分查询与发放",
+      "enable_on_default": true,
+      "manage_permission": "points.admin",
+      "commands": [
+        {
+          "name": "points",
+          "aliases": ["积分"],
+          "handler": "handlers.points_command",
+          "permission": "points.view",
+          "description": "积分查询 / 发放（子命令）",
+          "subcommands": [
+            {
+              "name": "view",
+              "aliases": ["查询"],
+              "description": "查看我的积分"
+            },
+            {
+              "name": "add",
+              "aliases": ["发放"],
+              "description": "给用户发放积分",
+              "params": [
+                {
+                  "name": "user_id",
+                  "type": "string",
+                  "required": true,
+                  "description": "目标 QQ"
+                },
+                {
+                  "name": "amount",
+                  "type": "int",
+                  "required": true,
+                  "description": "积分数量"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

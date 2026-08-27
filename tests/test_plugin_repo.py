@@ -252,6 +252,10 @@ async def test_plugin_repo_seed_plugins_load(tmp_path) -> None:
         "schedule_message",
         "signin",
         "todo",
+        "announcement",
+        "points",
+        "poll",
+        "random_choice",
     }
     scheduler = SchedulerService()
     manager = PluginManager(

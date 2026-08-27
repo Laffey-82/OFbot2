@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from app.adapters.base import BotClient
 from app.adapters.mirai import MiraiAdapter
+from app.adapters.onebot import OneBotAdapter
 from app.adapters.onebot_v12 import OneBotV12Adapter
 from app.adapters.qq_official import OfficialQQAdapter
 from app.adapters.satori import SatoriAdapter
 from app.core.config import ConnectionSettings, load_settings
+from app.core.messages import Message, MessageSegment
 from app.core.scopes import ScopePolicyService
 from app.runtime import build_adapters
 
@@ -148,3 +152,162 @@ def test_bot_client_scope_routing() -> None:
     client.set_active("default")
     assert asyncio.run(client.send_group_message("200", "hi")) is True
     assert sent == ["target"]
+
+
+@pytest.mark.asyncio
+async def test_onebot_v11_notice_dispatch() -> None:
+    """OneBot v11 notice 按类型分发：戳一戳 / 群文件上传 / 撤回。"""
+    from app.core.bus import get_bus, reset_bus
+    from app.core.events import FileUploaded, GroupPoke, MessageRecalled
+
+    client = BotClient()
+    adapter = OneBotAdapter(_conn(), "test", client)
+    captured: list = []
+    bus = get_bus()
+    bus.on(GroupPoke, lambda event: captured.append(event))
+    bus.on(FileUploaded, lambda event: captured.append(event))
+    bus.on(MessageRecalled, lambda event: captured.append(event))
+
+    await adapter._handle_notice_or_request(
+        {
+            "post_type": "notice",
+            "notice_type": "poke",
+            "group_id": 200,
+            "user_id": 100,
+            "operator_id": 1,
+            "target_id": 100,
+        }
+    )
+    await adapter._handle_notice_or_request(
+        {
+            "post_type": "notice",
+            "notice_type": "group_upload",
+            "group_id": 200,
+            "user_id": 100,
+            "file": {"name": "a.txt", "size": 3},
+        }
+    )
+    await adapter._handle_notice_or_request(
+        {
+            "post_type": "notice",
+            "notice_type": "group_recall",
+            "group_id": 200,
+            "user_id": 100,
+            "message_id": "m1",
+            "operator_id": 1,
+        }
+    )
+    await bus.wait_until_idle()
+    assert any(
+        isinstance(event, GroupPoke)
+        and event.group_id == "200"
+        and event.target_id == "100"
+        for event in captured
+    )
+    assert any(
+        isinstance(event, FileUploaded)
+        and event.file_name == "a.txt"
+        and event.file_size == 3
+        for event in captured
+    )
+    assert any(
+        isinstance(event, MessageRecalled) and event.message_id == "m1"
+        for event in captured
+    )
+    await get_bus().stop(clear=True)
+    reset_bus()
+
+
+def test_segment_factories_and_message_concat() -> None:
+    assert MessageSegment.text("hi").data == {"text": "hi"}
+    assert MessageSegment.at(100).data == {"user_id": "100"}
+    assert MessageSegment.image(file="f", url="u").data == {
+        "file": "f",
+        "url": "u",
+    }
+    assert MessageSegment.voice(file="v").type == "voice"
+    assert MessageSegment.video(file="v").type == "video"
+    assert MessageSegment.record(url="r").data == {"url": "r"}
+    assert MessageSegment.file(file="f", name="n").data == {
+        "file": "f",
+        "name": "n",
+    }
+    assert MessageSegment.face(1).data == {"id": "1"}
+    assert MessageSegment.reply(message_id="m", user_id="u").data == {
+        "message_id": "m",
+        "user_id": "u",
+    }
+    assert MessageSegment.forward("f").data == {"id": "f"}
+    assert MessageSegment.markdown("# hi").data == {"content": "# hi"}
+    assert MessageSegment.json({"a": 1}).data == {"data": {"a": 1}}
+
+    message = Message.text("a").add_segment(MessageSegment.at(1)) + MessageSegment.text("b")
+    assert [segment.type for segment in message.segments] == [
+        "text",
+        "at",
+        "text",
+    ]
+
+
+def test_onebot_v11_to_array_full_segments() -> None:
+    adapter = OneBotAdapter(_conn(), "t", BotClient())
+    message = (
+        Message.text("hi")
+        + MessageSegment.at(100)
+        + MessageSegment.image(file="a.png")
+        + MessageSegment.voice(file="v.amr")
+        + MessageSegment.video(file="vid.mp4")
+        + MessageSegment.face(1)
+        + MessageSegment.json({"k": "v"})
+        + MessageSegment.reply(message_id="m")
+    )
+    array = adapter._to_array(message)
+    types = [item["type"] for item in array]
+    assert types == [
+        "text",
+        "at",
+        "image",
+        "record",
+        "video",
+        "face",
+        "json",
+        "reply",
+    ]
+    assert array[1]["data"]["qq"] == "100"
+    assert array[3]["type"] == "record"
+
+
+def test_red_elements_and_other_mappings() -> None:
+    from app.adapters.mirai import MiraiAdapter
+    from app.adapters.red import RedAdapter
+    from app.adapters.satori import SatoriAdapter
+
+    red = RedAdapter(
+        _conn(protocol="red", api_base="http://127.0.0.1:8080"), "t", BotClient()
+    )
+    elements = red._to_elements(
+        Message.text("hi")
+        + MessageSegment.at(100)
+        + MessageSegment.image(file="a.png")
+        + MessageSegment.voice(file="v.amr")
+        + MessageSegment.file(file="f", name="n")
+    )
+    kinds = [item["elementType"] for item in elements]
+    assert kinds == [1, 7, 2, 4, 3]
+
+    satori = SatoriAdapter(_conn(protocol="satori"), "t", BotClient())
+    content = satori._to_satori(
+        Message.text("hi")
+        + MessageSegment.voice(file="v")
+        + MessageSegment.video(file="vid")
+        + MessageSegment.file(file="f")
+    )
+    assert [item["type"] for item in content] == ["text", "audio", "video", "file"]
+
+    mirai = MiraiAdapter(
+        _conn(protocol="mirai", api_base="http://127.0.0.1:8080"), "t", BotClient()
+    )
+    chain = mirai._to_chain(
+        Message.text("hi") + MessageSegment.voice(file="v") + MessageSegment.file(file="f")
+    )
+    assert [item["type"] for item in chain] == ["Plain", "Voice", "File"]

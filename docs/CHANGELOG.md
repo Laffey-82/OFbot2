@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.3.0（2026-08）— 承重墙补课
+
+### P0 数据与消息
+
+- 迁移持久化：新增 `MigrationRecord` 表，迁移执行成功后落库，重启不重复执行；失败不记录。
+- 消息段工厂：`MessageSegment.text/at/image/voice/video/record/file/face/reply/forward/markdown/json`，`Message` 支持拼接；发送侧补齐全段透传。
+- OneBot v11 发送改用消息数组（规避 CQ 码转义）；v12 / Red / Satori / Mirai 同步补齐 voice/video/file/face/markdown/json 等映射。
+
+### P1 连接与事件
+
+- 统一指数退避 + 抖动重连（`BaseAdapter`）：基础 3s、×2、上限 60s、±20% 抖动、可配置 `reconnect_max_attempts` 熔断；收包超时视为心跳过期触发重连。
+- 事件细分：`GroupPoke`（戳一戳）、`FileUploaded`（群文件上传）；`MessageRecalled` 补齐字段；OneBot v11/v12 按 notice_type 分发，Red 做 best-effort 映射。
+
+### P2 能力诚实化与生态
+
+- AI：OpenAI 兼容 Provider 实现 embeddings / image / speech_to_text / text_to_speech；Ollama 实现 embeddings；不支持的 Provider/OCR 明确报 `AIServiceError`；Mock 不再伪造多模态返回值；AI 页新增能力支持矩阵。
+- 插件仓库扩充 4 个官方插件：announcement、points、poll、random_choice（共 10 个）。
+
 ## v3.2.0（2026-08）— 公开准备 + 插件生态
 
 ### 社区设施

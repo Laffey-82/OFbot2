@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import random
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from app.core.bus import get_bus
@@ -46,6 +49,88 @@ class ProtocolAdapter(ABC):
     async def test(self) -> tuple[bool, str]:
         """轻量连接探针，返回 (是否成功, 详情)。"""
         raise NotImplementedError
+
+
+class BaseAdapter(ProtocolAdapter):
+    """提供指数退避 + 抖动重连与心跳超时收包的基础类。"""
+
+    def __init__(
+        self,
+        settings: Any | None = None,
+        bot_client: Any | None = None,
+    ) -> None:
+        self._running = False
+        self._reconnects = 0
+        self.bot_client = bot_client
+        self.reconnect_interval = float(
+            getattr(settings, "reconnect_interval", 3.0) or 3.0
+        )
+        self.reconnect_max_seconds = float(
+            getattr(settings, "reconnect_max_seconds", 60.0) or 60.0
+        )
+        self.reconnect_max_attempts = int(
+            getattr(settings, "reconnect_max_attempts", 0) or 0
+        )
+
+    async def run_reconnect_loop(
+        self,
+        connect: Callable[[], Awaitable[None]],
+        bot_id: str,
+    ) -> None:
+        """指数退避 + 抖动重连；达到 max_attempts 后进入 disabled 状态。"""
+        self._running = True
+        attempt = 0
+        while self._running:
+            try:
+                await connect()
+                attempt = 0
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("adapter %s connection failed: %s", bot_id, exc)
+                if self.bot_client is not None:
+                    self.bot_client.status[bot_id] = "disconnected"
+            if not self._running:
+                break
+            attempt += 1
+            if (
+                self.reconnect_max_attempts > 0
+                and attempt > self.reconnect_max_attempts
+            ):
+                logger.error(
+                    "adapter %s 超过最大重连次数（%s），已停用",
+                    bot_id,
+                    self.reconnect_max_attempts,
+                )
+                if self.bot_client is not None:
+                    self.bot_client.status[bot_id] = "disabled"
+                self._running = False
+                break
+            delay = min(
+                self.reconnect_interval * (2 ** (attempt - 1)),
+                self.reconnect_max_seconds,
+            )
+            delay *= random.uniform(0.8, 1.2)
+            await asyncio.sleep(max(0.1, delay))
+
+    async def recv_loop(
+        self,
+        ws: Any,
+        handler: Callable[[str], Awaitable[None]],
+        bot_id: str,
+        stale_seconds: float = 300.0,
+    ) -> None:
+        """收包循环：超时未收到任何数据视为心跳过期，抛错触发重连。"""
+        while True:
+            try:
+                raw = await asyncio.wait_for(
+                    ws.recv(), timeout=max(5.0, stale_seconds)
+                )
+            except TimeoutError as exc:
+                raise ConnectionError(
+                    f"adapter {bot_id} heartbeat stale"
+                ) from exc
+            await handler(raw)
 
 
 class BotClient:

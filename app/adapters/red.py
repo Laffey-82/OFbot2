@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 import websockets
 
-from app.adapters.base import BotClient, ProtocolAdapter, make_http_client
+from app.adapters.base import BaseAdapter, BotClient, make_http_client
 from app.core.bus import get_bus
 from app.core.config import ConnectionSettings, RedSettings
 from app.core.events import BotDisconnected
@@ -24,20 +24,18 @@ from app.core.messages import (
 logger = get_logger(__name__)
 
 
-class RedAdapter(ProtocolAdapter):
+class RedAdapter(BaseAdapter):
     def __init__(
         self,
         settings: RedSettings | ConnectionSettings,
         bot_id: str,
         bot_client: BotClient,
     ) -> None:
+        super().__init__(settings, bot_client)
         self.settings = settings
         self.bot_id = bot_id
-        self.bot_client = bot_client
         self.self_id = ""
-        self._reconnects = 0
         self._ws: Any = None
-        self._running = False
         self._http: httpx.AsyncClient | None = None
 
     def _http_client(self) -> httpx.AsyncClient:
@@ -46,17 +44,7 @@ class RedAdapter(ProtocolAdapter):
         return self._http
 
     async def start(self) -> None:
-        self._running = True
-        while self._running:
-            try:
-                await self._connect_loop()
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.warning("red adapter connection failed: %s", exc)
-                self.bot_client.status[self.bot_id] = "disconnected"
-            if self._running:
-                await asyncio.sleep(self.settings.reconnect_interval)
+        await self.run_reconnect_loop(self._connect_loop, self.bot_id)
 
     async def test(self) -> tuple[bool, str]:
         """尝试一次 Red WebSocket 握手，验证连接配置。"""
@@ -130,8 +118,7 @@ class RedAdapter(ProtocolAdapter):
                 self.self_id,
                 connect_data.get("payload", {}).get("version", ""),
             )
-            async for raw in ws:
-                await self._handle_raw(raw)
+            await self.recv_loop(ws, self._handle_raw, self.bot_id)
 
     async def _handle_raw(self, raw: str) -> None:
         try:
@@ -140,10 +127,60 @@ class RedAdapter(ProtocolAdapter):
             return
         if self.bot_id in self.bot_client.details:
             self.bot_client.details[self.bot_id]["last_heartbeat"] = time.time()
+        if data.get("type") == "notice::recv":
+            for item in data.get("payload", []):
+                self._dispatch_notice(item)
+            return
         if data.get("type") != "message::recv":
             return
         for item in data.get("payload", []):
             await self._handle_message(item)
+
+    def _dispatch_notice(self, data: dict[str, Any]) -> None:
+        """Red 通知载荷 best-effort 映射；未知载荷不丢弃，落 NoticeReceived。"""
+        from app.core.bus import get_bus
+        from app.core.events import (
+            FileUploaded,
+            GroupPoke,
+            MessageRecalled,
+            NoticeReceived,
+        )
+
+        notice_type = str(data.get("noticeType", "") or "")
+        user_id = str(data.get("userUin") or data.get("senderUin") or "")
+        group_id = str(data.get("peerUin") or data.get("peerUid") or "")
+        operator_id = str(data.get("operatorUin") or "")
+        target_id = str(data.get("targetUin") or "")
+        common = {
+            "bot_id": self.bot_id,
+            "self_id": self.self_id,
+            "notice_type": notice_type,
+            "user_id": user_id,
+            "group_id": group_id,
+            "operator_id": operator_id,
+            "target_id": target_id,
+            "file_name": str(data.get("fileName", "") or ""),
+            "file_size": int(data.get("fileSize", 0) or 0),
+            "raw_event": data,
+        }
+        if "poke" in notice_type.lower():
+            get_bus().dispatch(GroupPoke(**common))
+        elif "upload" in notice_type.lower():
+            get_bus().dispatch(FileUploaded(**common))
+        elif "recall" in notice_type.lower():
+            get_bus().dispatch(
+                MessageRecalled(
+                    bot_id=self.bot_id,
+                    self_id=self.self_id,
+                    message_id=str(data.get("msgId", "")),
+                    user_id=user_id,
+                    group_id=group_id,
+                    operator_id=operator_id,
+                    raw_event=data,
+                )
+            )
+        else:
+            get_bus().dispatch(NoticeReceived(**common))
 
     async def _handle_message(self, data: dict[str, Any]) -> None:
         chat_type = int(data.get("chatType", 0))
@@ -275,14 +312,7 @@ class RedAdapter(ProtocolAdapter):
             message = Message.from_segments([message])
         elif isinstance(message, str):
             message = Message.text(message)
-        elements = []
-        for segment in message.segments:
-            if segment.type == "text":
-                elements.append(
-                    {"elementType": 1, "textElement": {"content": segment.data.get("text", "")}}
-                )
-            else:
-                elements.append({"elementType": 1, "textElement": {"content": str(segment)}})
+        elements = self._to_elements(message)
         payload = {
             "peer": {"chatType": chat_type, "peerUin": str(target), "guildId": None},
             "elements": elements,
@@ -304,3 +334,88 @@ class RedAdapter(ProtocolAdapter):
         except Exception:
             logger.exception("red send_message exception")
             return False
+
+    @staticmethod
+    def _to_elements(message: str | Message | MessageSegment) -> list[dict[str, Any]]:
+        if isinstance(message, MessageSegment):
+            message = Message.from_segments([message])
+        elif isinstance(message, str):
+            message = Message.text(message)
+        elements: list[dict[str, Any]] = []
+        for segment in message.segments:
+            stype = segment.type
+            data = segment.data
+            if stype == "text":
+                elements.append(
+                    {"elementType": 1, "textElement": {"content": data.get("text", "")}}
+                )
+            elif stype == "at":
+                elements.append(
+                    {
+                        "elementType": 7,
+                        "atElement": {
+                            "target": int(data.get("user_id", 0) or 0)
+                        },
+                    }
+                )
+            elif stype == "image":
+                elements.append(
+                    {
+                        "elementType": 2,
+                        "picElement": {
+                            "sourcePath": data.get("file") or data.get("url", ""),
+                            "md5HexStr": data.get("md5", ""),
+                        },
+                    }
+                )
+            elif stype in {"voice", "record"}:
+                elements.append(
+                    {
+                        "elementType": 4,
+                        "pttElement": {
+                            "filePath": data.get("file") or data.get("url", "")
+                        },
+                    }
+                )
+            elif stype == "video":
+                elements.append(
+                    {
+                        "elementType": 5,
+                        "videoElement": {
+                            "filePath": data.get("file") or data.get("url", ""),
+                            "fileName": data.get("name", ""),
+                        },
+                    }
+                )
+            elif stype == "file":
+                elements.append(
+                    {
+                        "elementType": 3,
+                        "fileElement": {
+                            "filePath": data.get("file", ""),
+                            "fileName": data.get("name", ""),
+                        },
+                    }
+                )
+            elif stype == "face":
+                elements.append(
+                    {
+                        "elementType": 6,
+                        "faceElement": {"faceIndex": int(data.get("id", 0) or 0)},
+                    }
+                )
+            elif stype == "reply":
+                elements.append(
+                    {
+                        "elementType": 7,
+                        "replyElement": {
+                            "replayMsgId": data.get("message_id", ""),
+                            "senderUin": data.get("user_id", ""),
+                        },
+                    }
+                )
+            else:
+                elements.append(
+                    {"elementType": 1, "textElement": {"content": str(segment)}}
+                )
+        return elements or [{"elementType": 1, "textElement": {"content": ""}}]

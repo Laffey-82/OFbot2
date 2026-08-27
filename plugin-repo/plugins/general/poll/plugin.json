@@ -1,0 +1,85 @@
+{
+  "name": "poll",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "投票：创建 / 投票 / 结果（基于通用记录）",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["poll.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "poll",
+      "label": "投票",
+      "description": "创建投票、投票与查看结果",
+      "enable_on_default": true,
+      "manage_permission": "poll.admin",
+      "commands": [
+        {
+          "name": "poll",
+          "aliases": ["投票"],
+          "handler": "handlers.poll_command",
+          "permission": "poll.use",
+          "description": "投票管理：start 创建 / vote 投票 / result 结果",
+          "subcommands": [
+            {
+              "name": "start",
+              "aliases": ["创建"],
+              "description": "创建投票（选项用逗号分隔）",
+              "params": [
+                {
+                  "name": "topic",
+                  "type": "string",
+                  "required": true,
+                  "description": "投票主题"
+                },
+                {
+                  "name": "options",
+                  "type": "string",
+                  "required": true,
+                  "description": "选项（逗号分隔）"
+                }
+              ]
+            },
+            {
+              "name": "vote",
+              "aliases": ["投票"],
+              "description": "为某号投票选择某选项",
+              "params": [
+                {
+                  "name": "id",
+                  "type": "int",
+                  "required": true,
+                  "description": "投票序号"
+                },
+                {
+                  "name": "option",
+                  "type": "int",
+                  "required": true,
+                  "description": "选项序号"
+                }
+              ]
+            },
+            {
+              "name": "result",
+              "aliases": ["结果"],
+              "description": "查看投票结果",
+              "params": [
+                {
+                  "name": "id",
+                  "type": "int",
+                  "required": true,
+                  "description": "投票序号"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

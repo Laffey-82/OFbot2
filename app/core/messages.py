@@ -10,6 +10,86 @@ class MessageSegment:
     type: str
     data: dict[str, Any] = field(default_factory=dict)
 
+    @classmethod
+    def text(cls, text: str) -> MessageSegment:
+        return cls("text", {"text": text})
+
+    @classmethod
+    def at(cls, user_id: str | int) -> MessageSegment:
+        return cls("at", {"user_id": str(user_id)})
+
+    @classmethod
+    def image(cls, file: str = "", url: str = "") -> MessageSegment:
+        data: dict[str, Any] = {}
+        if file:
+            data["file"] = str(file)
+        if url:
+            data["url"] = str(url)
+        return cls("image", data)
+
+    @classmethod
+    def voice(cls, file: str = "", url: str = "") -> MessageSegment:
+        data: dict[str, Any] = {}
+        if file:
+            data["file"] = str(file)
+        if url:
+            data["url"] = str(url)
+        return cls("voice", data)
+
+    @classmethod
+    def video(cls, file: str = "", url: str = "") -> MessageSegment:
+        data: dict[str, Any] = {}
+        if file:
+            data["file"] = str(file)
+        if url:
+            data["url"] = str(url)
+        return cls("video", data)
+
+    @classmethod
+    def record(cls, file: str = "", url: str = "") -> MessageSegment:
+        data: dict[str, Any] = {}
+        if file:
+            data["file"] = str(file)
+        if url:
+            data["url"] = str(url)
+        return cls("record", data)
+
+    @classmethod
+    def file(cls, file: str = "", name: str = "") -> MessageSegment:
+        data: dict[str, Any] = {}
+        if file:
+            data["file"] = str(file)
+        if name:
+            data["name"] = str(name)
+        return cls("file", data)
+
+    @classmethod
+    def face(cls, face_id: int | str = 0) -> MessageSegment:
+        return cls("face", {"id": str(face_id)})
+
+    @classmethod
+    def reply(
+        cls, message_id: str | int = "", user_id: str | int = ""
+    ) -> MessageSegment:
+        data: dict[str, Any] = {}
+        if message_id:
+            data["message_id"] = str(message_id)
+        if user_id:
+            data["user_id"] = str(user_id)
+        return cls("reply", data)
+
+    @classmethod
+    def forward(cls, forward_id: str | int = "") -> MessageSegment:
+        return cls("forward", {"id": str(forward_id)})
+
+    @classmethod
+    def markdown(cls, content: str = "") -> MessageSegment:
+        return cls("markdown", {"content": content})
+
+    @classmethod
+    def json(cls, data: dict[str, Any] | str) -> MessageSegment:
+        return cls("json", {"data": data})
+
     def __str__(self) -> str:
         if self.type == "text":
             return str(self.data.get("text", ""))
@@ -34,6 +114,20 @@ class Message:
     @classmethod
     def from_segments(cls, segments: Iterable[MessageSegment]) -> Message:
         return cls(segments)
+
+    def add_segment(self, segment: MessageSegment | str) -> Message:
+        if isinstance(segment, str):
+            segment = MessageSegment.text(segment)
+        self.segments.append(segment)
+        return self
+
+    def __add__(self, other: str | MessageSegment | Message) -> Message:
+        result = Message(list(self.segments))
+        if isinstance(other, Message):
+            result.segments.extend(other.segments)
+        else:
+            result.add_segment(other)
+        return result
 
     def extract_plain_text(self) -> str:
         return "".join(segment.data.get("text", "") for segment in self.segments if segment.type == "text")

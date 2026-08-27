@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 from typing import Any
@@ -11,10 +10,10 @@ import httpx
 import websockets
 from fastapi import WebSocket
 
-from app.adapters.base import BotClient, ProtocolAdapter, make_http_client
+from app.adapters.base import BaseAdapter, BotClient, make_http_client
 from app.core.bus import get_bus
 from app.core.config import ConnectionSettings
-from app.core.events import BotDisconnected, NoticeReceived
+from app.core.events import BotDisconnected
 from app.core.logger import get_logger
 from app.core.messages import (
     GroupMessageEvent,
@@ -27,16 +26,14 @@ from app.core.messages import (
 logger = get_logger(__name__)
 
 
-class OneBotV12Adapter(ProtocolAdapter):
+class OneBotV12Adapter(BaseAdapter):
     def __init__(
         self, settings: ConnectionSettings, bot_id: str, bot_client: BotClient
     ) -> None:
+        super().__init__(settings, bot_client)
         self.settings = settings
         self.bot_id = bot_id
-        self.bot_client = bot_client
         self.self_id = ""
-        self._running = False
-        self._reconnects = 0
         self._ws: Any = None
         self._reverse_connections: list[Any] = []
         self._http: httpx.AsyncClient | None = None
@@ -65,17 +62,7 @@ class OneBotV12Adapter(ProtocolAdapter):
                     "mode": "http",
                 }
             return
-        self._running = True
-        while self._running:
-            try:
-                await self._connect_forward()
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.warning("onebot v12 forward connection failed: %s", exc)
-                self.bot_client.status[self.bot_id] = "disconnected"
-            if self._running:
-                await asyncio.sleep(self.settings.reconnect_interval)
+        await self.run_reconnect_loop(self._connect_forward, self.bot_id)
 
     async def test(self) -> tuple[bool, str]:
         if self._is_http():
@@ -138,8 +125,7 @@ class OneBotV12Adapter(ProtocolAdapter):
                 "connected_at": time.time(),
                 "reconnects": self._reconnects,
             }
-            async for raw in ws:
-                await self._handle_raw(raw)
+            await self.recv_loop(ws, self._handle_raw, self.bot_id)
 
     async def handle_reverse_ws(self, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -188,16 +174,54 @@ class OneBotV12Adapter(ProtocolAdapter):
         if event_type == "message":
             await self._handle_message(data)
         elif event_type == "notice":
+            self._dispatch_notice(data)
+
+    def _dispatch_notice(self, data: dict[str, Any]) -> None:
+        from app.core.bus import get_bus
+        from app.core.events import (
+            FileUploaded,
+            GroupPoke,
+            MessageRecalled,
+            NoticeReceived,
+        )
+
+        notice_type = data.get("detail_type", "")
+        common = {
+            "bot_id": self.bot_id,
+            "self_id": self.self_id,
+            "notice_type": notice_type,
+            "user_id": str(data.get("user_id", "")),
+            "group_id": str(data.get("group_id", "")),
+            "operator_id": str(data.get("operator_id", "")),
+            "target_id": str(data.get("target_id", "")),
+            "file_name": "",
+            "file_size": 0,
+            "raw_event": data,
+        }
+        if notice_type == "group_poke":
+            get_bus().dispatch(GroupPoke(**common))
+        elif notice_type == "group_upload":
+            file_info = data.get("file", {}) or {}
+            common["file_name"] = str(file_info.get("name", ""))
+            try:
+                common["file_size"] = int(file_info.get("size", 0) or 0)
+            except (TypeError, ValueError):
+                common["file_size"] = 0
+            get_bus().dispatch(FileUploaded(**common))
+        elif notice_type in {"group_recall", "friend_recall"}:
             get_bus().dispatch(
-                NoticeReceived(
+                MessageRecalled(
                     bot_id=self.bot_id,
                     self_id=self.self_id,
-                    notice_type=data.get("detail_type", ""),
+                    message_id=str(data.get("message_id", "")),
                     user_id=str(data.get("user_id", "")),
                     group_id=str(data.get("group_id", "")),
+                    operator_id=str(data.get("operator_id", "")),
                     raw_event=data,
                 )
             )
+        else:
+            get_bus().dispatch(NoticeReceived(**common))
 
     async def _handle_message(self, data: dict[str, Any]) -> None:
         detail_type = data.get("detail_type", "")
@@ -309,6 +333,59 @@ class OneBotV12Adapter(ProtocolAdapter):
                         "type": "image",
                         "data": {"file_id": segment.data.get("file", "")},
                     }
+                )
+            elif segment.type in {"voice", "record"}:
+                parts.append(
+                    {
+                        "type": "voice",
+                        "data": {
+                            "file_id": segment.data.get("file", "")
+                        },
+                    }
+                )
+            elif segment.type == "video":
+                parts.append(
+                    {
+                        "type": "video",
+                        "data": {
+                            "file_id": segment.data.get("file", "")
+                        },
+                    }
+                )
+            elif segment.type == "file":
+                parts.append(
+                    {
+                        "type": "file",
+                        "data": {
+                            "file_id": segment.data.get("file", ""),
+                            "name": segment.data.get("name", ""),
+                        },
+                    }
+                )
+            elif segment.type == "face":
+                parts.append(
+                    {
+                        "type": "face",
+                        "data": {"id": segment.data.get("id", 0)},
+                    }
+                )
+            elif segment.type == "forward":
+                parts.append(
+                    {
+                        "type": "forward",
+                        "data": {"id": segment.data.get("id", "")},
+                    }
+                )
+            elif segment.type == "markdown":
+                parts.append(
+                    {
+                        "type": "markdown",
+                        "data": {"content": segment.data.get("content", "")},
+                    }
+                )
+            elif segment.type == "json":
+                parts.append(
+                    {"type": "json", "data": {"data": segment.data.get("data", {})}}
                 )
             elif segment.type == "reply":
                 parts.append(

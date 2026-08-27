@@ -16,6 +16,8 @@ OFbot 2 支持多连接并存：一个实例可同时接入多套协议 / 多个
 | Mirai + mirai-api-http | Mirai HTTP | HTTP / WS / 反向 WS | ★★★ | 老牌方案，verifyKey + session 认证 |
 | QQ 官方机器人 | 官方 API v2 | WS Gateway + REST | ★★（受限） | 群内仅接收 @ 机器人消息，存在频控，需官方申请 |
 
+> **媒体能力**：除官方机器人外，各协议发送均透传完整消息段（文本 / @ / 图片 / 语音 / 视频 / 文件 / 表情 / 引用 / 合并转发 / JSON）；官方机器人当前仅支持文本（官方 API 限制）。
+
 ## 快速开始（推荐：NapCat OneBot v11 反向 WS）
 
 1. 部署 NapCat（Windows / Linux / macOS），登录一个 QQ 号。

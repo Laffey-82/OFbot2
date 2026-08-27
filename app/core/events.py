@@ -49,6 +49,10 @@ class NoticeReceived(BaseEvent):
     notice_type: str = ""
     user_id: str = ""
     group_id: str = ""
+    operator_id: str = ""
+    target_id: str = ""
+    file_name: str = ""
+    file_size: int = 0
     raw_event: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -73,6 +77,9 @@ class MessageRecalled(BaseEvent):
     bot_id: str = ""
     self_id: str = ""
     message_id: str = ""
+    user_id: str = ""
+    group_id: str = ""
+    operator_id: str = ""
     raw_event: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -90,6 +97,14 @@ class MemberMuted(NoticeReceived):
 
 class GroupNameUpdated(NoticeReceived):
     pass
+
+
+class GroupPoke(NoticeReceived):
+    """群戳一戳。"""
+
+
+class FileUploaded(NoticeReceived):
+    """群文件上传。"""
 
 
 class FriendRequestReceived(RequestReceived):

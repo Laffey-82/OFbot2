@@ -25,6 +25,34 @@
   未配置 API Key 时使用 Mock Provider，返回友好提示，不影响框架核心运行。已注册 Provider：{{ providers | join(', ') or 'mock' }}。
 </div>
 
+<div class="card">
+  <div class="card-head"><h2>能力支持矩阵</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Provider</th><th>chat</th><th>embeddings</th><th>image</th><th>speech_to_text</th><th>text_to_speech</th><th>ocr</th></tr></thead>
+      <tbody>
+      {% for name in providers %}
+      <tr data-row>
+        <td><span class="badge info">{{ name }}</span></td>
+        {% for method in ['chat','embeddings','image','speech_to_text','text_to_speech','ocr'] %}
+        <td>
+          {% if method in matrix.get(name, []) %}
+          <span class="badge success">支持</span>
+          {% else %}
+          <span class="badge">—</span>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">暂无 Provider</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:12.5px">标注「支持」表示该 Provider 已实现对应接口；未标注的能力会返回明确错误提示，不会返回伪造数据。</p>
+</div>
+
 {% set cards = [
   ("openai", "OpenAI 兼容", "OpenAI / DeepSeek / Qwen / Moonshot 等，修改 Base URL 即可"),
   ("anthropic", "Anthropic", "Claude 系列模型"),

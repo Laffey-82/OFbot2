@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 from typing import Any
@@ -10,7 +9,7 @@ from typing import Any
 import httpx
 import websockets
 
-from app.adapters.base import BotClient, ProtocolAdapter, make_http_client
+from app.adapters.base import BaseAdapter, BotClient, make_http_client
 from app.core.bus import get_bus
 from app.core.config import ConnectionSettings
 from app.core.events import BotDisconnected
@@ -26,16 +25,14 @@ from app.core.messages import (
 logger = get_logger(__name__)
 
 
-class SatoriAdapter(ProtocolAdapter):
+class SatoriAdapter(BaseAdapter):
     def __init__(
         self, settings: ConnectionSettings, bot_id: str, bot_client: BotClient
     ) -> None:
+        super().__init__(settings, bot_client)
         self.settings = settings
         self.bot_id = bot_id
-        self.bot_client = bot_client
         self.self_id = ""
-        self._running = False
-        self._reconnects = 0
         self._ws: Any = None
         self._http: httpx.AsyncClient | None = None
         self.api_base = (
@@ -55,17 +52,7 @@ class SatoriAdapter(ProtocolAdapter):
         return headers
 
     async def start(self) -> None:
-        self._running = True
-        while self._running:
-            try:
-                await self._connect_loop()
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.warning("satori connection failed: %s", exc)
-                self.bot_client.status[self.bot_id] = "disconnected"
-            if self._running:
-                await asyncio.sleep(self.settings.reconnect_interval)
+        await self.run_reconnect_loop(self._connect_loop, self.bot_id)
 
     async def test(self) -> tuple[bool, str]:
         url = f"ws://{self.settings.host}:{self.settings.port}{self.settings.path or '/'}"
@@ -111,8 +98,7 @@ class SatoriAdapter(ProtocolAdapter):
                 "connected_at": time.time(),
                 "reconnects": self._reconnects,
             }
-            async for raw in ws:
-                await self._handle_raw(raw)
+            await self.recv_loop(ws, self._handle_raw, self.bot_id)
 
     async def _handle_raw(self, raw: str) -> None:
         try:
@@ -239,6 +225,29 @@ class SatoriAdapter(ProtocolAdapter):
                         "type": "image",
                         "data": segment.data.get("url")
                         or segment.data.get("file", ""),
+                    }
+                )
+            elif segment.type in {"voice", "record"}:
+                parts.append(
+                    {
+                        "type": "audio",
+                        "data": segment.data.get("url")
+                        or segment.data.get("file", ""),
+                    }
+                )
+            elif segment.type == "video":
+                parts.append(
+                    {
+                        "type": "video",
+                        "data": segment.data.get("url")
+                        or segment.data.get("file", ""),
+                    }
+                )
+            elif segment.type == "file":
+                parts.append(
+                    {
+                        "type": "file",
+                        "data": segment.data.get("file", ""),
                     }
                 )
             elif segment.type == "reply":

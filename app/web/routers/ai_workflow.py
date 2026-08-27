@@ -72,6 +72,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
     ) -> HTMLResponse:
         ai = app.state.services.get("ai")
         providers = list(ai.providers) if ai else []
+        matrix = ai.matrix() if ai else {}
         active = ai.active_provider if ai else "mock"
         saved = settings.plugin_configs.get("ai", {})
         defaults = {
@@ -107,6 +108,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                 "request": request,
                 "user": user,
                 "providers": providers,
+                "matrix": matrix,
                 "active": active,
                 "configs": defaults,
                 "csrf_token": csrf_token,

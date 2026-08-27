@@ -46,7 +46,7 @@ plugin-repo/
   tools/build_packages.py     # 打包与校验脚本
 ```
 
-官方插件：`dice`、`welcome`、`keyword_reply`、`schedule_message`、`signin`、`todo`（见 `plugin-repo/plugins/`）。投稿流程：
+官方插件：`dice`、`welcome`、`keyword_reply`、`schedule_message`、`signin`、`todo`、`announcement`、`points`、`poll`、`random_choice`（见 `plugin-repo/plugins/`）。投稿流程：
 
 1. 在 `plugin-repo/plugins/<分类>/<插件名>/` 创建包式插件（参考 `dice`、`welcome` 与 [PLUGIN_MANIFEST.md](PLUGIN_MANIFEST.md)）。
 2. 本地校验并构建：

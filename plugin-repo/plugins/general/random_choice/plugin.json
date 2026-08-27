@@ -1,0 +1,42 @@
+{
+  "name": "random_choice",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "随机选择：从多个选项中随机取一个",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["random_choice.use"],
+  "config_schema": {"type": "object", "properties": {}},
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "choose",
+      "label": "随机选择",
+      "description": "从选项中随机取一个",
+      "enable_on_default": true,
+      "manage_permission": "random_choice.admin",
+      "commands": [
+        {
+          "name": "choose",
+          "aliases": ["随机", "选择"],
+          "handler": "handlers.choose_command",
+          "permission": "random_choice.use",
+          "description": "从多个选项中随机取一个（空格或逗号分隔）",
+          "usage": "/choose <选项1> <选项2> ...",
+          "examples": ["/choose 火锅 烧烤 奶茶"],
+          "params": [
+            {
+              "name": "items",
+              "type": "string",
+              "required": true,
+              "description": "选项列表（空格或逗号分隔）"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

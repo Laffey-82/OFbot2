@@ -402,6 +402,29 @@ async def greet_command(event, args, command_ctx) -> None:
 - 参数错误自动回复「【参数错误】原因 + 用法」，不进入处理器；`command_ctx.params` 为解析后的字典，`command_ctx.subcommand` 为命中的子命令名。
 - Web「命令速查」页与 `/help <命令>` 会自动展示参数与子命令。
 
+## 消息段与发送
+
+`MessageSegment` 提供工厂方法统一构造消息段：`text / at / image / voice / video / record / file / face / reply / forward / markdown / json`；`Message` 支持 `add_segment()` 与 `+` 拼接。
+
+```python
+from app.core.messages import Message, MessageSegment
+
+message = (
+    Message.text("早上好 ")
+    + MessageSegment.at(100)
+    + MessageSegment.image(file="a.png")
+)
+await event.reply(message)
+```
+
+- OneBot v11 发送统一使用消息数组（非 CQ 码字符串），规避转义问题；v12 / Red / Satori / Mirai 均按各自格式透传全部段类型。
+- 官方机器人适配器仅支持文本发送（官方 API 限制），能力矩阵见 [CONNECTIONS.md](CONNECTIONS.md)。
+- 未知段类型不崩溃：保留原始 data 并记日志。
+
+## 连接与重连
+
+正向连接使用统一指数退避重连：基础间隔 `reconnect_interval`（默认 3s），每次失败 ×2，上限 `reconnect_max_seconds`（默认 60s），±20% 抖动；`reconnect_max_attempts`（默认 0 = 无限）达到后连接进入 `disabled` 状态。收包超时视为心跳过期并触发重连。可在「连接中心」新增连接时配置这三个参数。
+
 ## 监听环境与作用域
 
 框架按「监听环境」管理策略：群消息 → `group:<id>`，私聊 → `private:*`（单一私聊环境，不做逐人控制）。

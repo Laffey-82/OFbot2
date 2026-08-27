@@ -252,3 +252,14 @@ class AdapterTestLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
+
+
+class MigrationRecord(Base):
+    """已应用的数据库迁移记录（持久化，重启后不重复执行）。"""
+
+    __tablename__ = "migration_records"
+
+    name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    applied_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )

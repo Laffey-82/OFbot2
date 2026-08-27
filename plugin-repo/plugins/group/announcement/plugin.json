@@ -1,0 +1,51 @@
+{
+  "name": "announcement",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "公告发送：向指定群发送公告内容",
+  "author": "OFbot 2",
+  "dependencies": {},
+  "permissions": ["announcement.send"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "group_id": {
+        "type": "string",
+        "default": "",
+        "description": "公告目标群号"
+      }
+    }
+  },
+  "web": false,
+  "models": [],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "announce",
+      "label": "公告发送",
+      "description": "向指定群发送公告",
+      "enable_on_default": true,
+      "manage_permission": "announcement.admin",
+      "commands": [
+        {
+          "name": "announce",
+          "aliases": ["公告"],
+          "handler": "handlers.announce_command",
+          "permission": "announcement.send",
+          "description": "向配置的群发送公告",
+          "usage": "/announce <内容>",
+          "examples": ["/announce 今晚 20:00 例行维护"],
+          "params": [
+            {
+              "name": "content",
+              "type": "string",
+              "required": true,
+              "description": "公告内容"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
