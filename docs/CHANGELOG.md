@@ -1,5 +1,36 @@
 # Changelog
 
+## v3.4.0（2026-08）— 能力深化（NoneBot2 / Koishi / LangBot 参照）
+
+### 响应规则（NoneBot2 Rule 轻量版）
+
+- 声明式规则：`plugin.json` 的 `commands[].rules` / `listeners[].rules` 支持 `to_me`、`keyword`、`regex`、`group_only`、`private_only`、`in_group`；加载期校验未注册规则。
+- `ctx.rules.register(name, checker)` 支持插件自定义规则；命令分发顺序：作用域门控 → 规则匹配 → 参数解析 → 执行；监听器在功能开关之后、处理器之前匹配规则。
+
+### 多轮会话（Koishi / ZeroBot 式交互）
+
+- 新增 `ctx.session`（`SessionManager`）：以 bot+群+用户 为键，TTL 过期 + 容量上限淘汰；`pending(question)` / `confirm()` / `cancel()` / `clear()`。
+- 命令声明 `session: true` 后，`CommandContext.session` 提供该会话上下文；`plugins/template` 新增 `/ask` 确认流示例。
+
+### Agent 工具调用循环（LangBot 式）
+
+- `AgentRunner` 升级：会话记忆（每会话最近 N 轮）、工具 schema 自动生成（inspect 签名）、最大轮次与工具超时、敏感工具权限点授权。
+- function-calling Provider（OpenAI 兼容）自动走工具调用；不支持的原生 Provider 自动降级 ReAct 文本解析。
+- 框架注册 5 个内置工具（send_group / send_private / records_create / records_list / ai_chat）；AI 页新增工具清单与「会话运行日志」，支持 Web 直接试跑 Agent。
+- 修复 `AIService._provider` 在无 mock Provider 注册时 `dict.get` 急切求值导致的 KeyError。
+
+### 流程引擎增强
+
+- `WorkflowEngine.dry_run()` 与 Web「干跑测试」：校验触发器/条件/步骤动作是否注册，不实际执行。
+- 运行步骤记录每步耗时（`elapsed_ms`），运行详情页展示步骤级回放。
+- 流程模板库：内置 4 个模板（消息回复 / AI 对话 / 定时写记录 / Webhook 转发），Web 一键导入，支持本地 JSON 模板目录扩展。
+
+### 多账号运维
+
+- `BotClient.health()`：连接健康度评分（连接状态 + 心跳新鲜度 + 消息吞吐），连接中心新增健康度卡片。
+- 连接中心支持 CSV 批量导入群-账号绑定（`group_id,connection_id`）。
+- 重连计数并入 `BotClient` 计数器，审计按连接 ID 区分。
+
 ## v3.3.0（2026-08）— 承重墙补课
 
 ### P0 数据与消息

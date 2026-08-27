@@ -22,6 +22,24 @@
   --radius: 10px;
   --radius-sm: 6px;
 }
+.health-bar {
+  display: inline-block;
+  width: 120px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border, rgba(128,128,128,.25));
+  overflow: hidden;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.health-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .4s ease;
+}
+.health-fill.ok { background: #34c759; }
+.health-fill.warn { background: #ff9f0a; }
+.health-fill.bad { background: #ff453a; }
 [data-theme="dark"] {
   --bg: #0f172a;
   --card: #1e293b;

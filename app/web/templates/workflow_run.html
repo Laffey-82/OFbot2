@@ -54,12 +54,13 @@
   {% if steps %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>#</th><th>动作</th><th>输出</th></tr></thead>
+      <thead><tr><th>#</th><th>动作</th><th>耗时</th><th>输出</th></tr></thead>
       <tbody>
       {% for step in steps %}
       <tr data-row>
         <td>{{ loop.index }}</td>
         <td><span class="badge info">{{ step.action }}</span></td>
+        <td class="mono">{{ step.elapsed_ms if step.elapsed_ms is defined else '—' }}ms</td>
         <td class="mono">{{ step.output }}</td>
       </tr>
       {% endfor %}

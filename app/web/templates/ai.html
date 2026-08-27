@@ -101,7 +101,78 @@
   {% endfor %}
 </div>
 
+<div class="card">
+  <div class="card-head">
+    <h2>Agent 工具与运行日志</h2>
+    <span class="badge info">多智能体工具调用循环</span>
+  </div>
+  <div class="form-grid" style="margin-bottom:14px">
+    <div class="form-row">
+      <label>测试提示词</label>
+      <input id="agent-prompt" placeholder="例如：把记录类型 todo 的前 5 条列出来">
+    </div>
+    <div class="form-row">
+      <label>会话 ID</label>
+      <input id="agent-session" value="web" placeholder="web">
+    </div>
+    <div class="form-row">
+      <button type="button" class="small" id="agent-run-btn" data-csrf="{{ csrf_token }}">运行 Agent</button>
+    </div>
+  </div>
+  <div id="agent-result" class="alert info" hidden></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>工具</th><th>说明</th><th>敏感</th><th>权限点</th></tr></thead>
+      <tbody id="agent-tools-body">
+        <tr><td colspan="4" class="empty">加载中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3 style="margin:16px 0 8px">最近运行</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>会话</th><th>提示词</th><th>轮次</th><th>耗时</th><th>最终输出</th></tr></thead>
+      <tbody id="agent-logs-body">
+        <tr><td colspan="5" class="empty">暂无运行记录</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <script>
+  async function loadAgentStatus() {
+    try {
+      const response = await fetch("/ai/agent");
+      const data = await response.json();
+      const toolsBody = document.getElementById("agent-tools-body");
+      if (!data.tools || !data.tools.length) {
+        toolsBody.innerHTML = '<tr><td colspan="4" class="empty">暂无工具</td></tr>';
+      } else {
+        toolsBody.innerHTML = data.tools.map((tool) =>
+          `<tr><td class="mono">${tool.name}</td><td>${tool.description || "—"}</td>` +
+          `<td>${tool.sensitive ? '<span class="badge danger">敏感</span>' : '<span class="badge">否</span>'}</td>` +
+          `<td class="mono">${tool.permission || "—"}</td></tr>`
+        ).join("");
+      }
+      renderAgentLogs(data.logs || []);
+    } catch (err) {
+      document.getElementById("agent-tools-body").innerHTML =
+        '<tr><td colspan="4" class="empty">加载失败</td></tr>';
+    }
+  }
+  function renderAgentLogs(logs) {
+    const body = document.getElementById("agent-logs-body");
+    if (!logs || !logs.length) {
+      body.innerHTML = '<tr><td colspan="5" class="empty">暂无运行记录</td></tr>';
+      return;
+    }
+    body.innerHTML = logs.map((log) =>
+      `<tr><td class="mono">${log.session_id || "—"}</td>` +
+      `<td>${(log.prompt || "").slice(0, 40)}</td>` +
+      `<td>${log.rounds}</td><td>${log.elapsed_ms}ms</td>` +
+      `<td>${(log.final || "").slice(0, 60)}</td></tr>`
+    ).join("");
+  }
   document.addEventListener("click", async (event) => {
     const testBtn = event.target.closest("[data-ai-test]");
     const activateBtn = event.target.closest("[data-ai-activate]");
@@ -133,6 +204,32 @@
       if (response.redirected) window.location.href = response.url;
       else window.location.reload();
     }
+    const agentRunBtn = event.target.closest("#agent-run-btn");
+    if (agentRunBtn) {
+      const body = new FormData();
+      body.append("csrf_token", agentRunBtn.dataset.csrf);
+      body.append("prompt", document.getElementById("agent-prompt").value);
+      body.append("session_id", document.getElementById("agent-session").value || "web");
+      body.append("max_rounds", "5");
+      agentRunBtn.disabled = true;
+      const original = agentRunBtn.textContent;
+      agentRunBtn.textContent = "运行中…";
+      try {
+        const response = await fetch("/ai/agent/run", { method: "POST", body });
+        const data = await response.json();
+        const resultEl = document.getElementById("agent-result");
+        resultEl.hidden = false;
+        resultEl.className = data.ok ? "alert success" : "alert error";
+        resultEl.textContent = data.ok ? ("Agent 回复：" + data.final) : ("运行失败：" + data.detail);
+        if (data.logs) renderAgentLogs(data.logs);
+      } catch (err) {
+        toast("网络错误", "error");
+      } finally {
+        agentRunBtn.disabled = false;
+        agentRunBtn.textContent = original;
+      }
+    }
   });
+  loadAgentStatus();
 </script>
 {% endblock %}

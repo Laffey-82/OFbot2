@@ -159,6 +159,7 @@ def _plugin_features(args: argparse.Namespace) -> None:
 
 def _plugin_check(args: argparse.Namespace) -> int:
     from app.core.plugin import PLUGIN_API_VERSION, PluginManifest
+    from app.core.rules import RuleRegistry
 
     plugin_dir = ROOT / "plugins" / args.name
     manifest_path = plugin_dir / "plugin.json"
@@ -177,6 +178,15 @@ def _plugin_check(args: argparse.Namespace) -> int:
         errors.append(f"目录名 {args.name} 与清单 name {manifest.name} 不一致")
     if manifest.api_version != PLUGIN_API_VERSION:
         errors.append(f"api_version {manifest.api_version} 不受支持")
+    rule_registry = RuleRegistry()
+    unknown_rules = []
+    for feature in manifest.effective_features():
+        for command in feature.commands:
+            unknown_rules.extend(rule_registry.validate(command.rules))
+        for listener in feature.listeners:
+            unknown_rules.extend(rule_registry.validate(listener.rules))
+    for rule in sorted(set(unknown_rules)):
+        errors.append(f"规则未注册：{rule}（可用：{' / '.join(rule_registry.names())}）")
     module_name = f"plugins.{args.name}"
     module = None
     try:

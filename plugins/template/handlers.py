@@ -44,6 +44,26 @@ async def greet_command(
         await event.reply("用法：/greet hello|world")
 
 
+async def ask_command(
+    event: MessageEvent, args: Message, command_ctx
+) -> None:
+    """会话上下文示例：首次调用发起待确认操作，再次调用执行确认。"""
+    session = getattr(command_ctx, "session", None)
+    if session is None:
+        await event.reply("该命令未启用会话上下文")
+        return
+    content = args.extract_plain_text().strip()
+    if await session.confirm():
+        task = session.state.pop("pending_task", "")
+        await event.reply(f"已确认执行：{task or '操作'}")
+        return
+    if not content:
+        await event.reply("请提供操作内容，例如：/ask 清理缓存")
+        return
+    session.state["pending_task"] = content
+    await event.reply(await session.ask(f"确认执行 {content} ？"))
+
+
 async def on_group_message(event: GroupMessageReceived) -> None:
     if event.message == "template:echo":
         await _ctx.bot.send_group_message(event.group_id, "template echo")

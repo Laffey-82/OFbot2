@@ -4,9 +4,45 @@
 <div class="page-head">
   <div>
     <h1>连接中心</h1>
-    <div class="sub">协议适配器连接状态，多账号预留</div>
+    <div class="sub">多协议多账号接入，健康度实时评分</div>
   </div>
 </div>
+
+{% if health %}
+<div class="card">
+  <div class="card-head">
+    <h2>健康度</h2>
+    <span class="muted" style="font-size:12.5px">评分 = 连接状态 + 心跳新鲜度 + 消息吞吐</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>连接</th><th>评分</th><th>状态</th><th>收到</th><th>发送</th><th>重连</th></tr></thead>
+      <tbody>
+      {% for item in health %}
+      <tr>
+        <td class="mono">{{ item.name }}</td>
+        <td>
+          <div class="health-bar">
+            <div class="health-fill {% if item.score >= 75 %}ok{% elif item.score >= 40 %}warn{% else %}bad{% endif %}" style="width: {{ item.score }}%"></div>
+          </div>
+          <span class="mono">{{ item.score }}/100</span>
+        </td>
+        <td>
+          {% if item.connected %}<span class="badge success">已连接</span>
+          {% elif item.status == 'disabled' %}<span class="badge danger">已停用</span>
+          {% elif item.heartbeat_stale %}<span class="badge danger">心跳过期</span>
+          {% else %}<span class="badge warning">{{ item.status }}</span>{% endif %}
+        </td>
+        <td>{{ item.messages_received }}</td>
+        <td>{{ item.messages_sent }}</td>
+        <td>{{ item.reconnects }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 <div class="card">
   <div class="card-head">
@@ -64,6 +100,21 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>群-账号绑定批量导入</h2></div>
+  <p class="muted" style="margin-top:0">CSV 表头：<code>group_id,connection_id</code>；导入后该群的出站消息走指定连接。</p>
+  <form method="post" action="/connections/import-bindings" enctype="multipart/form-data" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-row">
+      <label>CSV 文件</label>
+      <input type="file" name="file" accept=".csv,text/csv" required>
+    </div>
+    <div class="form-row">
+      <button type="submit" class="small">导入绑定</button>
+    </div>
+  </form>
 </div>
 
 <div class="card">

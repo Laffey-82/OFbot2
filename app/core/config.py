@@ -142,6 +142,11 @@ class RuntimeSettings(BaseModel):
 
     scopes: dict[str, ScopeEntry] = Field(default_factory=dict)
     plugin_tasks: dict[str, dict[str, bool]] = Field(default_factory=dict)
+    session_ttl_seconds: int = 600
+    session_max_sessions: int = 1000
+    agent_max_rounds: int = 5
+    agent_tool_timeout_seconds: float = 10.0
+    agent_max_memory_turns: int = 10
 
 
 class DatabaseSettings(BaseModel):

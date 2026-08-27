@@ -356,6 +356,72 @@ ofbot2 workflow run <id>           # 立即运行流程
 - 完整字段参考见 [PLUGIN_MANIFEST.md](PLUGIN_MANIFEST.md)；`ofbot2 plugin check <name>` 可在加载前校验。
 - 运行时 `ctx.commands.command()` / `ctx.subscribe()` / `ctx.scheduler` 仍可用，作为动态注册逃生通道（不入功能矩阵）。
 
+## 响应规则（rules）
+
+命令与监听器可在 `plugin.json` 中声明规则，框架在作用域门控之后、参数解析/处理器执行之前统一匹配：
+
+```json
+{
+  "name": "roll",
+  "handler": "handlers.roll_command",
+  "rules": [
+    {"name": "group_only"},
+    {"name": "in_group", "params": {"groups": ["123456789"]}}
+  ]
+}
+```
+
+内置规则：
+
+| 规则 | 参数 | 说明 |
+|---|---|---|
+| `to_me` | — | 私聊或消息包含 @bot |
+| `keyword` | `value`（字符串或列表） | 消息文本包含关键词 |
+| `regex` | `value` / `pattern` | 消息文本匹配正则 |
+| `group_only` | — | 仅群消息 |
+| `private_only` | — | 仅私聊消息 |
+| `in_group` | `groups`（群号列表） | 群号在白名单内 |
+
+插件可用 `ctx.rules.register("rule_name", checker)` 注册自定义规则，`checker(event, params)` 返回 `bool` 或协程；`ofbot2 plugin check` 会校验声明中未注册的规则。
+
+## 会话上下文（session）
+
+命令声明 `"session": true` 后，处理器通过 `command_ctx.session` 获得以 bot+群+用户 为键的会话对象：
+
+```python
+async def delete_command(event, args, command_ctx):
+    session = command_ctx.session
+    if await session.confirm():
+        await event.reply("已确认删除")
+        return
+    session.state["pending_id"] = args.extract_plain_text()
+    await event.reply(await session.ask("确认删除？"))
+```
+
+- 插件内可全局使用 `ctx.session`（`SessionManager`）：`get / prune / active_count`。
+- 会话默认 TTL 600 秒、上限 1000 个（`runtime.session_ttl_seconds` / `session_max_sessions` 可调），自动淘汰过期与最久未更新会话。
+
+## Agent 工具调用循环
+
+`ctx.services["agent"]`（`AgentRunner`）提供多智能体工具调用：
+
+```python
+runner = ctx.services["agent"]
+result = await runner.run(
+    "查询今天待办并汇总",
+    session_id=f"{event.group_id}:{event.user_id}",
+    max_rounds=5,
+    permission_check=lambda perm: ctx.permissions.has_permission(
+        event.user_id, perm
+    ),
+)
+```
+
+- 工具通过 `register_tool(name, func, description=..., sensitive=..., permission=...)` 注册；schema 默认由函数签名自动生成。
+- 支持 function-calling 的 Provider 自动走工具调用；其余 Provider 自动降级 ReAct 文本解析（`工具: name(参数JSON)`）。
+- 会话记忆保留最近 N 轮（`runtime.agent_max_memory_turns`）；运行日志可在 Web「AI → Agent 工具与运行日志」查看。
+- 敏感工具（如发消息、写记录）需携带 `sensitive=True` + 权限点，未授权时返回明确提示。
+
 ## 参数与子命令（分段命令）
 
 命令可在 `plugin.json` 声明参数与子命令，框架自动分词、类型转换与校验，无需手写字符串解析：

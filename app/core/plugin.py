@@ -22,7 +22,9 @@ from app.core.logger import get_logger
 from app.core.parsing import ParamSpec, SubcommandSpec
 from app.core.permissions import PermissionManager
 from app.core.plugin_tasks import PluginTaskEntry, PluginTaskRegistry
+from app.core.rules import RuleRegistry, RuleSpec
 from app.core.scopes import ScopePolicyService, feature_key, resolve_scope
+from app.core.sessions import SessionManager
 from app.core.subscriptions import EventSubscriptionRegistry
 from app.services.preset_utils import now, paginate, render_card
 
@@ -35,6 +37,8 @@ class DeclaredCommand(BaseModel):
     name: str
     aliases: list[str] = Field(default_factory=list)
     handler: str
+    rules: list[RuleSpec] = Field(default_factory=list)
+    session: bool = False
     permission: str = "bot.command"
     description: str = ""
     usage: str = ""
@@ -59,6 +63,7 @@ class DeclaredTask(BaseModel):
 class DeclaredListener(BaseModel):
     event: str
     handler: str
+    rules: list[RuleSpec] = Field(default_factory=list)
     description: str = ""
 
 
@@ -132,6 +137,8 @@ class PluginContext:
         workflow: Any = None,
         scope_policy: ScopePolicyService | None = None,
         task_registry: PluginTaskRegistry | None = None,
+        rules: RuleRegistry | None = None,
+        session: SessionManager | None = None,
     ) -> None:
         self.name = name
         self.config = config
@@ -153,6 +160,8 @@ class PluginContext:
         self.workflow = workflow
         self.scope_policy = scope_policy
         self.task_registry = task_registry
+        self.rules = rules or RuleRegistry()
+        self.session = session or SessionManager()
         self.features: dict[str, FeatureSpec] = {}
         self.storage = cache
         self.logger = get_logger(f"plugin.{name}")
@@ -288,6 +297,8 @@ class PluginManager:
         workflow: Any = None,
         scope_policy: ScopePolicyService | None = None,
         task_registry: PluginTaskRegistry | None = None,
+        rules: RuleRegistry | None = None,
+        session: SessionManager | None = None,
     ) -> None:
         self.plugins_dir = Path(plugins_dir)
         self.commands = commands
@@ -307,6 +318,8 @@ class PluginManager:
         self.workflow = workflow
         self.scope_policy = scope_policy or ScopePolicyService()
         self.task_registry = task_registry or PluginTaskRegistry()
+        self.rules = rules or RuleRegistry()
+        self.session = session or SessionManager()
         self._runtime_task_states: dict[str, dict[str, bool]] | None = None
         self.loaded: dict[str, LoadedPlugin] = {}
 
@@ -337,6 +350,18 @@ class PluginManager:
             return PluginManifest.model_validate(data)
         except (json.JSONDecodeError, ValidationError) as exc:
             raise ValueError(f"plugin manifest invalid: {manifest_path}") from exc
+
+    def validate_rules(self, manifest: PluginManifest) -> None:
+        """校验 manifest 中声明的规则均已在规则注册表注册。"""
+        unknown: list[str] = []
+        for feature in manifest.effective_features():
+            for command in feature.commands:
+                unknown.extend(self.rules.validate(command.rules))
+            for listener in feature.listeners:
+                unknown.extend(self.rules.validate(listener.rules))
+        if unknown:
+            names = "、".join(sorted(set(unknown)))
+            raise ValueError(f"插件声明了未注册的规则：{names}")
 
     def dependency_order(
         self, manifests: dict[str, PluginManifest], enabled: set[str]
@@ -423,6 +448,7 @@ class PluginManager:
             )
         if manifest.api_version != PLUGIN_API_VERSION:
             raise ValueError("incompatible plugin api version")
+        self.validate_rules(manifest)
         for permission in manifest.permissions:
             self.permissions.register_permission(permission)
             self.permissions.grant_role_permission("user", permission)
@@ -466,6 +492,8 @@ class PluginManager:
             workflow=self.workflow,
             scope_policy=self.scope_policy,
             task_registry=self.task_registry,
+            rules=self.rules,
+            session=self.session,
         )
         for migration in manifest.migrations:
             ctx.register_migrations(str(path / migration))
@@ -499,6 +527,8 @@ class PluginManager:
                     declared.name,
                     handler,
                     aliases=set(declared.aliases),
+                    rules=list(declared.rules),
+                    session=declared.session,
                     permission=declared.permission,
                     cooldown=declared.cooldown,
                     rate_limit=declared.rate_limit,
@@ -638,6 +668,10 @@ class PluginManager:
                 loaded.name, feature_key_id, scope
             ):
                 return
+            if declared.rules:
+                passed, _ = await self.rules.check(declared.rules, event)
+                if not passed:
+                    return
             await handler(event)
 
         loaded.context.subscribe(event_cls, wrapped)

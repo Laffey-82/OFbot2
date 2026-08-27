@@ -22,6 +22,7 @@ from app.core.parsing import (
     resolve_subcommand,
 )
 from app.core.permissions import permission_manager
+from app.core.rules import RuleRegistry, RuleSpec
 from app.core.scopes import resolve_scope
 from app.core.security import (
     SecurityPolicy,
@@ -58,6 +59,7 @@ class CommandContext:
     connection_id: str = ""
     subcommand: str = ""
     params: dict[str, Any] | None = None
+    session: Any = None
     raw_event: Any = None
 
 
@@ -78,6 +80,8 @@ class Command:
     examples: list[str] = field(default_factory=list)
     params: list[ParamSpec] = field(default_factory=list)
     subcommands: list[SubcommandSpec] = field(default_factory=list)
+    rules: list[RuleSpec] = field(default_factory=list)
+    session: bool = False
 
 
 class CommandRegistry:
@@ -90,9 +94,17 @@ class CommandRegistry:
         self.stat_callback: Callable[..., Any] | None = None
         self.scope_policy: Any = None
         self.unknown_command_hint: bool = True
+        self.rules: RuleRegistry | None = None
+        self.session_manager: Any = None
 
     def set_scope_policy(self, policy: Any) -> None:
         self.scope_policy = policy
+
+    def set_rule_registry(self, registry: RuleRegistry) -> None:
+        self.rules = registry
+
+    def set_session_manager(self, manager: Any) -> None:
+        self.session_manager = manager
 
     def set_command_start(self, prefixes: list[str]) -> None:
         self.command_start = prefixes
@@ -123,6 +135,8 @@ class CommandRegistry:
         examples: Iterable[str] | None = None,
         params: Iterable[ParamSpec] | None = None,
         subcommands: Iterable[SubcommandSpec] | None = None,
+        rules: Iterable[RuleSpec] | None = None,
+        session: bool = False,
     ) -> Callable[[CommandHandler], CommandHandler]:
         def decorator(func: CommandHandler) -> CommandHandler:
             self.register(
@@ -141,6 +155,8 @@ class CommandRegistry:
                 examples=list(examples or []),
                 params=self._coerce_params(params),
                 subcommands=self._coerce_subcommands(subcommands),
+                rules=self._coerce_rules(rules),
+                session=session,
             )
             return func
 
@@ -168,6 +184,17 @@ class CommandRegistry:
             for item in (subcommands or [])
         ]
 
+    @staticmethod
+    def _coerce_rules(
+        rules: Iterable[RuleSpec | dict] | None,
+    ) -> list[RuleSpec]:
+        return [
+            RuleSpec.model_validate(item)
+            if isinstance(item, dict)
+            else item
+            for item in (rules or [])
+        ]
+
     def register(
         self,
         name: str,
@@ -186,6 +213,8 @@ class CommandRegistry:
         examples: Iterable[str] | None = None,
         params: Iterable[ParamSpec] | None = None,
         subcommands: Iterable[SubcommandSpec] | None = None,
+        rules: Iterable[RuleSpec] | None = None,
+        session: bool = False,
     ) -> Command:
         command = Command(
             name=name,
@@ -203,6 +232,8 @@ class CommandRegistry:
             examples=list(examples or []),
             params=self._coerce_params(params),
             subcommands=self._coerce_subcommands(subcommands),
+            rules=self._coerce_rules(rules),
+            session=session,
         )
         self._commands[name] = command
         if plugin_name:
@@ -412,6 +443,31 @@ class CommandRegistry:
                 await event.reply(f"【×】{reason}")
                 return command.block
 
+        if command.rules and self.rules is not None:
+            passed, rule_reason = await self.rules.check(
+                command.rules, event
+            )
+            if not passed:
+                reason = rule_reason or "rule.mismatch"
+                bus.dispatch(
+                    CommandRejected(
+                        bot_id=getattr(event, "bot_id", ""),
+                        self_id=getattr(event, "self_id", ""),
+                        user_id=user_id,
+                        group_id=group_id,
+                        command_name=command.name,
+                        reason=reason,
+                    )
+                )
+                audit_logger.record(
+                    "command.rejected",
+                    user_id,
+                    target=command.name,
+                    success=False,
+                    detail={"reason": reason, "scope": scope},
+                )
+                return command.block
+
         override = None
         if self.scope_policy is not None:
             override = self.scope_policy.permission_override(
@@ -510,6 +566,15 @@ class CommandRegistry:
             connection_id=connection_id,
             subcommand=subcommand_name,
             params=bound_params,
+            session=(
+                self.session_manager.get(
+                    str(getattr(event, "bot_id", "")),
+                    group_id,
+                    user_id,
+                )
+                if command.session and self.session_manager is not None
+                else None
+            ),
             raw_event=event,
         )
         try:

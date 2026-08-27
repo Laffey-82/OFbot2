@@ -207,6 +207,67 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         except Exception as exc:
             return JSONResponse({"ok": False, "detail": str(exc)})
 
+    @router.get("/ai/agent")
+    async def ai_agent_status(
+        request: Request,
+        user: WebAccount = Depends(get_current_user),
+    ) -> JSONResponse:
+        runner = app.state.services.get("agent")
+        if runner is None:
+            return JSONResponse({"tools": [], "logs": []})
+        return JSONResponse(
+            {
+                "tools": runner.list_tools(),
+                "logs": runner.get_logs(limit=20),
+            }
+        )
+
+    @router.post("/ai/agent/run")
+    async def ai_agent_run(
+        request: Request,
+        user: WebAccount = Depends(require_admin),
+        prompt: str = Form(...),
+        session_id: str = Form("web"),
+        max_rounds: int = Form(5),
+        csrf: None = Depends(require_csrf),
+    ) -> JSONResponse:
+        runner = app.state.services.get("agent")
+        if runner is None:
+            return JSONResponse({"ok": False, "detail": "Agent 未初始化"})
+        permission_check = app.state.services.get("agent_permission")
+        try:
+            final = await runner.run(
+                prompt,
+                session_id=session_id or "web",
+                max_rounds=max_rounds,
+                permission_check=permission_check,
+            )
+        except Exception as exc:
+            audit_logger.record(
+                "agent.run_failed",
+                user.username,
+                target=session_id or "web",
+                success=False,
+                detail={"error": str(exc)},
+            )
+            return JSONResponse({"ok": False, "detail": str(exc)})
+        audit_logger.record(
+            "agent.run",
+            user.username,
+            target=session_id or "web",
+            success=True,
+            detail={"prompt": prompt[:200]},
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "final": final,
+                "logs": runner.get_logs(
+                    session_id=session_id or "web", limit=5
+                ),
+            }
+        )
+
     @router.get("/workflows", response_class=HTMLResponse)
     async def workflows_page(
         request: Request,
@@ -218,6 +279,12 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         runs = await engine.list_runs() if engine else []
         actions = sorted(engine.actions) if engine else []
         record_types, record_schemas = _record_schema_options(app)
+        template_service = app.state.services.get("workflow_templates")
+        template_list = (
+            template_service.list_templates()
+            if template_service is not None
+            else []
+        )
         return templates.TemplateResponse(
             request,
             "workflows.html",
@@ -229,8 +296,122 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                 "actions": actions,
                 "record_types": record_types,
                 "record_schemas": record_schemas,
+                "templates": template_list,
                 "csrf_token": csrf_token,
             },
+        )
+
+    @router.post("/workflows/{workflow_id}/dry-run")
+    async def workflows_dry_run(
+        workflow_id: int,
+        request: Request,
+        user: WebAccount = Depends(require_admin),
+        csrf: None = Depends(require_csrf),
+    ) -> JSONResponse:
+        engine = app.state.services.get("workflow")
+        if engine is None:
+            return JSONResponse(
+                {"ok": False, "detail": "流程引擎未初始化"}
+            )
+        try:
+            report = await engine.dry_run(workflow_id, {})
+        except Exception as exc:
+            return JSONResponse({"ok": False, "detail": str(exc)})
+        audit_logger.record(
+            "workflow.dry_run",
+            user.username,
+            target=str(workflow_id),
+            success=bool(report["valid"]),
+        )
+        return JSONResponse({"ok": True, "report": report})
+
+    @router.post("/workflows/import-template")
+    async def workflows_import_template(
+        request: Request,
+        user: WebAccount = Depends(require_admin),
+        template_id: str = Form(...),
+        name: str = Form(""),
+        csrf: None = Depends(require_csrf),
+    ) -> RedirectResponse:
+        engine = app.state.services.get("workflow")
+        templates = app.state.services.get("workflow_templates")
+        if engine is None or templates is None:
+            return flash_redirect("/workflows", error="模板服务未初始化")
+        try:
+            workflow = await templates.import_template(
+                engine, template_id, name or None
+            )
+        except Exception as exc:
+            return flash_redirect("/workflows", error=f"导入失败：{exc}")
+        audit_logger.record(
+            "workflow.template_imported",
+            user.username,
+            target=template_id,
+            success=True,
+        )
+        return flash_redirect(
+            "/workflows", message=f"已从模板导入流程 {workflow.name}"
+        )
+
+    @router.post("/workflows/dry-run-definition")
+    async def workflows_dry_run_definition(
+        request: Request,
+        user: WebAccount = Depends(require_admin),
+        steps_json: str = Form(...),
+        trigger_json: str = Form(""),
+        condition_json: str = Form(""),
+        csrf: None = Depends(require_csrf),
+    ) -> JSONResponse:
+        engine = app.state.services.get("workflow")
+        if engine is None:
+            return JSONResponse(
+                {"ok": False, "detail": "流程引擎未初始化"}
+            )
+        try:
+            import json
+
+            steps = json.loads(steps_json)
+            definition: dict[str, Any] = {"steps": steps}
+            if trigger_json:
+                trigger = json.loads(trigger_json)
+                if isinstance(trigger, dict) and trigger.get("type"):
+                    definition["trigger"] = trigger
+            if condition_json:
+                condition = json.loads(condition_json)
+                if isinstance(condition, (dict, list)):
+                    definition["condition"] = condition
+        except Exception as exc:
+            return JSONResponse({"ok": False, "detail": f"JSON 无效：{exc}"})
+
+        errors: list[str] = []
+        warnings: list[str] = []
+        steps = definition.get("steps", [])
+        if not steps:
+            warnings.append("流程没有动作步骤")
+        for index, step in enumerate(steps, start=1):
+            action_name = step.get("action") if isinstance(step, dict) else None
+            if not action_name:
+                errors.append(f"第 {index} 步缺少 action")
+            elif action_name not in engine.actions:
+                errors.append(f"第 {index} 步动作 {action_name} 未注册")
+            elif not isinstance(step.get("params"), dict):
+                errors.append(f"第 {index} 步参数必须是对象")
+        audit_logger.record(
+            "workflow.dry_run_definition",
+            user.username,
+            target="definition",
+            success=not errors,
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "report": {
+                    "valid": not errors,
+                    "errors": errors,
+                    "warnings": warnings,
+                    "would_run_steps": len(steps) if not errors else 0,
+                },
+            }
         )
 
     @router.post("/workflows/create")

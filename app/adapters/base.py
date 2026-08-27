@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import random
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.bus import get_bus
@@ -25,6 +27,22 @@ from app.core.messages import (
 logger = get_logger(__name__)
 
 __all__ = ["BotClient", "ProtocolAdapter", "make_http_client"]
+
+
+@dataclass
+class ConnectionHealth:
+    """单连接健康度快照（供监控页与告警使用）。"""
+
+    name: str
+    status: str = "unknown"
+    connected: bool = False
+    score: int = 0
+    last_heartbeat: float = 0.0
+    heartbeat_stale: bool = False
+    messages_received: int = 0
+    messages_sent: int = 0
+    reconnects: int = 0
+    detail: dict[str, Any] = field(default_factory=dict)
 
 
 class ProtocolAdapter(ABC):
@@ -90,6 +108,7 @@ class BaseAdapter(ProtocolAdapter):
                 logger.warning("adapter %s connection failed: %s", bot_id, exc)
                 if self.bot_client is not None:
                     self.bot_client.status[bot_id] = "disconnected"
+                    self.bot_client._bump(bot_id, "reconnects")
             if not self._running:
                 break
             attempt += 1
@@ -146,6 +165,8 @@ class BotClient:
         self.status: dict[str, str] = {}
         self.details: dict[str, dict[str, Any]] = {}
         self.counters: dict[str, dict[str, int]] = {}
+        self.reconnect_limits: dict[str, int] = {}
+        self.stale_seconds: float = 300.0
 
     def _bump(self, name: str, key: str, amount: int = 1) -> None:
         self.counters.setdefault(name, {})
@@ -181,6 +202,46 @@ class BotClient:
         for name in self.adapters:
             return name
         return ""
+
+    def health(self, stale_seconds: float | None = None) -> list[ConnectionHealth]:
+        """计算所有连接的健康度评分（0-100）。"""
+        stale_seconds = stale_seconds or self.stale_seconds
+        result: list[ConnectionHealth] = []
+        now = time.time()
+        for name in self.adapters:
+            status = self.status.get(name, "registered")
+            detail = dict(self.details.get(name, {}))
+            counters = self.counters.get(name, {})
+            heartbeat = detail.get("last_heartbeat", 0.0) or 0.0
+            connected = status == "connected"
+            score = 0
+            if connected:
+                score += 50
+            if heartbeat and (now - heartbeat) <= stale_seconds:
+                score += 25
+            received = int(counters.get("received", 0))
+            sent = int(counters.get("sent", 0))
+            if received:
+                score += min(15, received)
+            if sent:
+                score += min(10, sent)
+            if detail.get("error"):
+                score = max(0, score - 20)
+            result.append(
+                ConnectionHealth(
+                    name=name,
+                    status=status,
+                    connected=connected,
+                    score=min(100, score),
+                    last_heartbeat=heartbeat,
+                    heartbeat_stale=bool(heartbeat) and (now - heartbeat) > stale_seconds,
+                    messages_received=received,
+                    messages_sent=sent,
+                    reconnects=int(counters.get("reconnects", 0)),
+                    detail=detail,
+                )
+            )
+        return sorted(result, key=lambda item: item.name)
 
     async def send_group_message(
         self,

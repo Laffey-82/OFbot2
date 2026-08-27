@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -10,8 +12,10 @@ from fastapi import (
     APIRouter,
     Depends,
     FastAPI,
+    File,
     Form,
     Request,
+    UploadFile,
 )
 from fastapi.responses import (
     HTMLResponse,
@@ -120,8 +124,51 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                 ),
                 "connections": settings.transport.connections,
                 "test_history": test_history,
+                "health": (
+                    bot_client.health() if bot_client is not None else []
+                ),
                 "csrf_token": csrf_token,
             },
+        )
+
+    @router.post("/connections/import-bindings")
+    async def connections_import_bindings(
+        request: Request,
+        user: WebAccount = Depends(require_admin),
+        file: UploadFile = File(...),
+        csrf: None = Depends(require_csrf),
+    ) -> RedirectResponse:
+        """CSV 批量导入群-账号绑定：表头 group_id,connection_id。"""
+        raw = (await file.read()).decode("utf-8-sig", errors="replace")
+        reader = csv.DictReader(io.StringIO(raw))
+        valid_ids = {conn.id for conn in settings.transport.connections}
+        imported = 0
+        errors: list[str] = []
+        scope_policy = getattr(app.state, "scope_policy", None)
+        for row_number, row in enumerate(reader, start=2):
+            group_id = (row.get("group_id") or "").strip()
+            connection_id = (row.get("connection_id") or "").strip()
+            if not group_id:
+                continue
+            if connection_id not in valid_ids:
+                errors.append(f"第 {row_number} 行：连接 {connection_id or '(空)'} 不存在")
+                continue
+            if scope_policy is not None:
+                scope_policy.set_connection(f"group:{group_id}", connection_id)
+            imported += 1
+        save_settings(settings)
+        audit_logger.record(
+            "adapter.bindings_imported",
+            user.username,
+            target=str(imported),
+            success=True,
+            detail={"errors": errors[:20]},
+        )
+        if errors:
+            message = f"已导入 {imported} 条绑定，{len(errors)} 条失败"
+            return flash_redirect("/connections", error=message)
+        return flash_redirect(
+            "/connections", message=f"已导入 {imported} 条群-账号绑定"
         )
 
     @router.post("/connections/add")

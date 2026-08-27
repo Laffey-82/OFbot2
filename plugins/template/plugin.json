@@ -83,6 +83,15 @@
               ]
             }
           ]
+        },
+        {
+          "name": "ask",
+          "aliases": ["询问"],
+          "handler": "handlers.ask_command",
+          "permission": "template.ping",
+          "session": true,
+          "description": "会话上下文示例：先发起待确认操作，再次调用时确认",
+          "usage": "/ask <内容>"
         }
       ],
       "tasks": [
@@ -99,7 +108,13 @@
         {
           "event": "GroupMessageReceived",
           "handler": "handlers.on_group_message",
-          "description": "收到群消息时检查 template:echo 关键字"
+          "description": "收到含 template:echo 关键字的群消息时触发",
+          "rules": [
+            {
+              "name": "keyword",
+              "params": {"value": "template:echo"}
+            }
+          ]
         }
       ]
     }

@@ -11,6 +11,39 @@
 {% if request.query_params.get("error") %}<div class="alert error">创建或运行失败，请检查步骤 JSON。</div>{% endif %}
 
 <div class="card">
+  <div class="card-head">
+    <h2>模板库</h2>
+    <span class="badge info">一键导入，再按需修改</span>
+  </div>
+  {% if templates %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>模板</th><th>分类</th><th>说明</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for template in templates %}
+      <tr>
+        <td>{{ template.name }}</td>
+        <td><span class="badge">{{ template.category }}</span></td>
+        <td>{{ template.description }}</td>
+        <td>
+          <form method="post" action="/workflows/import-template" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="template_id" value="{{ template.id }}">
+            <input type="hidden" name="name" value="">
+            <button class="small secondary">导入</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">暂无模板。</p>
+  {% endif %}
+</div>
+
+<div class="card">
   <div class="card-head"><h2>创建流程</h2></div>
   <form method="post" action="/workflows/create" class="js-ajax">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -111,6 +144,7 @@
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="small secondary">立即运行</button>
             </form>
+            <button type="button" class="small secondary" data-dry-run="{{ workflow.id }}" data-csrf="{{ csrf_token }}">干跑校验</button>
             <form method="post" action="/workflows/{{ workflow.id }}/delete" class="js-ajax">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="small danger" data-confirm="确定删除流程 {{ workflow.name }}？">删除</button>
@@ -168,6 +202,33 @@
     recordTypes: {{ record_types | tojson }},
     recordSchemas: {{ record_schemas | tojson }}
   };
+  document.addEventListener("click", async (event) => {
+    const btn = event.target.closest("[data-dry-run]");
+    if (!btn) return;
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "校验中…";
+    try {
+      const body = new FormData();
+      body.append("csrf_token", btn.dataset.csrf);
+      const response = await fetch(`/workflows/${btn.dataset.dryRun}/dry-run`, {
+        method: "POST",
+        body
+      });
+      const data = await response.json();
+      if (data.ok && data.report.valid) {
+        toast(`干跑通过：将执行 ${data.report.would_run_steps} 步`, "success");
+      } else {
+        const errors = (data.report ? data.report.errors : [data.detail] || []).join("；");
+        toast("干跑失败：" + errors, "error");
+      }
+    } catch (err) {
+      toast("网络错误", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
 </script>
 <script src="/static/js/workflow-builder.js"></script>
 <script>initWorkflowBuilder(window.WORKFLOW_INIT);</script>

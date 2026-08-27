@@ -1,6 +1,6 @@
 [project]
 name = "ofbot2"
-version = "3.3.0"
+version = "3.4.0"
 description = "Extensible plugin-based bot framework with QQNT Red and OneBot adapters"
 requires-python = ">=3.11"
 dependencies = [

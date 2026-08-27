@@ -38,9 +38,11 @@ from app.core.observability import get_system_metrics
 from app.core.permissions import permission_manager
 from app.core.plugin import PluginManager
 from app.core.plugin_tasks import PluginTaskRegistry
+from app.core.rules import RuleRegistry
 from app.core.scheduler import SchedulerService
 from app.core.scopes import ScopePolicyService
 from app.core.security import SecurityPolicy, audit_logger
+from app.core.sessions import SessionManager
 from app.core.subscriptions import EventSubscriptionRegistry
 from app.core.whitelist import GroupWhitelistService
 from app.db.base import get_engine, init_db, session_factory
@@ -57,6 +59,7 @@ from app.runtime import (
     restore_tasks,
 )
 from app.services.aggregation import AggregationService
+from app.services.ai import AgentRunner
 from app.services.alerts import AlertService
 from app.services.audit_service import AuditService
 from app.services.backup import BackupService
@@ -76,6 +79,7 @@ from app.services.scaffold import ScaffoldService
 from app.services.state_machine import StateMachineService
 from app.services.webhook import WebhookService
 from app.services.workflow import WorkflowEngine
+from app.services.workflow_templates import WorkflowTemplateService
 
 ROOT = Path(__file__).resolve().parent
 logger = get_logger(__name__)
@@ -115,6 +119,13 @@ async def run(settings: Settings) -> None:
     command_registry.set_command_sep(settings.basic.command_sep)
     command_registry.set_security(security)
     command_registry.set_scope_policy(scope_policy)
+    rule_registry = RuleRegistry()
+    session_manager = SessionManager(
+        ttl_seconds=settings.runtime.session_ttl_seconds,
+        max_sessions=settings.runtime.session_max_sessions,
+    )
+    command_registry.set_rule_registry(rule_registry)
+    command_registry.set_session_manager(session_manager)
     command_registry.unknown_command_hint = (
         settings.security.unknown_command_hint
     )
@@ -132,6 +143,85 @@ async def run(settings: Settings) -> None:
     aggregation = AggregationService()
     audit_service = AuditService()
     ai_service = build_ai_service(settings)
+    agent_runner = AgentRunner(
+        ai_service,
+        max_memory_turns=settings.runtime.agent_max_memory_turns,
+    )
+
+    async def agent_send_group(group_id: str, message: str) -> str:
+        ok = await bot_client.send_group_message(str(group_id), message)
+        return "已发送" if ok else "发送失败（连接不可用）"
+
+    async def agent_send_private(user_id: str, message: str) -> str:
+        ok = await bot_client.send_private_message(str(user_id), message)
+        return "已发送" if ok else "发送失败（连接不可用）"
+
+    async def agent_records_create(record_type: str, data: str = "{}") -> str:
+        import json
+
+        try:
+            payload = json.loads(data) if data.strip() else {}
+        except json.JSONDecodeError:
+            return "数据 JSON 无效"
+        if not isinstance(payload, dict):
+            return "数据必须是 JSON 对象"
+        try:
+            record = await record_service.create(record_type, payload)
+        except Exception as exc:
+            return f"创建失败：{exc}"
+        return f"已创建记录 #{record.id}"
+
+    async def agent_records_list(record_type: str, limit: int = 20) -> str:
+        try:
+            records = await record_service.list(record_type, limit=limit)
+        except Exception as exc:
+            return f"查询失败：{exc}"
+        if not records:
+            return f"记录类型 {record_type} 暂无数据"
+        lines = [f"记录 #{item.id}：{item.data}" for item in records[:limit]]
+        return "\n".join(lines)
+
+    async def agent_ai_chat(prompt: str) -> str:
+        return await ai_service.chat(
+            [
+                {"role": "system", "content": "你是 OFbot 2 助手。"},
+                {"role": "user", "content": prompt},
+            ]
+        )
+
+    agent_runner.register_tool(
+        "send_group",
+        agent_send_group,
+        description="向指定群发送一条消息",
+        sensitive=True,
+        permission="bot.message",
+    )
+    agent_runner.register_tool(
+        "send_private",
+        agent_send_private,
+        description="向指定用户发送一条私聊消息",
+        sensitive=True,
+        permission="bot.message",
+    )
+    agent_runner.register_tool(
+        "records_create",
+        agent_records_create,
+        description="在记录中心创建一条记录",
+        sensitive=True,
+        permission="record.manage",
+    )
+    agent_runner.register_tool(
+        "records_list",
+        agent_records_list,
+        description="查询记录中心某类型的记录",
+        permission="record.read",
+    )
+    agent_runner.register_tool(
+        "ai_chat",
+        agent_ai_chat,
+        description="调用 AI 完成一次独立的单轮对话",
+    )
+
     workflow_engine = WorkflowEngine(
         auto_disable_after_failures=(
             settings.web.auto_disable_workflows_after_failures
@@ -278,9 +368,16 @@ async def run(settings: Settings) -> None:
         "audit": audit_service,
         "ai": ai_service,
         "workflow": workflow_engine,
+        "workflow_templates": WorkflowTemplateService(
+            ROOT / "data" / "workflow_templates"
+        ),
         "webhook": webhook_service,
         "alerts": alert_service,
         "capabilities": capability_registry,
+        "agent": agent_runner,
+        "agent_permission": permission_manager.has_permission,
+        "rules": rule_registry,
+        "session": session_manager,
     }
     subscriptions = EventSubscriptionRegistry()
 
@@ -386,6 +483,8 @@ async def run(settings: Settings) -> None:
         workflow=workflow_engine,
         scope_policy=scope_policy,
         task_registry=PluginTaskRegistry(scheduler),
+        rules=rule_registry,
+        session=session_manager,
     )
     plugin_manager.set_runtime_task_states(
         settings.runtime.plugin_tasks

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -166,10 +167,19 @@ class WorkflowEngine:
                     action = self.actions.get(action_name)
                     if action is None:
                         raise ValueError(f"action not registered: {action_name}")
+                    step_started = time.monotonic()
                     output = action(context, **step.get("params", {}))
                     if hasattr(output, "__await__"):
                         output = await output
-                    result["steps"].append({"action": action_name, "output": output})
+                    result["steps"].append(
+                        {
+                            "action": action_name,
+                            "output": output,
+                            "elapsed_ms": round(
+                                (time.monotonic() - step_started) * 1000, 1
+                            ),
+                        }
+                    )
                 status = "succeeded"
         except Exception as exc:
             logger.exception("workflow failed: %s", workflow.name)
@@ -251,6 +261,77 @@ class WorkflowEngine:
                             consecutive,
                         )
         return run
+
+    async def dry_run(
+        self, workflow_id: int, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """干跑：校验触发器/条件/步骤，不实际执行任何动作。"""
+        workflow = await self.get(workflow_id)
+        if workflow is None:
+            raise KeyError(workflow_id)
+        definition = workflow.definition
+        errors: list[str] = []
+        warnings: list[str] = []
+        trigger = definition.get("trigger", {})
+        trigger_type = str(trigger.get("type", ""))
+        known_triggers = {
+            "message",
+            "schedule",
+            "webhook",
+            "alert",
+            "command",
+            "record_changed",
+            "status_changed",
+        }
+        if not trigger_type:
+            errors.append("缺少触发器（trigger.type）")
+        elif trigger_type not in known_triggers:
+            warnings.append(f"触发器类型 {trigger_type} 未内置，需插件注册")
+        if trigger_type == "schedule" and not trigger.get("cron"):
+            errors.append("定时触发器缺少 cron 表达式")
+
+        context = context or {}
+        try:
+            condition_matched = self.evaluate_condition(
+                context, definition.get("condition")
+            )
+        except Exception as exc:
+            condition_matched = False
+            errors.append(f"条件校验失败：{exc}")
+
+        steps = definition.get("steps", [])
+        if not steps:
+            warnings.append("流程没有动作步骤")
+        for index, step in enumerate(steps, start=1):
+            action_name = step.get("action") if isinstance(step, dict) else None
+            if not action_name:
+                errors.append(f"第 {index} 步缺少 action")
+                continue
+            if action_name not in self.actions:
+                errors.append(f"第 {index} 步动作 {action_name} 未注册")
+            elif not isinstance(step.get("params"), dict):
+                errors.append(f"第 {index} 步参数必须是对象")
+        return {
+            "workflow_id": workflow.id,
+            "valid": not errors,
+            "errors": errors,
+            "warnings": warnings,
+            "condition_matched": condition_matched,
+            "would_run_steps": len(steps) if not errors else 0,
+        }
+
+    async def get_run(self, run_id: int) -> WorkflowRun | None:
+        async with session_factory()() as session:
+            return await session.get(WorkflowRun, run_id)
+
+    async def delete_run(self, run_id: int) -> bool:
+        async with session_factory()() as session:
+            run = await session.get(WorkflowRun, run_id)
+            if run is None:
+                return False
+            await session.delete(run)
+            await session.commit()
+        return True
 
     async def delete(self, workflow_id: int) -> bool:
         async with session_factory()() as session:

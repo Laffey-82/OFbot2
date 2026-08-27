@@ -522,6 +522,44 @@ function initWorkflowBuilder(options) {
     } catch (e) {}
   });
 
+  const dryRunBtn = document.getElementById("wf-dry-run");
+  if (dryRunBtn) {
+    dryRunBtn.addEventListener("click", async () => {
+      syncJson();
+      const body = new FormData();
+      body.append("csrf_token", dryRunBtn.dataset.csrf || "");
+      body.append("steps_json", jsonArea.value);
+      body.append("trigger_json", triggerJsonInput ? triggerJsonInput.value : "");
+      const rawCondition = conditionArea ? conditionArea.value.trim() : "";
+      if (rawCondition && rawCondition !== "null") {
+        body.append("condition_json", rawCondition);
+      }
+      dryRunBtn.disabled = true;
+      const original = dryRunBtn.textContent;
+      dryRunBtn.textContent = "校验中…";
+      try {
+        const response = await fetch("/workflows/dry-run-definition", {
+          method: "POST",
+          body
+        });
+        const data = await response.json();
+        if (data.ok && data.report.valid) {
+          toast(`干跑通过：将执行 ${data.report.would_run_steps} 步`, "success");
+        } else {
+          const errors = data.report
+            ? data.report.errors.join("；")
+            : data.detail || "未知错误";
+          toast("干跑失败：" + errors, "error");
+        }
+      } catch (err) {
+        toast("网络错误", "error");
+      } finally {
+        dryRunBtn.disabled = false;
+        dryRunBtn.textContent = original;
+      }
+    });
+  }
+
   if (wfSteps.length) {
     const first = wfSteps[0];
     if (first && first.params) {
