@@ -9,11 +9,11 @@ if (-not $SkipInstall) {
 }
 
 Write-Host "==> Syntax compile check"
-py -m compileall -q app plugins main.py tests scripts
+py -m compileall -q app plugins ofbot2 main.py tests scripts
 if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
 
 Write-Host "==> Ruff static check"
-py -m ruff check app plugins main.py tests scripts plugin-repo/tools
+py -m ruff check app plugins ofbot2 main.py tests scripts plugin-repo/tools
 if ($LASTEXITCODE -ne 0) { throw "ruff check failed" }
 
 Write-Host "==> Unit tests"

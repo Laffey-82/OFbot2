@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.5（2026-08）— 工程与文档收尾
+
+- 测试补齐：roles 路由 Web 流程、`plugin_state` 读写、`capability_setup` 内置能力注册、`example_ai` 声明式加载。
+- `scripts/benchmark.py` 接入 CI（仅输出报告，不设硬性门槛）。
+- `docs/API.md` 重新生成，路径数对齐实际（171 路径 / 184 操作）。
+- `scripts/dev.ps1` 门禁与 CI 对齐（compileall/ruff 纳入 `ofbot2` 包）。
+- `docs/PRESETS.md` 重写：明确 15 个示例已转正为官方插件，examples 仅作脚手架。
+- `plugins/example_ai` 改写为声明式（features + handlers.py），保持 `/ask` 行为。
+
 ## v1.0.4（2026-08）— 适配器与 Web 边界
 
 - 反向 WS 热更新生效：WebSocket 路由改为动态查找当前适配器 handler，连接热重载后新连接可用。

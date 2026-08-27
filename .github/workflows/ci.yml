@@ -22,6 +22,8 @@ jobs:
         run: ruff check app plugins ofbot2 main.py tests scripts plugin-repo/tools
       - name: Test
         run: python -m pytest -q
+      - name: Benchmark (report only)
+        run: python scripts/benchmark.py --rounds 500
   package:
     runs-on: ubuntu-latest
     steps:

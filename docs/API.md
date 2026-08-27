@@ -9,7 +9,7 @@
 
 ## 接口总览
 
-共 160 个路径。
+共 171 个路径。
 
 ### /
 
@@ -39,6 +39,7 @@
 | GET | `/monitor` | Monitor Page |
 | GET | `/plugins` | Plugins Page |
 | GET | `/records` | Records Page |
+| GET | `/roles` | Roles Page |
 | GET | `/scopes` | Scopes Page |
 | GET | `/self-heal` | Self Heal Page |
 | GET | `/setup` | Setup Page |
@@ -61,6 +62,8 @@
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/ai/activate` | Ai Activate |
+| GET | `/ai/agent` | Ai Agent Status |
+| POST | `/ai/agent/run` | Ai Agent Run |
 | POST | `/ai/config` | Ai Config |
 | POST | `/ai/test` | Ai Test |
 
@@ -71,6 +74,7 @@
 | POST | `/alerts/add` | Alerts Add |
 | GET | `/alerts/export` | Alerts Export |
 | POST | `/alerts/history/clear` | Alerts History Clear |
+| POST | `/alerts/install-template` | Alerts Install Template |
 | POST | `/alerts/remove` | Alerts Remove |
 | POST | `/alerts/toggle` | Alerts Toggle |
 | POST | `/alerts/{name}/edit` | Alerts Edit |
@@ -152,6 +156,7 @@
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/connections/add` | Connections Add |
+| POST | `/connections/import-bindings` | Connections Import Bindings |
 | POST | `/connections/reconnect-all` | Connections Reconnect All |
 | POST | `/connections/send-test` | Connections Send Test |
 | POST | `/connections/test-all` | Connections Test All |
@@ -166,7 +171,6 @@
 | --- | --- | --- |
 | GET | `/docs/index` | Docs Page |
 | GET | `/docs/view/{name}` | Docs View |
-| GET | `/docs/{name}` | Docs File |
 
 ### /executions
 
@@ -219,6 +223,8 @@
 | --- | --- | --- |
 | POST | `/plugins/install` | Plugin Install Upload |
 | POST | `/plugins/new` | Plugin Scaffold Create |
+| GET | `/plugins/repo` | Plugin Repo Page |
+| POST | `/plugins/repo/install` | Plugin Repo Install |
 | POST | `/plugins/{name}/config` | Plugin Config Save |
 | POST | `/plugins/{name}/load` | Load Plugin Route |
 | POST | `/plugins/{name}/reload` | Reload Plugin |
@@ -236,6 +242,13 @@
 | POST | `/records/{record_id}/delete` | Records Delete |
 | POST | `/records/{record_id}/transition` | Records Transition |
 | POST | `/records/{record_id}/update` | Records Update |
+
+### /roles
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/roles/remove` | Roles Remove |
+| POST | `/roles/set` | Roles Set |
 
 ### /scopes
 
@@ -307,8 +320,11 @@
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/workflows/create` | Workflows Create |
+| POST | `/workflows/dry-run-definition` | Workflows Dry Run Definition |
+| POST | `/workflows/import-template` | Workflows Import Template |
 | GET | `/workflows/runs/{run_id}` | Workflow Run Detail |
 | POST | `/workflows/{workflow_id}/delete` | Workflows Delete |
+| POST | `/workflows/{workflow_id}/dry-run` | Workflows Dry Run |
 | GET | `/workflows/{workflow_id}/edit` | Workflow Edit Page |
 | POST | `/workflows/{workflow_id}/edit` | Workflow Edit Save |
 | POST | `/workflows/{workflow_id}/enable` | Workflows Enable |
