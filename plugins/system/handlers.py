@@ -430,3 +430,53 @@ async def task_command(
         f"{_prefix()}task enable|disable|remove <id> ｜ "
         f"{_prefix()}task add interval|cron <名称> <群号> <参数> <消息>"
     )
+
+
+async def _set_feature(
+    event: MessageEvent,
+    args: Message,
+    command_ctx,
+    *,
+    enabled: bool,
+) -> None:
+    group_id = str(getattr(event, "group_id", "") or "")
+    if not group_id:
+        await event.reply("【仅群内可用】请在群聊中使用该命令")
+        return
+    params = getattr(command_ctx, "params", None) or {}
+    feature = str(params.get("feature", "") or "").strip()
+    if not feature:
+        await event.reply("请提供功能键，例如 /功能启用 dice.roll")
+        return
+    policy = getattr(_ctx, "scope_policy", None)
+    if policy is None:
+        await event.reply("作用域策略不可用，请联系管理员")
+        return
+    scope = f"group:{group_id}"
+    policy.set_feature(scope, feature, enabled)
+    try:
+        from pathlib import Path
+
+        from app.core.config import load_settings, save_settings
+
+        root = Path(__file__).resolve().parents[2]
+        config_path = root / "config.yaml"
+        if config_path.exists():
+            settings = load_settings(config_path)
+            save_settings(settings)
+    except Exception as exc:
+        _ctx.logger.warning("持久化功能开关失败：%s", exc)
+    state = "启用" if enabled else "禁用"
+    await event.reply(f"已在本群{state}功能 {feature}（即时生效）")
+
+
+async def feature_enable_command(
+    event: MessageEvent, args: Message, command_ctx
+) -> None:
+    await _set_feature(event, args, command_ctx, enabled=True)
+
+
+async def feature_disable_command(
+    event: MessageEvent, args: Message, command_ctx
+) -> None:
+    await _set_feature(event, args, command_ctx, enabled=False)

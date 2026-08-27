@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 import zipfile
@@ -22,10 +23,15 @@ _CACHE_TTL = 60.0
 class PluginMeta(BaseModel):
     id: str
     name: str = ""
+    api_version: int = 1
     version: str = ""
     description: str = ""
     author: str = ""
     category: str = ""
+    dependencies: dict[str, str] = {}
+    tags: list[str] = []
+    released_at: str = ""
+    checksum: str = ""
     zip_url: str = ""
 
 
@@ -131,10 +137,24 @@ class PluginRepoService:
                     PluginMeta(
                         id=plugin_id,
                         name=plugin_id,
+                        api_version=int(manifest.get("api_version", 1) or 1),
                         version=str(manifest.get("version", "")),
                         description=str(manifest.get("description", "")),
                         author=str(manifest.get("author", "")),
                         category="local",
+                        dependencies={
+                            str(key): str(value)
+                            for key, value in (
+                                manifest.get("dependencies", {}) or {}
+                            ).items()
+                        },
+                        tags=[
+                            str(item)
+                            for item in (
+                                manifest.get("tags", [])
+                                or ["local"]
+                            )
+                        ],
                         zip_url=str(zip_path),
                     )
                 )
@@ -158,10 +178,27 @@ class PluginRepoService:
         meta = await self.get_plugin(plugin_id)
         if meta.zip_url.startswith(("http://", "https://")):
             archive = await self._download(meta.zip_url)
+            if meta.checksum:
+                digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+                if digest != meta.checksum.lower():
+                    archive.unlink(missing_ok=True)
+                    raise RuntimeError(
+                        f"插件包校验失败（checksum 不匹配），已拒绝安装：{plugin_id}"
+                    )
         else:
             archive = Path(meta.zip_url)
             if not archive.exists():
                 raise FileNotFoundError(f"插件包不存在：{archive}")
+            if meta.checksum:
+                digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+                if digest != meta.checksum.lower():
+                    raise RuntimeError(
+                        f"插件包校验失败（checksum 不匹配）：{plugin_id}"
+                    )
+        if meta.api_version != 1:
+            raise RuntimeError(
+                f"插件 {plugin_id} api_version {meta.api_version} 不受支持"
+            )
         install_name = target_name or meta.name
         target = self.plugins_dir / install_name
         if target.exists():

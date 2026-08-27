@@ -2,7 +2,7 @@
   "name": "system",
   "api_version": 1,
   "version": "1.0.0",
-  "description": "内置系统命令：help / about / echo / whitelist / plugins / status / task。",
+  "description": "内置系统命令：help / about / echo / whitelist / plugins / status / task / 功能启停。",
   "author": "OFbot 2",
   "dependencies": {},
   "permissions": ["system.status", "system.restart", "task.manage"],
@@ -93,6 +93,40 @@
           "description": "定时任务管理：list 查看 / add 创建 / enable|disable|remove 启停删除",
           "usage": "/task list ｜ /task add interval|cron <名称> <群号> <参数> <消息>",
           "examples": ["/task list", "/task add interval 播报 123456 60 你好"]
+        },
+        {
+          "name": "功能启用",
+          "aliases": ["feature-on", "feature_enable"],
+          "handler": "handlers.feature_enable_command",
+          "permission": "system.admin",
+          "description": "在本群启用某个功能（ZeroBot 式，与 Web 监听环境同源）",
+          "usage": "/功能启用 <功能键>",
+          "examples": ["/功能启用 dice.roll"],
+          "params": [
+            {
+              "name": "feature",
+              "type": "string",
+              "required": true,
+              "description": "功能键，如 dice.roll（用 /help 查看各插件功能）"
+            }
+          ]
+        },
+        {
+          "name": "功能禁用",
+          "aliases": ["feature-off", "feature_disable"],
+          "handler": "handlers.feature_disable_command",
+          "permission": "system.admin",
+          "description": "在本群禁用某个功能",
+          "usage": "/功能禁用 <功能键>",
+          "examples": ["/功能禁用 dice.roll"],
+          "params": [
+            {
+              "name": "feature",
+              "type": "string",
+              "required": true,
+              "description": "功能键，如 dice.roll"
+            }
+          ]
         }
       ]
     }

@@ -62,9 +62,22 @@
         <div class="muted" style="font-size:12px;margin-top:6px">
           <div>作者：{{ plugin.author or '未知' }}</div>
           <div>版本：{{ plugin.version }}</div>
+          <div>API 版本：{{ plugin.api_version }}
+            {% if plugin.api_version != 1 %}<span class="badge danger">不兼容</span>{% endif %}
+          </div>
+          {% if plugin.tags %}
+          <div>标签：{% for tag in plugin.tags %}<span class="badge">{{ tag }}</span> {% endfor %}</div>
+          {% endif %}
+          {% if plugin.dependencies %}
+          <div>依赖：{% for dep, ver in plugin.dependencies.items() %}<span class="badge">{{ dep }} {{ ver }}</span> {% endfor %}</div>
+          {% endif %}
+          {% if plugin.checksum %}<div class="mono cell-truncate" title="{{ plugin.checksum }}">校验：{{ plugin.checksum[:12] }}…</div>{% endif %}
           <div class="cell-truncate" title="{{ plugin.zip_url }}">来源：{{ plugin.zip_url }}</div>
         </div>
       </details>
+      {% if plugin.api_version != 1 %}
+      <div class="alert error" style="margin-top:8px">该插件 API 版本不受当前框架支持，禁止安装。</div>
+      {% endif %}
       {% if plugin.id not in installed %}
       <form method="post" action="/plugins/repo/install" class="js-ajax" style="margin-top:10px">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}角色分配 - OFbot 2{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>角色分配</h1>
+    <div class="sub">按 QQ 授予角色（user / operator / admin / superadmin），替代仅 superusers 的单一入口</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>分配角色</h2></div>
+  <form method="post" action="/roles/set" class="form-grid js-ajax">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-row">
+      <label>QQ 号 / 用户 ID</label>
+      <input name="user_id" placeholder="例如 10001" required>
+    </div>
+    <div class="form-row">
+      <label>角色</label>
+      <select name="role">
+        {% for option in role_options %}
+        <option value="{{ option }}">{{ option }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-row">
+      <button type="submit" class="small">保存角色</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>当前角色</h2>
+    <div class="search-box">
+      <input data-table-filter="roles-table" placeholder="搜索 QQ…">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="roles-table">
+      <thead><tr><th>QQ / 用户 ID</th><th>角色</th><th>操作</th></tr></thead>
+      <tbody>
+      {% for user_id, role in roles.items() %}
+      <tr data-row>
+        <td class="mono">{{ user_id }}</td>
+        <td><span class="badge {{ 'danger' if role == 'superadmin' else ('info' if role == 'admin' else '') }}">{{ role }}</span></td>
+        <td>
+          <form method="post" action="/roles/remove" class="js-ajax">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="user_id" value="{{ user_id }}">
+            <button class="small danger" data-confirm="移除 QQ {{ user_id }} 的角色？">移除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="empty">尚未分配角色；超级管理员仍可在「配置」的 superusers 中配置。</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:12.5px;margin-bottom:0">角色权限点：user = 基础命令；operator = + 系统状态；admin = + 任务/用户/审计/导出；superadmin = 全部（含插件与配置管理）。</p>
+</div>
+{% endblock %}

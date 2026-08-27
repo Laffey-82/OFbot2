@@ -5,91 +5,161 @@
     {
       "id": "schedule_message",
       "name": "schedule_message",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "定时播报：按 cron 定时向指定群发送消息",
       "author": "OFbot 2",
       "category": "data",
+      "dependencies": {},
+      "tags": [
+        "data"
+      ],
+      "released_at": "",
+      "checksum": "817a57d77d74f0378fe47ab99a5b9d87cda4f8e8621392fdee33be9dbff646ca",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/schedule_message.zip"
     },
     {
       "id": "dice",
       "name": "dice",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "掷骰子：随机 1-N 点数",
       "author": "OFbot 2",
       "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "d9bcb11055606a581c39b22d0772185099d0794d7d386c96c550d44c3c4aa797",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/dice.zip"
     },
     {
       "id": "points",
       "name": "points",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "积分：查询与发放（基于通用记录）",
       "author": "OFbot 2",
       "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "6118dadbdcf3ab22f1e18668d08b72b6b48da7b732180c664039198c33ec7e4e",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/points.zip"
     },
     {
       "id": "poll",
       "name": "poll",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "投票：创建 / 投票 / 结果（基于通用记录）",
       "author": "OFbot 2",
       "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "72e189500129f0c8cc2159b2671ec82c9475c193e8a6ae0489cd090136409395",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/poll.zip"
     },
     {
       "id": "random_choice",
       "name": "random_choice",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "随机选择：从多个选项中随机取一个",
       "author": "OFbot 2",
       "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "258694822de39f8d09ac23e87f7004aa9d200c70690067a142a0792b22221a6e",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/random_choice.zip"
     },
     {
       "id": "signin",
       "name": "signin",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "每日签到：记录连续天数与累计天数",
       "author": "OFbot 2",
       "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "76521b3dab00474542031a0c9abc8bb1ab499e81e136760478deac49d29b647d",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/signin.zip"
     },
     {
       "id": "todo",
       "name": "todo",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "个人待办：添加 / 列表 / 完成 / 删除",
       "author": "OFbot 2",
       "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "223522e3471c6dcc6a7fedcb439c2894600b5e256235c84234cb8ca324344284",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/todo.zip"
     },
     {
       "id": "announcement",
       "name": "announcement",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "公告发送：向指定群发送公告内容",
       "author": "OFbot 2",
       "category": "group",
+      "dependencies": {},
+      "tags": [
+        "group"
+      ],
+      "released_at": "",
+      "checksum": "b33c0c49ffa82bea25b33880d2165d3362dffe52c0bd3afa07e0b6512a8c868e",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/announcement.zip"
     },
     {
       "id": "keyword_reply",
       "name": "keyword_reply",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "关键词自动回复：命中配置的关键词即回复对应内容",
       "author": "OFbot 2",
       "category": "group",
+      "dependencies": {},
+      "tags": [
+        "group"
+      ],
+      "released_at": "",
+      "checksum": "1f538291e98dd975ea46a8d404d57ec903768ecaa8a3f7f145111f46ff9489d1",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/keyword_reply.zip"
     },
     {
       "id": "welcome",
       "name": "welcome",
+      "api_version": 1,
       "version": "1.0.0",
       "description": "入群欢迎：新成员加入时自动发送欢迎语",
       "author": "OFbot 2",
       "category": "group",
+      "dependencies": {},
+      "tags": [
+        "group"
+      ],
+      "released_at": "",
+      "checksum": "e8770707515bb3c531e30b5f861b63216a2d3b9c1c7ece17f44776913d401315",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/welcome.zip"
     }
   ]

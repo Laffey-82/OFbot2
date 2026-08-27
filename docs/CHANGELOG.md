@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.6.0（2026-08）— 社区与治理（Koishi 市场 / ZeroBot 控制参照）
+
+### 插件市场元数据升级
+
+- `registry.json` 条目扩展：`api_version`、`dependencies`、`tags`、`released_at`、`checksum`（SHA-256）。
+- 安装校验顺序：checksum → api_version → 清单字段 → 路径穿越；不匹配一律拒绝。
+- 市场页展示 API 版本兼容标记、标签、依赖与校验摘要；非 API 1 的插件禁止安装。
+- `build_packages.py` 自动生成新元数据，`--check` 校验 registry 条目的 checksum 完整性。
+
+### 权限与群管理（Koishi 等级 + ZeroBot 式控制）
+
+- Web 新增「角色分配」页（`/roles`）：按 QQ 授予 user / operator / admin / superadmin，配置持久化到 `runtime.user_roles`，运行时即时生效；替代仅 superusers 的单一入口。
+- system 插件新增群内命令 `/功能启用 <功能键>` / `/功能禁用 <功能键>`（ZeroBot 式）：按群即时更新作用域开关，与 Web 监听环境页同源生效；私聊拒绝执行。
+
+### 治理文档与运营
+
+- 新增 `CODEOWNERS`、`CREDITS.md`、`docs/MAINTENANCE.md`（维护与门禁清单）、`docs/SECURITY_REVIEW.md`（插件安全评审 checklist）、`docs/ISSUE_LABELS.md`（标签体系）。
+- i18n 由侧边栏扩展到登录页与仪表盘（语言切换后页面标题/标签同步）。
+- 发布节奏：每里程碑 minor 版本 + `v*` tag 自动 Release（见 release.yml 与 MAINTENANCE.md）。
+
 ## v3.5.0（2026-08）— 稳定与性能（OneBot 生态 / 沙箱审计参照）
 
 ### 协议契约测试矩阵

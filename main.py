@@ -505,6 +505,12 @@ async def run(settings: Settings) -> None:
         permission_manager.upsert_principal(
             str(user_id), role="superadmin", scopes={"*"}
         )
+    for user_id, role in settings.runtime.user_roles.items():
+        permission_manager.upsert_principal(
+            str(user_id),
+            role=str(role or "user"),
+            scopes={"*"} if role == "superadmin" else set(),
+        )
 
     await background.start()
     scheduler.start()

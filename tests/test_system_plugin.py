@@ -9,9 +9,11 @@ from app.adapters.base import BotClient
 from app.core.bus import get_bus, reset_bus
 from app.core.cache import TTLCache
 from app.core.commands import CommandRegistry
-from app.core.permissions import PermissionManager
+from app.core.config import RuntimeSettings, ScopeEntry, Settings
+from app.core.permissions import PermissionManager, permission_manager
 from app.core.plugin import PluginManager
 from app.core.scheduler import SchedulerService
+from app.core.scopes import SCOPE_GLOBAL_GROUP, ScopePolicyService
 from app.core.security import SecurityPolicy
 from app.core.subscriptions import EventSubscriptionRegistry
 from app.core.whitelist import GroupWhitelistService
@@ -139,6 +141,96 @@ async def test_help_text_follows_custom_prefix() -> None:
     await handler(event2, Message(""), None)
     assert event2.replies
     assert "发送 #help" in event2.replies[0]
+
+    await manager.unload_plugin("system")
+    scheduler.shutdown()
+    try:
+        await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
+    except Exception:
+        pass
+    reset_bus()
+
+
+@pytest.mark.asyncio
+async def test_feature_toggle_command_updates_scope() -> None:
+    """群内 /功能禁用 应即时更新作用域开关（与 Web 同源）。"""
+    from app.core.messages import GroupMessageEvent, Message, MessageSegment, Sender
+
+    commands = CommandRegistry()
+    commands.set_command_start(["/"])
+    commands.set_security(SecurityPolicy())
+    settings = Settings()
+    settings.runtime = RuntimeSettings(
+        scopes={SCOPE_GLOBAL_GROUP: ScopeEntry()}
+    )
+    policy = ScopePolicyService(settings)
+    commands.set_scope_policy(policy)
+    permissions = PermissionManager()
+    permission_manager.upsert_principal("100", role="superadmin", scopes={"*"})
+    subscriptions = EventSubscriptionRegistry()
+    scheduler = SchedulerService()
+    manager = PluginManager(
+        Path(__file__).resolve().parents[1] / "plugins",
+        commands=commands,
+        db=None,
+        scheduler=scheduler,
+        cache=TTLCache(),
+        bot=BotClient(),
+        permissions=permissions,
+        services={"whitelist": GroupWhitelistService([])},
+        subscriptions=subscriptions,
+        scope_policy=policy,
+    )
+    manager.load_enabled({"system": True}, {"system": {"groups": []}})
+    assert "功能禁用" in commands._commands
+
+    replies: list[str] = []
+    event = GroupMessageEvent(
+        bot_id="test",
+        self_id="10",
+        raw_event={},
+        message_id="1",
+        user_id="100",
+        sender=Sender("100", "admin"),
+        message=Message("/功能禁用 dice.roll"),
+        group_id="200",
+    )
+
+    async def reply(content: str | Message | MessageSegment) -> None:
+        replies.append(
+            content.extract_plain_text()
+            if isinstance(content, Message)
+            else str(content)
+        )
+
+    event.reply = reply
+    await commands.handle_message(event)
+    assert policy.feature_value("group:200", "dice.roll") is False
+    assert replies and "已在本群禁用功能 dice.roll" in replies[0]
+
+    # 私聊应拒绝
+    private_replies: list[str] = []
+    private_event = GroupMessageEvent(
+        bot_id="test",
+        self_id="10",
+        raw_event={},
+        message_id="2",
+        user_id="100",
+        sender=Sender("100", "admin"),
+        message=Message("/功能启用 dice.roll"),
+        group_id="",
+    )
+
+    async def reply_private(content: str | Message | MessageSegment) -> None:
+        private_replies.append(
+            content.extract_plain_text()
+            if isinstance(content, Message)
+            else str(content)
+        )
+
+    private_event.reply = reply_private
+    await commands.handle_message(private_event)
+    assert private_replies and "仅群内可用" in private_replies[0]
 
     await manager.unload_plugin("system")
     scheduler.shutdown()

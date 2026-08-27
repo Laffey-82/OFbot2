@@ -147,6 +147,7 @@ class RuntimeSettings(BaseModel):
     agent_max_rounds: int = 5
     agent_tool_timeout_seconds: float = 10.0
     agent_max_memory_turns: int = 10
+    user_roles: dict[str, str] = Field(default_factory=dict)
 
 
 class DatabaseSettings(BaseModel):

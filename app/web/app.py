@@ -118,6 +118,7 @@ def create_app(
     from app.web.routers.files import build_router as build_files
     from app.web.routers.monitoring import build_router as build_monitoring
     from app.web.routers.plugins import build_router as build_plugins
+    from app.web.routers.roles import build_router as build_roles
     from app.web.routers.scopes import build_router as build_scopes
     from app.web.routers.stats import build_router as build_stats
     from app.web.routers.tasks import build_router as build_tasks
@@ -127,6 +128,7 @@ def create_app(
     app.include_router(build_plugins(app=app, settings=settings, templates=templates))
     app.include_router(build_connections(app=app, settings=settings, templates=templates))
     app.include_router(build_scopes(app=app, settings=settings, templates=templates))
+    app.include_router(build_roles(app=app, settings=settings, templates=templates))
     app.include_router(build_stats(app=app, settings=settings, templates=templates))
     app.include_router(build_config_pages(app=app, settings=settings, templates=templates))
     app.include_router(build_docs_pages(app=app, settings=settings, templates=templates))

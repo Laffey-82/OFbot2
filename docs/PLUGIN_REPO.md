@@ -59,3 +59,17 @@ py plugin-repo/tools/build_packages.py
 3. 提交源码与构建产物（`packages/*.zip`、`registry.json`），发起 PR；CI 会自动复跑校验（构建后 `git diff` 不一致会失败）。
 
 投稿规范详见 [plugin-repo/CONTRIBUTING.md](../plugin-repo/CONTRIBUTING.md)。
+
+## 注册表元数据（v3.6.0 起）
+
+`registry.json` 条目由构建脚本自动生成，除基础字段外包含：
+
+| 字段 | 说明 |
+|---|---|
+| `api_version` | 插件 API 版本；非 1 的插件市场禁止安装 |
+| `dependencies` | 依赖声明（名称 → 版本范围），市场页展示 |
+| `tags` | 标签（默认取分类），市场页展示 |
+| `released_at` | 发布日期（插件 manifest 可填，留空则不展示） |
+| `checksum` | 插件包 SHA-256，安装前强制校验，不匹配拒绝安装 |
+
+安装器校验顺序：`checksum` → `api_version` → 清单字段 → 路径穿越；校验失败即拒绝。

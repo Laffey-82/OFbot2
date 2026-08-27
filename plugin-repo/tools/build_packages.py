@@ -11,6 +11,7 @@ CI 流程：先运行全量构建，再 `git diff --exit-code -- plugin-repo` �
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import zipfile
@@ -124,15 +125,30 @@ def build_zip(category: str, plugin_dir: Path, owner: str, repo: str, branch: st
     return {
         "id": name,
         "name": name,
+        "api_version": manifest.get("api_version", 1),
         "version": manifest["version"],
         "description": manifest.get("description", ""),
         "author": manifest.get("author", ""),
         "category": category,
+        "dependencies": manifest.get("dependencies", {}),
+        "tags": [
+            str(item).strip()
+            for item in (
+                manifest.get("tags", [])
+                or [category]
+            )
+        ],
+        "released_at": manifest.get("released_at", ""),
+        "checksum": _sha256(zip_path),
         "zip_url": (
             f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}"
             f"/plugin-repo/packages/{name}.zip"
         ),
     }
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def build_registry(owner: str, repo: str, branch: str) -> list[dict]:

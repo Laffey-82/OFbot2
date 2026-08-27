@@ -1,0 +1,16 @@
+# 默认维护者：核心框架与安全相关文件
+* @Laffey-82
+
+# 插件仓库投稿与构建产物
+/plugin-repo/ @Laffey-82
+
+# CI / 安全配置
+/.github/ @Laffey-82
+/SECURITY.md @Laffey-82
+
+# Web 安全相关（会话 / CSRF / 权限）
+/app/web/security.py @Laffey-82
+/app/core/permissions.py @Laffey-82
+
+# 协议适配器（协议变更需重点评审）
+/app/adapters/ @Laffey-82

@@ -1,21 +1,21 @@
 {% extends "base.html" %}
-{% block title %}仪表盘 - OFbot 2{% endblock %}
+{% block title %}{{ t_('dashboard.title') }} - OFbot 2{% endblock %}
 {% block content %}
 {% if needs_setup %}
 <div class="alert warning" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-  <span>管理员仍在使用默认密码 admin/admin，建议立即修改并确认协议配置。</span>
-  <a class="btn" href="/setup">前往设置向导</a>
+  <span>{{ t_('dashboard.default_password_warning') }}</span>
+  <a class="btn" href="/setup">{{ t_('dashboard.go_setup') }}</a>
 </div>
 {% endif %}
 
 <div class="page-head">
   <div>
-    <h1>仪表盘</h1>
-    <div class="sub">OFbot 2 运行总览</div>
+    <h1>{{ t_('dashboard.title') }}</h1>
+    <div class="sub">{{ t_('dashboard.subtitle') }}</div>
   </div>
   <div class="page-actions">
-    <a class="btn secondary" href="/monitor">系统监控</a>
-    <a class="btn" href="/workflows">新建流程</a>
+    <a class="btn secondary" href="/monitor">{{ t_('dashboard.monitor') }}</a>
+    <a class="btn" href="/workflows">{{ t_('dashboard.new_workflow') }}</a>
   </div>
 </div>
 
