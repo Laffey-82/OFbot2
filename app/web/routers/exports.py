@@ -363,7 +363,10 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         service = app.state.services.get("export")
         if service is None:
             raise HTTPException(status_code=404, detail="export service unavailable")
-        path = service.resolve_path(name)
+        try:
+            path = service.resolve_path(name)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="file not found")
         if not path.exists():
             raise HTTPException(status_code=404, detail="file not found")
         return FileResponse(path)

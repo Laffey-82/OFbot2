@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.6（2026-08）— 审查修复（测试隔离 / 导出 404 / 死配置清理）
+
+- 修复 `test_patch_103/104/105` 的 Web 流程测试未隔离 `config_path`：运行测试会改写工作区真实 `config.yaml`（数据库指向已删除的临时目录），现在统一写入临时目录。
+- `/exports/{name}/download` 对非法/逃逸路径返回 404 而非 500。
+- 移除未使用的 `web.secret` 配置项，FAQ 公网部署建议改为强调配置 `web.api_keys`。
+- Web 绑定非本机地址且未配置 API Key 时输出启动告警。
+- 本地 `config.yaml` 恢复 `data/ofbot2.db` 并清理测试残留（该文件不入库）。
+
 ## v1.0.5（2026-08）— 工程与文档收尾
 
 - 测试补齐：roles 路由 Web 流程、`plugin_state` 读写、`capability_setup` 内置能力注册、`example_ai` 声明式加载。

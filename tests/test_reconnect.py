@@ -26,13 +26,17 @@ class FakeAdapter(BaseAdapter):
 
 
 def _adapter(**overrides) -> FakeAdapter:
-    settings = ConnectionSettings(reconnect_interval=0.05, **overrides)
+    params = {"reconnect_interval": 0.05}
+    params.update(overrides)
+    settings = ConnectionSettings(**params)
     return FakeAdapter(settings, BotClient())
 
 
 @pytest.mark.asyncio
 async def test_reconnect_backoff_increases_delay() -> None:
-    adapter = _adapter(reconnect_max_seconds=1.0)
+    # 基础间隔 0.3s（抖动 0.8~1.2 后第一档 0.24~0.36、第二档 0.48~0.72，
+    # 两档区间不重叠），避免 0.1s 下限把两档压成相等导致时序抖动误报。
+    adapter = _adapter(reconnect_interval=0.3, reconnect_max_seconds=1.0)
     attempts_meta = []
 
     async def connect() -> None:
@@ -42,7 +46,7 @@ async def test_reconnect_backoff_increases_delay() -> None:
         await asyncio.Event().wait()
 
     task = asyncio.create_task(adapter.run_reconnect_loop(connect, "fake"))
-    await asyncio.sleep(0.25)
+    await asyncio.sleep(1.5)
     assert len(attempts_meta) >= 3
     gaps = [
         attempts_meta[i + 1] - attempts_meta[i]

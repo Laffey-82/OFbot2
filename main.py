@@ -699,6 +699,16 @@ async def run(settings: Settings) -> None:
 
     web_app.state.reconfigure_adapters = reconfigure_adapters
 
+    if (
+        settings.web.host not in ("127.0.0.1", "localhost", "::1")
+        and not settings.web.api_keys
+    ):
+        logger.warning(
+            "Web 服务绑定非本机地址 %s 且未配置 web.api_keys，"
+            "/api/v1/* 管理接口将不做密钥校验；公网部署请务必配置 API Key（见 FAQ）",
+            settings.web.host,
+        )
+
     config = uvicorn.Config(
         web_app,
         host=settings.web.host,

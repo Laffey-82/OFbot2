@@ -109,7 +109,6 @@ web:
   plugin_repo_token: ''
   plugin_repo_url: https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/registry.json
   port: 8080
-  secret: ''
   session_ttl_seconds: 28800
   cookie_secure: false
   webhook_history_page_size: 20

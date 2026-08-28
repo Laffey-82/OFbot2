@@ -157,7 +157,6 @@ class DatabaseSettings(BaseModel):
 class WebSettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8000
-    secret: str = ""
     session_ttl_seconds: int = 60 * 60 * 8
     cookie_secure: bool = False
     api_keys: list[str] = Field(default_factory=list)
@@ -256,7 +255,6 @@ DEFAULT_CONFIG = {
     "web": {
         "host": "127.0.0.1",
         "port": 8000,
-        "secret": "",
         "session_ttl_seconds": 28800,
         "api_keys": [],
         "plugin_repo_url": (

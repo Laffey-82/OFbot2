@@ -126,6 +126,7 @@ async def test_scopes_add_validation() -> None:
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         settings = load_settings()
+        settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = (
             f"sqlite+aiosqlite:///{(Path(tmp_dir) / 'w.db').as_posix()}"
         )
