@@ -103,7 +103,9 @@ async def test_api_records_and_tasks_pagination() -> None:
 
 @pytest.mark.asyncio
 async def test_backup_api_with_service() -> None:
-    app = create_app(load_settings())
+    settings = load_settings()
+    settings.web.api_keys = ["test-key"]
+    app = create_app(settings)
 
     class FakeBackup:
         def list_backups(self) -> list[dict[str, str]]:
@@ -112,18 +114,25 @@ async def test_backup_api_with_service() -> None:
     app.state.services = {"backup": FakeBackup()}
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/v1/backups")
+        headers = {"x-api-key": "test-key"}
+        response = await client.get("/api/v1/backups", headers=headers)
         assert response.status_code == 200
         assert response.json()["backups"][0]["name"] == "backup-1"
 
-        response = await client.get("/api/v1/status")
+        response = await client.get("/api/v1/status", headers=headers)
         assert response.status_code == 200
         assert "adapters" in response.json()
+
+        # 配置了 Key 但未携带 → 401（不允许无凭证访问）
+        response = await client.get("/api/v1/status")
+        assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_plugin_install_api() -> None:
-    app = create_app(load_settings())
+    settings = load_settings()
+    settings.web.api_keys = ["test-key"]
+    app = create_app(settings)
 
     class FakeInstaller:
         def install_zip(self, path: Path) -> Path:
@@ -133,9 +142,11 @@ async def test_plugin_install_api() -> None:
     app.state.services = {"installer": FakeInstaller()}
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
+        headers = {"x-api-key": "test-key"}
         response = await client.post(
             "/api/v1/plugins/install",
             files={"file": ("plugin.zip", b"zip-bytes", "application/zip")},
+            headers=headers,
         )
         assert response.status_code == 200
         assert response.json()["installed"] == "installed"
@@ -148,9 +159,12 @@ async def test_read_only_api_endpoints() -> None:
         reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
-        app = create_app(load_settings())
+        settings = load_settings()
+        settings.web.api_keys = ["test-key"]
+        app = create_app(settings)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = {"x-api-key": "test-key"}
             for path in [
                 "/api/v1/capabilities",
                 "/api/v1/workflows",
@@ -159,7 +173,62 @@ async def test_read_only_api_endpoints() -> None:
                 "/api/v1/alerts",
                 "/api/v1/state-machines",
             ]:
-                response = await client.get(path)
+                response = await client.get(path, headers=headers)
                 assert response.status_code == 200
+        await engine.dispose()
+        reset_db_engine()
+
+
+@pytest.mark.asyncio
+async def test_api_requires_admin_session_when_no_keys() -> None:
+    """未配置 web.api_keys 时，/api/v1/* 必须持有后台管理员会话。"""
+    from app.web.helpers import ensure_default_admin
+
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+        db_path = Path(tmp_dir) / "api.db"
+        settings = load_settings()
+        settings.config_path = str(Path(tmp_dir) / "config.yaml")
+        settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
+        settings.web.api_keys = []
+        reset_db_engine()
+        engine = get_engine(settings.database.url)
+        await init_db(settings.database.url)
+        await ensure_default_admin(settings)
+
+        app = create_app(settings, plugin_manager=None)
+
+        class FakeInstaller:
+            def install_zip(self, path: Path) -> Path:
+                return Path(tmp_dir) / "installed"
+
+        app.state.services = {"installer": FakeInstaller()}
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # 无会话 + 无 Key：读写一律 401（JSON，不跳转登录页）
+            response = await client.get("/api/v1/status")
+            assert response.status_code == 401
+            assert response.headers["content-type"].startswith("application/json")
+            response = await client.post(
+                "/api/v1/plugins/install",
+                files={"file": ("plugin.zip", b"zip-bytes", "application/zip")},
+            )
+            assert response.status_code == 401
+
+            # 管理员登录后，未配置 Key 也可通过会话调用 REST 接口
+            login = await client.post(
+                "/login",
+                data={"username": "admin", "password": "admin"},
+                follow_redirects=False,
+            )
+            assert login.status_code == 303
+            response = await client.get("/api/v1/status")
+            assert response.status_code == 200
+            response = await client.post(
+                "/api/v1/plugins/install",
+                files={"file": ("plugin.zip", b"zip-bytes", "application/zip")},
+            )
+            assert response.status_code == 200
+            assert response.json()["installed"] == "installed"
+
         await engine.dispose()
         reset_db_engine()

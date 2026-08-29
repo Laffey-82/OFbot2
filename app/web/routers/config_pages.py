@@ -92,6 +92,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         plugin_repo_token: str = Form(""),
         webhook_history_retention: int = Form(-1),
         webhook_history_page_size: int = Form(-1),
+        webhook_secret: str = Form(""),
         export_job_retention: int = Form(-1),
         export_job_retention_days: int = Form(-1),
         export_retries: int = Form(-1),
@@ -144,6 +145,7 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             settings.web.webhook_history_retention = webhook_history_retention
         if webhook_history_page_size >= 0:
             settings.web.webhook_history_page_size = webhook_history_page_size
+        settings.web.webhook_secret = webhook_secret.strip()
         if export_job_retention >= 0:
             settings.web.export_job_retention = export_job_retention
         if export_job_retention_days >= 0:

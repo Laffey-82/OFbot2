@@ -167,6 +167,7 @@ class WebSettings(BaseModel):
     export_job_retention_days: int = 0
     webhook_history_retention: int = 200
     webhook_history_page_size: int = 20
+    webhook_secret: str = ""
     cpu_threshold: int = 80
     memory_threshold: int = 85
     alert_history_retention_days: int = 30
@@ -262,6 +263,7 @@ DEFAULT_CONFIG = {
             "main/plugin-repo/registry.json"
         ),
         "plugin_repo_token": "",
+        "webhook_secret": "",
         "cpu_threshold": 80,
         "memory_threshold": 85,
         "alert_history_retention_days": 30,

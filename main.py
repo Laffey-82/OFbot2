@@ -705,7 +705,8 @@ async def run(settings: Settings) -> None:
     ):
         logger.warning(
             "Web 服务绑定非本机地址 %s 且未配置 web.api_keys，"
-            "/api/v1/* 管理接口将不做密钥校验；公网部署请务必配置 API Key（见 FAQ）",
+            "/api/v1/* 管理接口将要求后台登录会话；"
+            "程序化调用请配置 API Key（见 FAQ）",
             settings.web.host,
         )
 

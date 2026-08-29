@@ -129,9 +129,18 @@ async def require_api_key(
 ) -> None:
     settings = request.app.state.settings
     allowed = settings.web.api_keys or []
-    if not allowed:
+    if allowed:
+        if x_api_key is None or not any(
+            hmac.compare_digest(x_api_key, key) for key in allowed
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="invalid api key",
+            )
         return
-    if x_api_key is None or not any(
-        hmac.compare_digest(x_api_key, key) for key in allowed
-    ):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid api key")
+    # 未配置 API Key 时回退为后台会话鉴权（管理员），避免 /api/v1/* 默认裸奔。
+    user = await get_current_user(request)
+    if user.permission_level < 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="forbidden"
+        )

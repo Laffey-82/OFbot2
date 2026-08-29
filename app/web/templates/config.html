@@ -59,6 +59,7 @@
         <input id="cfg-plugin-repo-token" name="plugin_repo_token" type="password" value="{{ config.web.plugin_repo_token }}" autocomplete="off">
         <span class="hint">GitHub Token（读取私有仓库注册表与插件包）</span>
       </div>
+      <input type="hidden" name="webhook_secret" value="{{ config.web.webhook_secret }}">
     </div>
     <div class="form-actions"><button type="submit">保存配置</button></div>
   </form>
@@ -78,6 +79,7 @@
     <input type="hidden" name="language" value="{{ config.basic.language }}">
     <input type="hidden" name="plugin_repo_url" value="{{ config.web.plugin_repo_url }}">
     <input type="hidden" name="plugin_repo_token" value="{{ config.web.plugin_repo_token }}">
+    <input type="hidden" name="webhook_secret" value="{{ config.web.webhook_secret }}">
     <div class="form-grid">
       <div class="form-row">
         <label for="cfg-wh-retention">Webhook 历史保留条数</label>
@@ -86,6 +88,11 @@
       <div class="form-row">
         <label for="cfg-wh-page">Webhook 历史分页大小</label>
         <input id="cfg-wh-page" type="number" min="5" max="100" name="webhook_history_page_size" value="{{ config.web.webhook_history_page_size }}">
+      </div>
+      <div class="form-row">
+        <label for="cfg-wh-secret">Webhook 共享密钥（留空 = 不校验）</label>
+        <input id="cfg-wh-secret" name="webhook_secret" type="password" value="{{ config.web.webhook_secret }}" autocomplete="off">
+        <span class="hint">配置后外部调用 /webhook/{name} 需携带 X-Webhook-Secret 请求头</span>
       </div>
       <div class="form-row">
         <label for="cfg-wf-auto">流程连续失败自动停用阈值（0 = 关闭）</label>
@@ -144,6 +151,7 @@
     <input type="hidden" name="language" value="{{ config.basic.language }}">
     <input type="hidden" name="plugin_repo_url" value="{{ config.web.plugin_repo_url }}">
     <input type="hidden" name="plugin_repo_token" value="{{ config.web.plugin_repo_token }}">
+    <input type="hidden" name="webhook_secret" value="{{ config.web.webhook_secret }}">
     <div class="alert info">以下配置在服务重启后生效：日志保留、会话有效期、调度器参数与安全策略。</div>
     <div class="form-grid">
       <div class="form-row">

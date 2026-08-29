@@ -111,5 +111,6 @@ web:
   port: 8080
   session_ttl_seconds: 28800
   cookie_secure: false
+  webhook_secret: ''
   webhook_history_page_size: 20
   webhook_history_retention: 200

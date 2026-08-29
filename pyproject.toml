@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ofbot2"
-version = "1.0.6"
+version = "1.0.7"
 description = "Extensible plugin-based bot framework with QQNT Red and OneBot adapters"
 readme = "readme.md"
 license = { file = "LICENSE" }

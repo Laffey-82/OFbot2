@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -60,6 +61,7 @@ def create_app(
     app.state.services = {}
     app.state.export_jobs: dict[str, dict[str, Any]] = {}
     app.state.adapter_test_history: dict[str, list[dict[str, Any]]] = {}
+    app.state.http_handlers: list[tuple[str, Any]] = list(http_routes or [])
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(
@@ -173,12 +175,35 @@ def create_app(
                 return
             await handler(websocket)
 
-    for http_path, http_handler in http_routes or []:
+    for http_path, _http_handler in http_routes or []:
 
         @app.post(http_path)
-        async def http_event(
-            request: Request, _handler: Any = http_handler
-        ) -> JSONResponse:
+        async def http_event(request: Request) -> JSONResponse:
+            # 动态查找当前 handler（FastAPI 会深拷贝闭包默认值，
+            # 不能通过函数签名传入适配器实例）。
+            path = request.url.path
+            _handler = next(
+                (handler for route_path, handler in app.state.http_handlers
+                 if route_path == path),
+                None,
+            )
+            if _handler is None:
+                return JSONResponse(
+                    status_code=404, content={"status": "not found"}
+                )
+            # 与反向 WS 一致：配置了 access_token 时校验 Authorization，
+            # 防止未授权客户端伪造事件（消息/notice/request）。
+            expected_token = getattr(
+                getattr(_handler, "settings", None), "access_token", ""
+            )
+            if expected_token:
+                supplied = request.headers.get("authorization", "")
+                if not supplied or not hmac.compare_digest(
+                    supplied, f"Bearer {expected_token}"
+                ):
+                    return JSONResponse(
+                        status_code=401, content={"status": "unauthorized"}
+                    )
             try:
                 payload = await request.json()
             except Exception:

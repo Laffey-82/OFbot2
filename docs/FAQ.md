@@ -123,7 +123,7 @@ Windows 下常见于服务仍在运行。先停止服务（关闭 `main.py` 进�
 
 ### 公网部署需要注意什么？
 
-框架默认面向本地/私域使用。公网部署务必：启用 HTTPS（反向代理）、修改默认 `admin/admin` 密码、为 REST API 配置 `web.api_keys`（未配置时 `/api/v1/*` 不校验密钥）、按需关闭 8080 公网暴露。
+框架默认面向本地/私域使用。公网部署务必：启用 HTTPS（反向代理）、修改默认 `admin/admin` 密码、为 REST API 配置 `web.api_keys`（未配置时 `/api/v1/*` 要求后台管理员登录会话）、为 Webhook 接收配置 `web.webhook_secret`（未配置时 `/webhook/{name}` 不校验）、为每个连接配置 `access_token`（反向 WS/HTTP 事件入口会校验 `Authorization: Bearer`）、按需关闭 8080 公网暴露。
 
 ## 其他
 

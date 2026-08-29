@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.7（2026-08）— 审查修复（API 鉴权收紧 / 事件入口校验）
+
+- `/api/v1/*` 默认不再裸奔：未配置 `web.api_keys` 时改为要求后台管理员登录会话；配置后维持 `X-API-Key` 鉴权（恒定时间比较）。
+- 反向 HTTP 事件入口（`/onebot/v11/http`、`/onebot/v12/http`）与反向 WS 一致，配置 `access_token` 时校验 `Authorization: Bearer`。
+- Webhook 接收端点新增可选共享密钥 `web.webhook_secret`：配置后 `POST /webhook/{name}` 需携带 `X-Webhook-Secret` 请求头（恒定时间比较）。
+- 配置页新增「Webhook 共享密钥」项；FAQ 公网部署建议同步更新。
+
 ## v1.0.6（2026-08）— 审查修复（测试隔离 / 导出 404 / 死配置清理）
 
 - 修复 `test_patch_103/104/105` 的 Web 流程测试未隔离 `config_path`：运行测试会改写工作区真实 `config.yaml`（数据库指向已删除的临时目录），现在统一写入临时目录。

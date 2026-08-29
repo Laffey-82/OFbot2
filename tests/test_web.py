@@ -766,6 +766,108 @@ async def test_web_records_alerts_workflow_scaffold() -> None:
 
 
 @pytest.mark.asyncio
+async def test_web_reverse_http_event_requires_access_token() -> None:
+    """反向 HTTP 事件入口：配置 access_token 后必须携带 Authorization 头。"""
+
+    class FakeHTTPAdapter:
+        def __init__(self, access_token: str = "") -> None:
+            self.settings = type(
+                "FakeSettings", (), {"access_token": access_token}
+            )()
+            self.received: list[dict] = []
+
+        async def handle_http_event(self, data: dict) -> None:
+            self.received.append(data)
+
+    # 未配置 token：保持兼容，直接接收
+    open_adapter = FakeHTTPAdapter("")
+    app = create_app(
+        load_settings(), http_routes=[("/onebot/v11/http", open_adapter)]
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/onebot/v11/http", json={"post_type": "message"}
+        )
+        assert response.status_code == 200
+        assert open_adapter.received == [{"post_type": "message"}]
+
+    # 配置 token：缺失/错误 → 401 且不处理；正确 → 200
+    secured_adapter = FakeHTTPAdapter("secret-token")
+    app = create_app(
+        load_settings(), http_routes=[("/onebot/v11/http", secured_adapter)]
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/onebot/v11/http", json={"post_type": "message"}
+        )
+        assert response.status_code == 401
+        assert secured_adapter.received == []
+        response = await client.post(
+            "/onebot/v11/http",
+            json={"post_type": "message"},
+            headers={"authorization": "Bearer wrong"},
+        )
+        assert response.status_code == 401
+        assert secured_adapter.received == []
+        response = await client.post(
+            "/onebot/v11/http",
+            json={"post_type": "notice"},
+            headers={"authorization": "Bearer secret-token"},
+        )
+        assert response.status_code == 200
+        assert secured_adapter.received == [{"post_type": "notice"}]
+
+
+@pytest.mark.asyncio
+async def test_web_webhook_secret_required() -> None:
+    """配置 web.webhook_secret 后，/webhook/{name} 必须携带 X-Webhook-Secret。"""
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+        db_path = Path(tmp_dir) / "test.db"
+        settings = load_settings()
+        settings.config_path = str(Path(tmp_dir) / "config.yaml")
+        settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
+        settings.web.webhook_secret = "s3cret"
+        reset_db_engine()
+        engine = get_engine(settings.database.url)
+        await init_db(settings.database.url)
+
+        from app.services.webhook import WebhookService
+
+        app = create_app(settings, plugin_manager=None)
+        service = WebhookService()
+        service.register("test_hook")
+        app.state.services["webhook"] = service
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post("/webhook/test_hook", json={"a": 1})
+            assert response.status_code == 403
+            response = await client.post(
+                "/webhook/test_hook",
+                json={"a": 1},
+                headers={"x-webhook-secret": "wrong"},
+            )
+            assert response.status_code == 403
+            assert service.history.get("test_hook") is None
+            response = await client.post(
+                "/webhook/test_hook",
+                json={"a": 1},
+                headers={"x-webhook-secret": "s3cret"},
+            )
+            assert response.status_code == 200
+            assert service.history.get("test_hook")
+
+        await engine.dispose()
+        reset_db_engine()
+        try:
+            await get_bus().stop(clear=True)
+        except Exception:
+            pass
+        reset_bus()
+
+
+@pytest.mark.asyncio
 async def test_web_api_keys_unauth_redirects_to_login() -> None:
     """未登录访问 /api-keys 应跳转登录页（此前被 /api 前缀误判为 API 路径）。"""
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:

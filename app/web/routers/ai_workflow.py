@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import Any
 
 from fastapi import (
@@ -653,6 +654,13 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
 
     @router.post("/webhook/{name}")
     async def webhook_receive(name: str, request: Request) -> dict[str, Any]:
+        secret = getattr(settings.web, "webhook_secret", "") or ""
+        if secret:
+            supplied = request.headers.get("x-webhook-secret", "")
+            if not supplied or not hmac.compare_digest(supplied, secret):
+                return JSONResponse(
+                    status_code=403, content={"detail": "invalid webhook secret"}
+                )
         service = app.state.services.get("webhook")
         if service is None or not await service.handle(name, await request.json()):
             raise HTTPException(status_code=404, detail="webhook not found")
