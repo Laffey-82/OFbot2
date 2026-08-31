@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from playwright.sync_api import expect
+
+try:
+    from playwright.sync_api import expect
+except ImportError:  # pragma: no cover - 仅 e2e job 安装 playwright
+    expect = None  # type: ignore[assignment]
 
 from tests.e2e.conftest import login
 
