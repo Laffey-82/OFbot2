@@ -1,7 +1,7 @@
 name: 插件投稿
 description: 提交新插件到 plugin-repo/ 插件仓库
 title: "[Plugin] "
-labels: ["plugin"]
+labels: ["plugin-submission"]
 body:
   - type: input
     id: name

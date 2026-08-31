@@ -1,0 +1,21 @@
+adapters:
+  - app/adapters/**
+web:
+  - app/web/**
+core:
+  - app/core/**
+plugins:
+  - plugins/**
+  - plugin-repo/**
+  - examples/**
+docs:
+  - docs/**
+  - readme.md
+  - CONTRIBUTING.md
+  - SECURITY.md
+  - CODE_OF_CONDUCT.md
+ci:
+  - .github/**
+tests:
+  - tests/**
+  - scripts/**

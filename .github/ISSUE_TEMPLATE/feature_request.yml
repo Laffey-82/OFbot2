@@ -21,3 +21,10 @@ body:
     id: alternatives
     attributes:
       label: 替代方案（可选）
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 怎样的行为可以视为该功能完成（可勾选列表或场景描述）
+    validations:
+      required: true

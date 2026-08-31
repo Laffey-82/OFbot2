@@ -68,3 +68,12 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Web E2E
         run: python -m pytest tests/e2e -m e2e -q
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Check docs links and screenshot assets
+        run: python scripts/check_docs_links.py

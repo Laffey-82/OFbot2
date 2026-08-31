@@ -2,35 +2,51 @@
 
 OFbot 2 采用四层架构，职责清晰、可独立演进：
 
-```text
-┌────────────────────────────────────────────────────────────┐
-│  Web 后台（app/web）   FastAPI + Jinja2 + 原生 JS           │
-│  仪表盘 / 配置 / 插件 / 连接 / 监听环境 / 任务 / 流程 / 审计   │
-├────────────────────────────────────────────────────────────┤
-│  核心层（app/core）                                          │
-│  配置 · 日志 · 事件总线 · 命令路由 · 作用域策略 · 权限 · 限流    │
-│  调度器 · 插件管理 · 缓存 · 安全                              │
-├────────────────────────────────────────────────────────────┤
-│  数据层（app/db + app/services）                             │
-│  SQLAlchemy 异步模型 · 迁移 · 记录/状态机/聚合 · AI · 流程 ·    │
-│  Webhook · 告警 · 导出 · 文件 · 备份                          │
-├────────────────────────────────────────────────────────────┤
-│  协议层（app/adapters）                                      │
-│  ConnectionManager · OneBot v11/v12 · Red · Satori ·        │
-│  Mirai · QQ 官方机器人 · 统一 BotEvent / MessageSegment      │
-└────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph WEB[Web 后台 app/web]
+        W1[FastAPI + Jinja2 + 原生 JS]
+        W2[仪表盘/配置/插件/连接/监听环境/任务/流程/审计]
+    end
+    subgraph CORE[核心层 app/core]
+        C1[配置 · 日志 · 事件总线]
+        C2[命令路由 · 作用域策略 · 权限 · 限流]
+        C3[调度器 · 插件管理 · 缓存 · 安全]
+    end
+    subgraph DATA[数据层 app/db + app/services]
+        D1[SQLAlchemy 异步模型 · 迁移]
+        D2[记录/状态机/聚合 · AI · 流程]
+        D3[Webhook · 告警 · 导出 · 文件 · 备份]
+    end
+    subgraph ADAPTER[协议层 app/adapters]
+        A1[ConnectionManager]
+        A2[OneBot v11/v12 · Red · Satori · Mirai · QQ 官方]
+        A3[统一 BotEvent / MessageSegment]
+    end
+    ADAPTER --> CORE --> DATA
+    CORE --> WEB
+    WEB --> CORE
 ```
 
 ## 消息流
 
-```text
-协议端（NapCat / Chronocat / ...）
-  → ConnectionManager 内的适配器：归一化为 BotEvent + MessageSegment
-  → BotClient.handle_bot_event：群白名单过滤 + 事件总线广播
-  → CommandRegistry.handle_message：
-      解析命令 → 黑名单（全局+环境）→ 文本校验 → 功能开关门控
-      → 冷却/限流 → 权限（环境覆盖优先）→ 执行 handler
-  → 插件处理器 → event.reply → 按环境账号绑定路由到连接 → 协议端
+```mermaid
+sequenceDiagram
+    participant P as 协议端（NapCat/Chronocat）
+    participant A as 适配器（ConnectionManager）
+    participant B as BotClient
+    participant E as 事件总线
+    participant R as CommandRegistry
+    participant H as 插件 Handler
+    P->>A: 原始事件/消息
+    A->>B: BotEvent + MessageSegment（归一化）
+    B->>E: 群白名单过滤后广播
+    E->>R: 派发消息事件
+    R->>R: 解析 → 黑名单 → 文本校验 → 功能开关 → 冷却/限流 → 权限
+    R->>H: 执行 handler
+    H-->>R: event.reply
+    R-->>A: 按环境账号绑定路由出站
+    A-->>P: 协议端发送
 ```
 
 ## 监听环境与作用域

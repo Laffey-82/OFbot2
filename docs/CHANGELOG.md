@@ -1,5 +1,16 @@
 # Changelog
 
+## 未发布 — 文档与 GitHub 仓库专业化
+
+- README 重构：徽章行、界面截图（登录/仪表盘/连接中心/监听环境/插件市场/流程）、
+  mermaid 架构图、TOC、安全提示与贡献/License 区块。
+- 新增文档中枢 [docs/README.md](README.md)、[docs/GLOSSARY.md](GLOSSARY.md) 与
+  [docs/MAINTAINERS.md](MAINTAINERS.md)；ARCHITECTURE/FAQ/SECURITY 增强。
+- 英文关键页：Overview 重写 + QuickStart / Install / Connections（中英互链）。
+- 贡献指南、Issue/PR 模板增强；PR 按路径自动打标签（labeler）。
+- CI 新增 `docs-check`：校验文档链接、锚点与截图资产（`scripts/check_docs_links.py`）。
+- 仓库元数据与标签由 `scripts/repo_setup.py` 一键应用（description/topics/homepage/标签）。
+
 ## v1.3.0（2026-09）— 插件子进程沙箱
 
 - `plugin.json` 新增 `sandbox: "inline" | "process"`（默认 inline）与
@@ -114,6 +125,6 @@
 
 ## 历史归档
 
-- v3 预发布演进（v3.0.0–v3.6.0）：[docs/archive/CHANGELOG_v3.md](docs/archive/CHANGELOG_v3.md)
-- v2 早期历史（v2.0.0–v2.140.0）：[docs/archive/CHANGELOG_v2.md](docs/archive/CHANGELOG_v2.md)
+- v3 预发布演进（v3.0.0–v3.6.0）：[archive/CHANGELOG_v3.md](archive/CHANGELOG_v3.md)
+- v2 早期历史（v2.0.0–v2.140.0）：[archive/CHANGELOG_v2.md](archive/CHANGELOG_v2.md)
 

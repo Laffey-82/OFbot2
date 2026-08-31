@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 常见问题（FAQ）
+    url: https://github.com/Laffey-82/OFbot2/blob/main/docs/FAQ.md
+    about: 先查 FAQ，连接、备份、告警与公网部署问题大多有答案。
+  - name: 文档中心
+    url: https://github.com/Laffey-82/OFbot2/blob/main/docs/README.md
+    about: 上手、开发、运维与治理文档索引。
+  - name: 安全漏洞报告（私密）
+    url: https://github.com/Laffey-82/OFbot2/security/advisories/new
+    about: 请勿公开提交安全问题，使用 GitHub 安全公告私密报告。

@@ -10,4 +10,6 @@
 | 插件投稿 | `plugin-submission` / `plugin-review` | 仓库投稿与评审 |
 | 流程 | `needs-triage` / `good-first-issue` / `wontfix` / `duplicate` | 处理状态 |
 | 安全 | `security` | 安全问题（优先处理，走 SECURITY.md 私密报告） |
-| 版本 | `v1.0.0` / `v1.1.0` … | 目标里程碑 |
+| 版本 | `v1.0.0` / `v1.1.0` / `v1.2.0` / `v1.3.0` … | 目标里程碑 |
+
+> 标签由 `scripts/repo_setup.py` 自动创建（幂等）：`py scripts/repo_setup.py`。

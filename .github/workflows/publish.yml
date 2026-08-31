@@ -2,7 +2,8 @@ name: Publish to PyPI
 
 on:
   # 暂不自动发布：仅在仓库所有者手动触发时运行。
-  # 启用后改为 push tags: ["v*"] 即可随版本自动发布。
+  # 首次发布前请配置 OIDC（受信发布）或 PYPI_TOKEN secret；
+  # 启用自动发布后改为 push tags: ["v*"] 即可随版本发布。
   workflow_dispatch:
 
 permissions:

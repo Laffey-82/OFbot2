@@ -10,6 +10,34 @@ body:
       description: `py -m app.cli version` 的输出
     validations:
       required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python 版本
+      description: `python --version` 的输出（如 3.12.4）
+    validations:
+      required: true
+  - type: input
+    id: protocol
+    attributes:
+      label: 协议端与版本
+      description: 如 NapCat 4.2 / LLOneBot / Lagrange / Mirai / QQ 官方
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 部署环境
+      options: ["Windows", "Linux", "macOS", "Docker"]
+    validations:
+      required: true
+  - type: dropdown
+    id: connection_mode
+    attributes:
+      label: 连接模式
+      options: ["反向 WS", "正向 WS", "HTTP 事件上报", "轮询", "WS Gateway"]
+    validations:
+      required: false
   - type: textarea
     id: describe
     attributes:
@@ -27,14 +55,18 @@ body:
     validations:
       required: true
   - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      description: 你认为应该发生什么
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 实际发生了什么（含报错信息）
+  - type: textarea
     id: logs
     attributes:
       label: 日志 / 报错信息
+      description: 相关日志片段（logs/ofbot2-*.log 或控制台输出），敏感信息请脱敏
       render: shell
-  - type: dropdown
-    id: environment
-    attributes:
-      label: 部署环境
-      options: ["Windows", "Linux", "macOS", "Docker"]
-    validations:
-      required: true

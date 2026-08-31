@@ -1,12 +1,44 @@
 # OFbot 2
 
 ![CI](https://github.com/Laffey-82/OFbot2/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![License](https://img.shields.io/github/license/Laffey-82/OFbot2)
+![Stars](https://img.shields.io/github/stars/Laffey-82/OFbot2)
+![Forks](https://img.shields.io/github/forks/Laffey-82/OFbot2)
+![Last commit](https://img.shields.io/github/last-commit/Laffey-82/OFbot2)
 
-可扩展的插件化 QQ 机器人框架：**多协议多账号并存**（OneBot v11/v12、Red、Satori、Mirai、QQ 官方机器人），**逐群/私聊独立控制功能开关**，配套 FastAPI Web 管理后台、异步 SQLite、APScheduler 与 bubus 事件总线。
+可扩展的插件化 QQ 机器人框架：**多协议多账号并存**（OneBot v11/v12、Red、Satori、Mirai、QQ 官方机器人），**逐群/私聊独立控制功能开关**，配套 FastAPI Web 管理后台、异步 SQLite 与自研异步事件总线。
 
-> 要求 Python >= 3.11；默认本地/私域部署，公网部署请阅读 [FAQ](docs/FAQ.md) 的安全建议。
+> 要求 Python >= 3.11；默认面向本地/私域部署，公网部署请阅读 [FAQ](docs/FAQ.md) 与 [SECURITY.md](SECURITY.md) 的安全建议。
 
-> [English Overview](docs/README.en.md)
+> [English Overview](docs/README.en.md) · [文档导航](docs/README.md)
+
+## 目录
+
+- [界面预览](#界面预览)
+- [功能特性](#功能特性)
+- [快速开始](#快速开始)
+- [文档导航](#文档导航)
+- [架构总览](#架构总览)
+- [插件开发](#插件开发)
+- [配置](#配置)
+- [内置命令](#内置命令)
+- [CLI](#cli)
+- [开发验证](#开发验证)
+- [目录结构](#目录结构)
+- [贡献与 License](#贡献与-license)
+
+## 界面预览
+
+| 登录 | 仪表盘 | 连接中心 |
+| --- | --- | --- |
+| ![登录页](docs/assets/screenshots/login.png) | ![仪表盘](docs/assets/screenshots/dashboard.png) | ![连接中心](docs/assets/screenshots/connections.png) |
+
+| 监听环境 | 插件市场 | 流程引擎 |
+| --- | --- | --- |
+| ![监听环境](docs/assets/screenshots/scopes.png) | ![插件市场](docs/assets/screenshots/plugin_market.png) | ![流程引擎](docs/assets/screenshots/workflow.png) |
+
+> 截图由 `py scripts/capture_screenshots.py` 生成（Playwright + 临时实例）。
 
 ## 功能特性
 
@@ -17,7 +49,8 @@
 - **Web 后台**：仪表盘、连接中心、插件管理、定时任务、流程引擎、AI 能力、记录/状态机/聚合、导出/文件/备份、审计/监控/自愈。
 - **统一 AI**：OpenAI 兼容（OpenAI/DeepSeek/Qwen/Moonshot/Azure）、Anthropic、Gemini、Ollama，多 Provider 切换与降级。
 - **自动化流程引擎**：消息/定时/Webhook/记录变更触发，动作可组合（发消息、执行命令、调 AI、写记录、导出）。
-- **可观测与安全**：结构化日志、Prometheus 指标、审计日志、登录锁定与 CSRF、命令冷却与三级限流、异常脱敏。
+- **插件市场**：内置 `plugin-repo/` 官方插件 25+ 个，支持 URL / 本地双数据源，Web 或 CLI 一键安装。
+- **可观测与安全**：结构化日志、Prometheus 指标、审计日志、登录锁定与 CSRF、命令冷却与三级限流、异常脱敏、插件安装静态审计与可选子进程沙箱。
 
 ## 快速开始
 
@@ -42,7 +75,7 @@ py -m app.cli run
 2. 启动机器人后打开「连接中心」，确认 `napcat_main` 状态为「已连接」。
 3. 在「监听环境」页添加你的群，并开启需要的插件功能。
 
-各协议接入步骤与能力对比见 [docs/CONNECTIONS.md](docs/CONNECTIONS.md)。
+各协议接入步骤与能力对比见 [docs/CONNECTIONS.md](docs/CONNECTIONS.md)（[EN](docs/en/CONNECTIONS.md)）。
 
 没有 QQ 环境时可用假 Red 服务联调：
 
@@ -59,30 +92,52 @@ py scripts/e2e_smoke.py
 
 ## 文档导航
 
-| 文档 | 说明 |
-| --- | --- |
-| [docs/QUICKSTART.md](docs/QUICKSTART.md) | 3 分钟上手：连接 → 插件 → 功能开关 |
-| [docs/INSTALL.md](docs/INSTALL.md) | 三种安装方式：pip / Git / Docker |
-| [docs/TUTORIAL.md](docs/TUTORIAL.md) | 从零写第一个插件（10 分钟教程） |
-| [docs/CONNECTIONS.md](docs/CONNECTIONS.md) | QQ 接入方案总览、能力矩阵与图文步骤 |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 插件开发指南（声明式规范、能力 API、CLI） |
-| [docs/PLUGIN_MANIFEST.md](docs/PLUGIN_MANIFEST.md) | `plugin.json` 全字段参考与校验错误对照 |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构分层、消息流、作用域判定、插件生命周期 |
-| [docs/FAQ.md](docs/FAQ.md) | 常见问题与运维排查 |
-| [docs/API.md](docs/API.md) | REST 接口清单（自动生成） |
-| [docs/CHANGELOG.md](docs/CHANGELOG.md) | 版本更新记录 |
-| [docs/CHRONOCAT.md](docs/CHRONOCAT.md) | Chronocat/Red 旧接入指南（兼容保留） |
+| 文档 | 说明 | 语言 |
+| --- | --- | --- |
+| [docs/README.md](docs/README.md) | 文档导航中枢（上手/开发/运维/参考/治理） | 中文 |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | 3 分钟上手：连接 → 插件 → 功能开关 | 中文 / [EN](docs/en/QUICKSTART.md) |
+| [docs/INSTALL.md](docs/INSTALL.md) | 三种安装方式：pip / Git / Docker | 中文 / [EN](docs/en/INSTALL.md) |
+| [docs/TUTORIAL.md](docs/TUTORIAL.md) | 从零写第一个插件（10 分钟教程） | 中文 |
+| [docs/CONNECTIONS.md](docs/CONNECTIONS.md) | QQ 接入方案总览、能力矩阵与图文步骤 | 中文 / [EN](docs/en/CONNECTIONS.md) |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 插件开发指南（声明式规范、能力 API、CLI） | 中文 |
+| [docs/PLUGIN_MANIFEST.md](docs/PLUGIN_MANIFEST.md) | `plugin.json` 全字段参考与校验错误对照 | 中文 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构分层、消息流、作用域判定、插件生命周期 | 中文 |
+| [docs/GLOSSARY.md](docs/GLOSSARY.md) | 术语表 | 中文 |
+| [docs/FAQ.md](docs/FAQ.md) | 常见问题与运维排查 | 中文 |
+| [docs/API.md](docs/API.md) | REST 接口清单（自动生成） | 中文 |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 修复路线图 | 中文 |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | 版本更新记录 | 中文 |
 
-## 目录结构
+## 架构总览
 
-- `app/core`：配置、日志、事件总线、权限、限流、缓存、命令路由、作用域策略、插件管理、调度器。
-- `app/adapters`：多协议适配器（OneBot v11/v12、Red、Satori、Mirai、QQ 官方）、`ConnectionManager` 与统一消息模型。
-- `app/db`：异步 SQLAlchemy 模型、会话、迁移基础设施。
-- `app/web`：FastAPI 后台（服务端渲染 + 原生 JS），路由按域拆分（仪表盘/配置/插件/连接/监听环境/任务/流程/AI/审计等）。
-- `app/services`：records / state_machine / aggregation / audit / ai / workflow / webhook / alerts / export / files / backup 等服务。
-- `app/runtime.py`：运行时装配（任务恢复与执行、命令统计、审计持久化、适配器构建）。
-- `plugins/<name>/`：包式插件（`plugin.json` + `__init__.py`），system 与 template 为内置示例。
-- `examples/plugins/presets/`：示例模板，供 `ofbot2 plugin new` 生成新插件。
+```mermaid
+flowchart LR
+    subgraph 协议层[协议层 app/adapters]
+        OB11[OneBot v11] --- OB12[OneBot v12]
+        OB11 --- RED[Red] --- SAT[Satori]
+        OB11 --- MIR[Mirai] --- QQO[QQ 官方]
+    end
+    subgraph 核心层[核心层 app/core]
+        BUS[事件总线] --- CMD[命令路由]
+        CMD --- SCOPE[作用域策略]
+        SCOPE --- PERM[权限 · 限流 · 冷却]
+        PLUGIN[插件管理] --- BUS
+    end
+    subgraph 数据层[数据层 app/db + app/services]
+        DB[(SQLite)] --- SVC[记录/状态机/聚合]
+        SVC --- AI[AI Provider]
+        SVC --- WF[流程引擎]
+        SVC --- AUDIT[审计 · 告警 · 备份]
+    end
+    subgraph 后台[Web 后台 app/web]
+        WEB[FastAPI + Jinja2]
+    end
+    协议层 --> 核心层 --> 数据层
+    核心层 --> 后台
+    后台 --> 核心层
+```
+
+详细说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## 插件开发
 
@@ -123,7 +178,7 @@ py -m app.cli plugin check my_plugin
 py -m app.cli plugin dev my_plugin
 ```
 
-完整规范见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) 与 [docs/PLUGIN_MANIFEST.md](docs/PLUGIN_MANIFEST.md)。
+第三方插件可选择 `sandbox: "process"` 子进程沙箱（能力白名单）运行，详见 [docs/PLUGIN_MANIFEST.md](docs/PLUGIN_MANIFEST.md)。完整规范见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 
 ## 配置
 
@@ -183,10 +238,26 @@ py -m compileall -q app plugins main.py tests scripts
 py -m ruff check app plugins main.py tests scripts
 py -m pytest -q
 py scripts/e2e_smoke.py
+py scripts/check_docs_links.py        # 文档链接与截图资产检查
 ```
 
 GitHub Actions 会在每次 push / PR 自动运行上述检查。
 
-## 更新记录
+## 目录结构
 
-版本里程碑见 [docs/CHANGELOG.md](docs/CHANGELOG.md)，v2 / v3 预发布历史见 [docs/archive/](docs/archive/)（`CHANGELOG_v2.md`、`CHANGELOG_v3.md`）。
+- `app/core`：配置、日志、事件总线、权限、限流、缓存、命令路由、作用域策略、插件管理、调度器。
+- `app/adapters`：多协议适配器（OneBot v11/v12、Red、Satori、Mirai、QQ 官方）、`ConnectionManager` 与统一消息模型。
+- `app/db`：异步 SQLAlchemy 模型、会话、迁移基础设施。
+- `app/web`：FastAPI 后台（服务端渲染 + 原生 JS），路由按域拆分（仪表盘/配置/插件/连接/监听环境/任务/流程/AI/审计等）。
+- `app/services`：records / state_machine / aggregation / audit / ai / workflow / webhook / alerts / export / files / backup 等服务。
+- `app/runtime.py`：运行时装配（任务恢复与执行、命令统计、审计持久化、适配器构建）。
+- `plugins/<name>/`：包式插件（`plugin.json` + `__init__.py`），system 与 template 为内置示例。
+- `examples/plugins/presets/`：示例模板，供 `ofbot2 plugin new` 生成新插件。
+
+## 贡献与 License
+
+欢迎提交 Issue、PR 与插件投稿。请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)、[docs/MAINTAINERS.md](docs/MAINTAINERS.md) 与 [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md)；安全问题请走 [SECURITY.md](SECURITY.md) 私密渠道。
+
+本项目基于 MIT 开源，详见 [LICENSE](LICENSE) 与 [CREDITS.md](CREDITS.md)。
+
+版本里程碑见 [docs/CHANGELOG.md](docs/CHANGELOG.md)，v2 / v3 预发布历史见 [docs/archive/](docs/archive/)。

@@ -5,6 +5,8 @@
 - 每完成一个功能里程碑，执行 `py scripts/sync_version.py X.Y.Z` 并更新 `docs/CHANGELOG.md`。
 - 推送 `vX.Y.Z` tag 触发 [release.yml](../.github/workflows/release.yml) 自动生成 GitHub Release。
 - 破坏性变更（插件 API、数据表结构）必须在 CHANGELOG 中显著标注。
+- PyPI 发布：在仓库 Actions 手动触发 `Publish to PyPI`（需配置 OIDC 受信发布或
+  `PYPI_TOKEN` secret），发布后可在 README 补挂 PyPI 版本徽章。
 
 ## 门禁清单（合并 PR 前）
 
@@ -21,6 +23,12 @@ py scripts/e2e_smoke.py
 py plugin-repo/tools/build_packages.py
 py plugin-repo/tools/build_packages.py --check
 git diff --exit-code -- plugin-repo
+```
+
+文档/仓库层变更需额外：
+
+```powershell
+py scripts/check_docs_links.py
 ```
 
 ## 分支与版本
