@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "updated_at": "2026-08-27",
+  "updated_at": "2026-08-31",
   "plugins": [
     {
       "id": "backup",
@@ -193,6 +193,22 @@
       "released_at": "",
       "checksum": "7dbdfa4715867efbea91bc83a1b293b27e89839a5a1b9075a7a94c7b7c2f4028",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/order.zip"
+    },
+    {
+      "id": "order_ledger",
+      "name": "order_ledger",
+      "api_version": 1,
+      "version": "1.0.0",
+      "description": "订单管理与分账（OFbot 重写）：订单录入/接单/完成/统计/分账/排行/账目/导出与定时任务",
+      "author": "OFbot 2 Contributors",
+      "category": "general",
+      "dependencies": {},
+      "tags": [
+        "general"
+      ],
+      "released_at": "",
+      "checksum": "8c11e1f070ffc9258d7d1f3965344d35560c12da071dea3748a2fb98a76f8418",
+      "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/order_ledger.zip"
     },
     {
       "id": "points",

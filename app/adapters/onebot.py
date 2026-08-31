@@ -363,6 +363,19 @@ class OneBotAdapter(BaseAdapter):
             {"user_id": int(user_id), "message": self._to_array(message)},
         )
 
+    async def upload_group_file(
+        self, group_id: str, file_path: str, name: str
+    ) -> bool:
+        """群文件上传（NapCat 等支持 upload_group_file 的实现）。"""
+        return await self._send_action(
+            "upload_group_file",
+            {
+                "group_id": int(group_id),
+                "file": str(file_path),
+                "name": str(name),
+            },
+        )
+
     def _to_array(self, message: str | Message | MessageSegment) -> list[dict[str, Any]]:
         """统一消息段 → OneBot v11 消息数组（规避 CQ 码转义问题）。"""
         if isinstance(message, MessageSegment):

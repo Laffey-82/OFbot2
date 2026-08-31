@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import (
     APIRouter,
@@ -39,6 +41,40 @@ from app.web.helpers import flash_redirect
 logger = get_logger(__name__)
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def _apply_schema_defaults(schema: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    """把 JSON Schema 中缺失字段的 default 递归补进配置。"""
+    properties = schema.get("properties", {})
+    result = dict(config)
+    for key, prop in properties.items():
+        value = result.get(key)
+        if (value is None or key not in result) and "default" in prop:
+            result[key] = prop["default"]
+        if (
+            isinstance(result.get(key), dict)
+            and prop.get("type") == "object"
+            and isinstance(prop.get("properties"), dict)
+        ):
+            result[key] = _apply_schema_defaults(prop, result[key])
+    return result
+
+
+def _validate_config_schema(
+    schema: dict[str, Any], config: dict[str, Any]
+) -> tuple[dict[str, Any], str]:
+    """按 config_schema 校验插件配置；返回 (补默认值后的配置, 错误信息)。"""
+    try:
+        import jsonschema
+    except ImportError:
+        return config, ""
+    normalized = _apply_schema_defaults(schema, config)
+    try:
+        jsonschema.Draft7Validator(schema).validate(normalized)
+    except jsonschema.ValidationError as exc:
+        path = ".".join(str(part) for part in exc.absolute_path) or "(root)"
+        return normalized, f"{path}: {exc.message}"
+    return normalized, ""
 
 
 def _version_greater(candidate: str, base: str) -> bool:
@@ -456,14 +492,28 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         config_json: str = Form(...),
         csrf: None = Depends(require_csrf),
     ) -> RedirectResponse:
-        import json
-
         try:
             config = json.loads(config_json)
             if not isinstance(config, dict):
                 raise TypeError("config must be an object")
         except Exception:
             return flash_redirect("/plugins", error="1")
+        manager = getattr(app.state, "plugin_manager", None)
+        loaded = (
+            manager.loaded.get(name)
+            if manager is not None and name in getattr(manager, "loaded", {})
+            else None
+        )
+        if loaded is not None and loaded.manifest.config_schema:
+            normalized, schema_error = _validate_config_schema(
+                loaded.manifest.config_schema, config
+            )
+            if schema_error:
+                return flash_redirect(
+                    "/plugins",
+                    error=quote(f"配置校验失败：{schema_error}"),
+                )
+            config = normalized
         settings.plugin_configs[name] = config
         save_settings(settings)
         if app.state.plugin_manager:

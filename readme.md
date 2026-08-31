@@ -49,8 +49,10 @@
 - **Web 后台**：仪表盘、连接中心、插件管理、定时任务、流程引擎、AI 能力、记录/状态机/聚合、导出/文件/备份、审计/监控/自愈。
 - **统一 AI**：OpenAI 兼容（OpenAI/DeepSeek/Qwen/Moonshot/Azure）、Anthropic、Gemini、Ollama，多 Provider 切换与降级。
 - **自动化流程引擎**：消息/定时/Webhook/记录变更触发，动作可组合（发消息、执行命令、调 AI、写记录、导出）。
-- **插件市场**：内置 `plugin-repo/` 官方插件 25+ 个，支持 URL / 本地双数据源，Web 或 CLI 一键安装。
+- **插件市场**：内置 `plugin-repo/` 官方插件 26 个，支持 URL / 本地双数据源，Web 或 CLI 一键安装。
 - **可观测与安全**：结构化日志、Prometheus 指标、审计日志、登录锁定与 CSRF、命令冷却与三级限流、异常脱敏、插件安装静态审计与可选子进程沙箱。
+- **复杂插件开发**：权限角色映射（`permission_roles`）、命令冲突自动命名空间解决（`plugin conflicts`）、配置模板化定时任务、`config_schema` 强校验、records 过滤、`rest` 参数、handler `ctx` 注入、文本转图与群文件上传。
+- **插件测试工具**：`FakeBotHarness` 假 Chronocat + 真实机器人子进程端到端夹具（`plugin e2e`）。
 
 ## 快速开始
 

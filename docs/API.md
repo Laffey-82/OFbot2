@@ -9,7 +9,7 @@
 
 ## 接口总览
 
-共 171 个路径。
+共 172 个路径。
 
 ### /
 
@@ -92,6 +92,7 @@
 | POST | `/api/v1/backups` | Api Create Backup |
 | GET | `/api/v1/capabilities` | Api Capabilities |
 | GET | `/api/v1/metrics/history` | Api Metrics History |
+| GET | `/api/v1/plugins/conflicts` | Api Plugin Conflicts |
 | POST | `/api/v1/plugins/install` | Api Install Plugin |
 | POST | `/api/v1/plugins/{name}/reload` | Api Plugin Reload |
 | POST | `/api/v1/plugins/{name}/unload` | Api Plugin Unload |

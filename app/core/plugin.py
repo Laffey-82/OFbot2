@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import importlib
 import importlib.util
+import inspect
 import json
 import sys
 from collections.abc import Callable, Iterable
@@ -33,6 +34,13 @@ logger = get_logger(__name__)
 PLUGIN_API_VERSION = 1
 
 
+def _call_with_ctx(func: Callable, *args: Any, ctx: Any = None, **kwargs: Any) -> Any:
+    """handler 若声明 ctx 参数则注入 PluginContext；否则保持原签名调用。"""
+    if "ctx" in inspect.signature(func).parameters:
+        kwargs["ctx"] = ctx
+    return func(*args, **kwargs)
+
+
 class DeclaredCommand(BaseModel):
     name: str
     aliases: list[str] = Field(default_factory=list)
@@ -49,6 +57,7 @@ class DeclaredCommand(BaseModel):
     block: bool = True
     params: list[ParamSpec] = Field(default_factory=list)
     subcommands: list[SubcommandSpec] = Field(default_factory=list)
+    max_arg_length: int | None = None
 
 
 class DeclaredTask(BaseModel):
@@ -56,8 +65,21 @@ class DeclaredTask(BaseModel):
     kind: str = "interval"  # interval | cron | date
     params: dict[str, Any] = Field(default_factory=dict)
     handler: str
-    target: str = "all"  # all | group:<id> | private:*
+    target: str | list[str] = "all"  # all | group:<id> | private:* | 上述的列表
     description: str = ""
+
+    @field_validator("target")
+    @classmethod
+    def _validate_target(cls, value: Any) -> Any:
+        entries = value if isinstance(value, list) else [value]
+        for entry in entries:
+            if not isinstance(entry, str):
+                raise TypeError(f"task target 必须为字符串或字符串列表：{entry!r}")
+            if entry != "all" and not (
+                entry.startswith("group:") or entry == "private:*"
+            ):
+                raise ValueError(f"task target 取值非法：{entry}")
+        return value
 
 
 class DeclaredListener(BaseModel):
@@ -88,6 +110,8 @@ class PluginManifest(BaseModel):
     sandbox_policy: dict[str, Any] = Field(default_factory=dict)
     dependencies: dict[str, str] = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
+    permission_roles: dict[str, list[str]] = Field(default_factory=dict)
+    conflicts: dict[str, str] = Field(default_factory=dict)
     config_schema: dict[str, Any] = Field(default_factory=dict)
     web: bool = False
     models: list[str] = Field(default_factory=list)
@@ -104,6 +128,16 @@ class PluginManifest(BaseModel):
         value = str(value or "inline").strip()
         if value not in {"inline", "process"}:
             raise ValueError("sandbox 仅支持 inline 或 process")
+        return value
+
+    @field_validator("conflicts")
+    @classmethod
+    def _validate_conflicts(cls, value: dict[str, str]) -> dict[str, str]:
+        for command, action in value.items():
+            if action not in {"rename", "skip"}:
+                raise ValueError(
+                    f"conflicts[{command}] 仅支持 rename 或 skip，收到：{action}"
+                )
         return value
 
     def effective_features(self) -> list[FeatureSpec]:
@@ -201,6 +235,74 @@ class PluginContext:
         self._background_tasks.append(coroutine_factory)
         return coroutine_factory
 
+    def register_managed_task(
+        self,
+        task_id: str,
+        kind: str,
+        params: dict[str, Any],
+        handler: Callable,
+        *,
+        target: str | list[str] = "all",
+        description: str = "",
+    ) -> PluginTaskEntry:
+        """注册运行时定时任务：进入 PluginTaskRegistry（Web 定时任务页可见、可启停）。"""
+        if kind not in {"interval", "cron", "date"}:
+            raise ValueError(f"task kind 仅支持 interval/cron/date，收到：{kind}")
+        entry = PluginTaskEntry(
+            plugin=self.name,
+            task_id=task_id,
+            feature_id="",
+            kind=kind,
+            params=dict(params),
+            handler=handler,
+            target=target,
+            description=description,
+        )
+        job_id = f"plugin.{self.name}.{task_id}"
+        entry.job_id = job_id
+
+        async def run() -> None:
+            return await _call_with_ctx(handler, ctx=self)
+
+        try:
+            if kind == "cron":
+                self.scheduler.add_cron_job(
+                    run,
+                    job_id=job_id,
+                    cron_expression=str(params.get("cron", "")),
+                    plugin_name=self.name,
+                )
+            elif kind == "date":
+                from datetime import UTC, datetime
+
+                run_date = params.get("run_date")
+                parsed = (
+                    datetime.fromisoformat(str(run_date))
+                    if isinstance(run_date, str)
+                    else run_date
+                )
+                if parsed is not None and parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=UTC)
+                self.scheduler.add_date_job(
+                    run,
+                    job_id=job_id,
+                    run_date=parsed,
+                    plugin_name=self.name,
+                )
+            else:
+                self.scheduler.add_interval_job(
+                    run,
+                    job_id=job_id,
+                    seconds=int(params.get("seconds", 3600)),
+                    plugin_name=self.name,
+                )
+        except Exception as exc:
+            self.logger.warning("managed task %s registration failed: %s", task_id, exc)
+            entry.enabled = False
+        if self.task_registry is not None:
+            self.task_registry.register(entry)
+        return entry
+
     def require_permission(self, permission: str) -> Callable:
         def decorator(func: Callable) -> Callable:
             func.__required_permission__ = permission
@@ -257,6 +359,13 @@ class PluginContext:
     async def send_private(self, user_id: str, message: Any) -> bool:
         return await self.bot.send_private_message(str(user_id), message)
 
+    def text_image(self, text: str, **kwargs: Any) -> Path:
+        """把文本渲染为 PNG 图片（依赖 textimg 服务，Pillow 可选）。"""
+        service = self.services.get("textimg")
+        if service is None:
+            raise RuntimeError("textimg service unavailable")
+        return service.render(text, **kwargs)
+
 
 class Plugin:
     name = ""
@@ -283,6 +392,7 @@ class LoadedPlugin:
     state: str = "loaded"
     error: str = ""
     features: dict[str, FeatureSpec] = field(default_factory=dict)
+    conflicts: list[dict[str, Any]] = field(default_factory=list)
 
 
 class PluginManager:
@@ -331,6 +441,7 @@ class PluginManager:
         self.rules = rules or RuleRegistry()
         self.session = session or SessionManager()
         self._runtime_task_states: dict[str, dict[str, bool]] | None = None
+        self._resolution: dict[str, dict[str, str]] | None = None
         self.loaded: dict[str, LoadedPlugin] = {}
 
     @staticmethod
@@ -400,6 +511,72 @@ class PluginManager:
             visit(name)
         return visited
 
+    @staticmethod
+    def compute_resolution(
+        ordered_plugins: list[str], manifests: dict[str, PluginManifest]
+    ) -> dict[str, dict[str, str]]:
+        """按加载顺序 + system 保留规则，为每个插件的每条命令计算 keep/rename/skip。"""
+        claims: dict[str, str] = {}
+        for plugin in ordered_plugins:
+            manifest = manifests[plugin]
+            for feature in manifest.effective_features():
+                for command in feature.commands:
+                    for name in [command.name, *command.aliases]:
+                        if name not in claims or plugin == "system" and claims[name] != "system":
+                            claims[name] = plugin
+
+        actions: dict[str, dict[str, str]] = {}
+        for plugin in ordered_plugins:
+            manifest = manifests[plugin]
+            plugin_actions: dict[str, str] = {}
+            for feature in manifest.effective_features():
+                for command in feature.commands:
+                    override = manifest.conflicts.get(command.name)
+                    if override == "skip":
+                        plugin_actions[command.name] = "skip"
+                    elif claims.get(command.name) != plugin:
+                        plugin_actions[command.name] = "rename"
+                    else:
+                        plugin_actions[command.name] = "keep"
+            actions[plugin] = plugin_actions
+        return actions
+
+    def _current_claims(self) -> dict[str, str]:
+        """从命令注册表收集 名称/别名 → 归属插件。"""
+        claims: dict[str, str] = {}
+        for command in self.commands.get_commands():
+            claims[command.name] = command.plugin_name
+            for alias in command.aliases:
+                claims[alias] = command.plugin_name
+        return claims
+
+    def _resolution_for(self, name: str, manifest: PluginManifest) -> dict[str, str]:
+        """返回插件的命令解决动作；批量加载用预计算表，单独加载按当前注册表推断。"""
+        if self._resolution is not None and name in self._resolution:
+            return self._resolution[name]
+        claims = self._current_claims()
+        actions: dict[str, str] = {}
+        for feature in manifest.effective_features():
+            for command in feature.commands:
+                override = manifest.conflicts.get(command.name)
+                if override == "skip":
+                    actions[command.name] = "skip"
+                    continue
+                owner = claims.get(command.name)
+                if owner is None or owner == name:
+                    actions[command.name] = "keep"
+                elif owner == "system" or name == "system":
+                    # 单独加载时保持注册表一致性：无论哪方是 system，当前插件都让位
+                    actions[command.name] = "rename"
+                else:
+                    actions[command.name] = "rename"
+        return actions
+
+    def get_context(self, plugin_name: str) -> PluginContext | None:
+        """按插件名获取 PluginContext（供命令 handler ctx 注入等使用）。"""
+        loaded = self.loaded.get(plugin_name)
+        return loaded.context if loaded is not None else None
+
     def load_enabled(
         self, enabled: dict[str, bool], plugin_configs: dict[str, dict[str, Any]]
     ) -> list[LoadedPlugin]:
@@ -423,6 +600,7 @@ class PluginManager:
                 logger.warning("enabled plugin %s not found", name)
 
         order = self.dependency_order(manifests, enabled_names)
+        self._resolution = self.compute_resolution(order, manifests)
         result: list[LoadedPlugin] = []
         for name in order:
             try:
@@ -438,6 +616,7 @@ class PluginManager:
                 self.bus().dispatch(
                     PluginFailed(plugin_name=name, version="", error=str(exc))
                 )
+        self._resolution = None
         return result
 
     def bus(self) -> Any:
@@ -461,7 +640,13 @@ class PluginManager:
         self.validate_rules(manifest)
         for permission in manifest.permissions:
             self.permissions.register_permission(permission)
-            self.permissions.grant_role_permission("user", permission)
+            roles = manifest.permission_roles.get(permission)
+            if roles:
+                for role in roles:
+                    self.permissions.grant_role_permission(role, permission)
+            else:
+                # 默认行为保持不变：未指定角色映射的权限授予 user
+                self.permissions.grant_role_permission("user", permission)
 
         if manifest.sandbox == "process":
             return self._load_plugin_process(name, path, manifest, config)
@@ -581,22 +766,74 @@ class PluginManager:
         """按 manifest features 自动注册命令、定时任务与监听器（handler 为包内点分符号）。"""
         name = loaded.name
         features: dict[str, FeatureSpec] = {}
+        actions = self._resolution_for(name, loaded.manifest)
+        registered_names: set[str] = set()
+        conflict_log: list[dict[str, Any]] = []
         for feature in loaded.manifest.effective_features():
             key = feature_key(name, feature.id)
             features[key] = feature
             for declared in feature.commands:
+                action = actions.get(declared.name, "keep")
+                if action == "skip":
+                    conflict_log.append(
+                        {"command": declared.name, "action": "skip", "effective": ""}
+                    )
+                    logger.warning(
+                        "plugin %s 命令 /%s 按 conflicts 声明跳过注册", name, declared.name
+                    )
+                    continue
                 handler = self.resolve_dotted(loaded.module, declared.handler)
-                conflict = self.commands.check_conflict(
-                    declared.name, set(declared.aliases), name
+                effective = (
+                    f"{name}.{declared.name}" if action == "rename" else declared.name
                 )
-                if conflict is not None:
+                if effective in registered_names:
                     raise ValueError(
-                        f"命令 /{declared.name} 与插件 {conflict} 冲突（命令名/别名已被占用）"
+                        f"插件 {name} 内部命令名重复：/{effective}"
+                    )
+                claims = self._current_claims()
+                kept_aliases: set[str] = set()
+                for alias in set(declared.aliases):
+                    if alias in registered_names:
+                        raise ValueError(f"插件 {name} 内部别名重复：/{alias}")
+                    owner = claims.get(alias)
+                    if owner is None or owner == name:
+                        kept_aliases.add(alias)
+                    else:
+                        conflict_log.append(
+                            {
+                                "command": declared.name,
+                                "alias": alias,
+                                "action": "dropped",
+                                "effective": effective,
+                                "other": owner,
+                            }
+                        )
+                        logger.warning(
+                            "plugin %s 别名 /%s 与插件 %s 冲突，已丢弃",
+                            name,
+                            alias,
+                            owner,
+                        )
+                if action == "rename":
+                    conflict_log.append(
+                        {
+                            "command": declared.name,
+                            "action": "rename",
+                            "effective": effective,
+                            "other": claims.get(declared.name, ""),
+                        }
+                    )
+                    logger.warning(
+                        "plugin %s 命令 /%s 与插件 %s 冲突，注册为 /%s",
+                        name,
+                        declared.name,
+                        claims.get(declared.name, "?"),
+                        effective,
                     )
                 self.commands.register(
-                    declared.name,
+                    effective,
                     handler,
-                    aliases=set(declared.aliases),
+                    aliases=kept_aliases,
                     rules=list(declared.rules),
                     session=declared.session,
                     permission=declared.permission,
@@ -611,12 +848,16 @@ class PluginManager:
                     examples=list(declared.examples),
                     params=list(declared.params),
                     subcommands=list(declared.subcommands),
+                    max_arg_length=declared.max_arg_length,
                 )
+                registered_names.add(effective)
+                registered_names.update(kept_aliases)
             for declared in feature.tasks:
                 self._register_manifest_task(loaded, feature, declared, key)
             for declared in feature.listeners:
                 self._register_manifest_listener(loaded, feature, declared, key)
         loaded.context.features = features
+        loaded.conflicts = conflict_log
         return features
 
     def _register_manifest_task(
@@ -627,12 +868,15 @@ class PluginManager:
         feature_key_id: str,
     ) -> None:
         handler = self.resolve_dotted(loaded.module, declared.handler)
+        params = self._resolve_task_params(
+            dict(declared.params), loaded.context.config
+        )
         entry = PluginTaskEntry(
             plugin=loaded.name,
             task_id=declared.id,
             feature_id=feature_key_id,
             kind=declared.kind,
-            params=dict(declared.params),
+            params=params,
             handler=handler,
             target=declared.target,
             description=declared.description,
@@ -649,13 +893,13 @@ class PluginManager:
                 self.scheduler.add_cron_job(
                     functools.partial(self._run_manifest_task, entry),
                     job_id=job_id,
-                    cron_expression=str(declared.params.get("cron", "")),
+                    cron_expression=str(params.get("cron", "")),
                     plugin_name=loaded.name,
                 )
             elif declared.kind == "date":
                 from datetime import UTC, datetime
 
-                run_date = declared.params.get("run_date")
+                run_date = params.get("run_date")
                 parsed = (
                     datetime.fromisoformat(str(run_date))
                     if isinstance(run_date, str)
@@ -673,7 +917,7 @@ class PluginManager:
                 self.scheduler.add_interval_job(
                     functools.partial(self._run_manifest_task, entry),
                     job_id=job_id,
-                    seconds=int(declared.params.get("seconds", 3600)),
+                    seconds=int(params.get("seconds", 3600)),
                     plugin_name=loaded.name,
                 )
             if not enabled:
@@ -690,30 +934,64 @@ class PluginManager:
             entry.enabled = False
         self.task_registry.register(entry)
 
+    @staticmethod
+    def _resolve_task_params(
+        params: dict[str, Any], config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """解析任务参数模板（${a.b.c} 指向插件配置点分路径），缺失回退静态值。"""
+        resolved: dict[str, Any] = {}
+        for key, value in params.items():
+            if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+                path = value[2:-1].strip().split(".")
+                current: Any = config
+                try:
+                    for part in path:
+                        current = current[part]
+                except (KeyError, TypeError, IndexError):
+                    logger.warning(
+                        "task 参数模板 %s 无法从插件配置解析，使用静态值", value
+                    )
+                    resolved[key] = value
+                else:
+                    resolved[key] = current
+            else:
+                resolved[key] = value
+        return resolved
+
     async def _run_manifest_task(self, entry: PluginTaskEntry) -> None:
         """按任务 target 与功能开关门控执行。"""
         if not entry.enabled:
             return
-        if entry.target == "private:*":
-            if not self._feature_enabled(
-                entry.plugin, entry.feature_id, "private:*"
+        targets = (
+            list(entry.target)
+            if isinstance(entry.target, list)
+            else [entry.target]
+        )
+        loaded = self.loaded.get(entry.plugin)
+        for target in targets:
+            if target == "private:*":
+                if not self._feature_enabled(
+                    entry.plugin, entry.feature_id, "private:*"
+                ):
+                    continue
+            elif target.startswith("group:"):
+                if not self._feature_enabled(
+                    entry.plugin, entry.feature_id, target
+                ):
+                    continue
+            elif not self._feature_enabled(
+                entry.plugin, entry.feature_id, "group:*"
             ):
-                return
-        elif entry.target.startswith("group:"):
-            if not self._feature_enabled(
-                entry.plugin, entry.feature_id, entry.target
-            ):
-                return
-        elif not self._feature_enabled(
-            entry.plugin, entry.feature_id, "group:*"
-        ):
-            return
-        try:
-            await entry.handler()
-        except Exception:
-            logger.exception(
-                "plugin task failed: %s.%s", entry.plugin, entry.task_id
-            )
+                continue
+            try:
+                await _call_with_ctx(
+                    entry.handler,
+                    ctx=loaded.context if loaded is not None else None,
+                )
+            except Exception:
+                logger.exception(
+                    "plugin task failed: %s.%s", entry.plugin, entry.task_id
+                )
 
     def _register_manifest_listener(
         self,
@@ -742,7 +1020,9 @@ class PluginManager:
                 passed, _ = await self.rules.check(declared.rules, event)
                 if not passed:
                     return
-            await handler(event)
+            await _call_with_ctx(
+                handler, event, ctx=loaded.context
+            )
 
         loaded.context.subscribe(event_cls, wrapped)
 
@@ -823,9 +1103,31 @@ class PluginManager:
         loaded = self.loaded[name]
         if config is None:
             config = loaded.context.config
+        old_manifest = loaded.manifest
         await self.unload_plugin(name)
         self.load_plugin(name, loaded.path, config=config)
         await self.start_plugin(name)
+        new_manifest = self.loaded[name].manifest
+        if old_manifest.models != new_manifest.models:
+            logger.warning(
+                "插件 %s 模型声明发生变化，表结构不支持热更新，请重启服务后生效",
+                name,
+            )
+        old_tasks = {
+            (feature.id, task.id): dict(task.params)
+            for feature in old_manifest.effective_features()
+            for task in feature.tasks
+        }
+        new_tasks = {
+            (feature.id, task.id): dict(task.params)
+            for feature in new_manifest.effective_features()
+            for task in feature.tasks
+        }
+        if old_tasks != new_tasks:
+            logger.warning(
+                "插件 %s 定时任务声明/参数变化，已按新声明重新注册",
+                name,
+            )
         return True
 
     def get_loaded_plugins(self) -> list[dict[str, Any]]:
@@ -838,6 +1140,7 @@ class PluginManager:
                 "error": item.error,
                 "config_schema": item.manifest.config_schema,
                 "config": item.context.config,
+                "conflicts": list(item.conflicts),
             }
             for item in self.loaded.values()
         ]

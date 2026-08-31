@@ -80,5 +80,13 @@ async def init_db(url: str, extra_models: list[type[Base]] | None = None) -> Non
     engine = get_engine(url)
     from app.db import models  # noqa: F401
 
+    # 确保 ctx.register_models 注册的模型表已进入元数据（防御性，通常类定义即注册）
+    for model in extra_models or []:
+        table = getattr(model, "__table__", None)
+        if table is not None and table.name not in Base.metadata.tables:
+            try:
+                Base.metadata._add_table(table.name, table.schema, table)
+            except (AttributeError, TypeError):
+                Base.metadata.add(table)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

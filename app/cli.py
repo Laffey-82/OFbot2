@@ -181,35 +181,84 @@ def _plugin_check(args: argparse.Namespace) -> int:
         errors.append(f"目录名 {args.name} 与清单 name {manifest.name} 不一致")
     if manifest.api_version != PLUGIN_API_VERSION:
         errors.append(f"api_version {manifest.api_version} 不受支持")
-    # 跨插件命令冲突检测：扫描 plugins/ 下其他插件的声明
-    declared_commands: dict[str, set[str]] = {}
+    if manifest.config_schema:
+        try:
+            import jsonschema
+
+            jsonschema.Draft7Validator.check_schema(manifest.config_schema)
+        except ImportError:
+            pass
+        except Exception as exc:
+            errors.append(f"config_schema 无效：{exc}")
+    # 跨插件命令冲突预览：加载期会按「先加载保留 + system 保留 + 后加载命名空间化」解决
+    from app.core.config import load_settings
+    from app.core.plugin import PluginManager
+
+    manifests: dict[str, PluginManifest] = {}
     plugins_dir = ROOT / "plugins"
     if plugins_dir.exists():
-        for manifest_path in sorted(plugins_dir.glob("*/plugin.json")):
-            if manifest_path.parent.name == args.name:
-                continue
+        for path in sorted(plugins_dir.glob("*/plugin.json")):
             try:
-                other = PluginManifest.model_validate_json(
-                    manifest_path.read_text(encoding="utf-8")
+                manifests[path.parent.name] = PluginManifest.model_validate_json(
+                    path.read_text(encoding="utf-8")
                 )
             except Exception as exc:
-                logger.warning("跳过无法解析的插件清单 %s：%s", manifest_path, exc)
-                continue
-            for feature in other.effective_features():
-                for command in feature.commands:
-                    declared_commands.setdefault(
-                        manifest_path.parent.name, set()
-                    ).add(command.name)
-                    declared_commands[manifest_path.parent.name].update(
-                        command.aliases
+                logger.warning("跳过无法解析的插件清单 %s：%s", path, exc)
+    config_path = ROOT / "config.yaml"
+    if config_path.exists():
+        try:
+            settings = load_settings(config_path)
+            enabled = {name for name, flag in settings.plugins.items() if flag}
+            manifests = {
+                name: manifest
+                for name, manifest in manifests.items()
+                if name in enabled
+            }
+        except Exception:
+            pass
+    if manifests:
+        order = [name for name in sorted(manifests) if name in manifests]
+        resolution = PluginManager.compute_resolution(order, manifests)
+        planned = resolution.get(args.name, {})
+        for feature in manifest.effective_features():
+            for command in feature.commands:
+                action = planned.get(command.name, "keep")
+                if action == "rename":
+                    print(
+                        f"[INFO] 命令 /{command.name} 将注册为 /{args.name}.{command.name}"
+                        "（与其他插件冲突，自动命名空间化）"
                     )
+                elif action == "skip":
+                    print(
+                        f"[INFO] 命令 /{command.name} 按 conflicts 声明跳过注册"
+                    )
+    # 权限角色映射校验
+    for permission, roles in manifest.permission_roles.items():
+        if permission not in manifest.permissions:
+            errors.append(
+                f"permission_roles 中的权限点 {permission} 未在 permissions 中声明"
+            )
+        for role in roles:
+            if not str(role).strip():
+                errors.append(f"permission_roles[{permission}] 存在空角色名")
+    # rest 参数校验：唯一且位于末尾
     for feature in manifest.effective_features():
         for command in feature.commands:
-            for other_plugin, names in declared_commands.items():
-                if command.name in names or set(command.aliases) & names:
-                    errors.append(
-                        f"命令 /{command.name} 与插件 {other_plugin} 冲突"
-                    )
+            rest_params = [
+                p for p in command.params if p.type.lower() in {"rest", "greedy_string"}
+            ]
+            if len(rest_params) > 1:
+                errors.append(
+                    f"命令 /{command.name} 最多只能声明一个 rest 参数"
+                )
+            if rest_params and command.params[-1] is not rest_params[0]:
+                errors.append(
+                    f"命令 /{command.name} 的 rest 参数 {rest_params[0].name} 必须位于末尾"
+                )
+            if command.max_arg_length is not None and command.max_arg_length < 1:
+                errors.append(
+                    f"命令 /{command.name} 的 max_arg_length 必须为正整数"
+                )
     rule_registry = RuleRegistry()
     unknown_rules = []
     for feature in manifest.effective_features():
@@ -234,8 +283,6 @@ def _plugin_check(args: argparse.Namespace) -> int:
     except Exception as exc:
         errors.append(f"插件模块导入失败: {exc}")
     if module is not None:
-        from app.core.plugin import PluginManager
-
         for feature in manifest.effective_features():
             for command in feature.commands:
                 try:
@@ -270,6 +317,86 @@ def _plugin_check(args: argparse.Namespace) -> int:
         for item in findings:
             print(f"  [{item['level']}] {item['check']}: {item['detail']}")
     print(f"[PASS] 插件 {args.name} 清单与处理器符号校验通过")
+    return 0
+
+
+def _plugin_conflicts(args: argparse.Namespace) -> int:
+    """扫描 plugins/ 下全部插件的命令冲突与加载期解决策略。"""
+    from app.core.config import load_settings
+    from app.core.plugin import PluginManager, PluginManifest
+
+    plugins_dir = ROOT / "plugins"
+    manifests: dict[str, PluginManifest] = {}
+    if plugins_dir.exists():
+        for path in sorted(plugins_dir.glob("*/plugin.json")):
+            try:
+                manifests[path.parent.name] = PluginManifest.model_validate_json(
+                    path.read_text(encoding="utf-8")
+                )
+            except Exception as exc:
+                print(f"[SKIP] {path.parent.name}：清单解析失败 {exc}")
+    config_path = ROOT / "config.yaml"
+    if config_path.exists():
+        try:
+            settings = load_settings(config_path)
+            enabled = {name for name, flag in settings.plugins.items() if flag}
+            manifests = {
+                name: manifest
+                for name, manifest in manifests.items()
+                if name in enabled
+            }
+        except Exception:
+            pass
+    if not manifests:
+        print("plugins/ 下没有可解析的插件")
+        return 1
+    order = sorted(manifests)
+    resolution = PluginManager.compute_resolution(order, manifests)
+    conflicts: list[tuple[str, str, str]] = []
+    for plugin in order:
+        manifest = manifests[plugin]
+        for feature in manifest.effective_features():
+            for command in feature.commands:
+                action = resolution[plugin].get(command.name, "keep")
+                if action != "keep":
+                    conflicts.append((plugin, command.name, action))
+    if not conflicts:
+        print("未发现命令冲突")
+        return 0
+    print(f"发现 {len(conflicts)} 处命令冲突，加载期解决策略如下：")
+    for plugin, name, action in conflicts:
+        if action == "rename":
+            print(f"  /{name}（{plugin}）→ /{plugin}.{name}（命名空间化）")
+        else:
+            print(f"  /{name}（{plugin}）→ 跳过注册")
+    return 0
+
+
+def _plugin_e2e(args: argparse.Namespace) -> int:
+    """运行插件 e2e/ 目录下的端到端脚本（每个脚本独立进程执行）。"""
+    import subprocess
+
+    plugin_dir = ROOT / "plugins" / args.name
+    e2e_dir = plugin_dir / "e2e"
+    if not e2e_dir.exists():
+        print(f"插件 {args.name} 没有 e2e/ 目录，跳过")
+        return 0
+    scripts = sorted(e2e_dir.glob("*.py"))
+    if not scripts:
+        print(f"插件 {args.name} 的 e2e/ 目录下没有脚本")
+        return 0
+    failed: list[str] = []
+    for script in scripts:
+        print(f"运行 {script.name} …")
+        result = subprocess.run(
+            [sys.executable, str(script)], cwd=ROOT, check=False
+        )
+        if result.returncode != 0:
+            failed.append(script.name)
+    if failed:
+        print(f"[FAIL] e2e 脚本失败：{'、'.join(failed)}")
+        return 1
+    print(f"[PASS] 插件 {args.name} 全部 e2e 脚本通过")
     return 0
 
 
@@ -635,6 +762,15 @@ def build_parser() -> argparse.ArgumentParser:
     test_cmd = plugin_sub.add_parser("test", help="运行插件自带测试")
     test_cmd.add_argument("name", help="插件名")
     test_cmd.set_defaults(func=_plugin_test)
+
+    e2e_cmd = plugin_sub.add_parser("e2e", help="运行插件 e2e/ 端到端脚本")
+    e2e_cmd.add_argument("name", help="插件名")
+    e2e_cmd.set_defaults(func=_plugin_e2e)
+
+    conflicts_cmd = plugin_sub.add_parser(
+        "conflicts", help="扫描全部插件的命令冲突与解决策略"
+    )
+    conflicts_cmd.set_defaults(func=_plugin_conflicts)
 
     repo_cmd = plugin_sub.add_parser("repo", help="插件仓库（市场）")
     repo_sub = repo_cmd.add_subparsers(dest="repo_command")

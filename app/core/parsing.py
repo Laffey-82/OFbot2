@@ -15,7 +15,7 @@ class ParamSpec(BaseModel):
     """命令参数声明。"""
 
     name: str
-    type: str = "string"  # string | int | float | bool
+    type: str = "string"  # string | int | float | bool | rest（贪婪字符串）
     required: bool = False
     default: Any = None
     description: str = ""
@@ -131,6 +131,11 @@ def bind_params(
                     return {}, f"缺少必填参数：{param.name}"
                 bound[param.name] = param.default
                 continue
+        if param.type.lower() in {"rest", "greedy_string"}:
+            # 贪婪字符串：吞掉剩余全部位置参数，合并为一个字符串
+            rest_tokens = [token, *list(positional_iter)]
+            bound[param.name] = " ".join(rest_tokens)
+            break
         value, error = _coerce(token, param)
         if error:
             return {}, error
@@ -185,6 +190,8 @@ def format_param_hint(param: ParamSpec) -> str:
     if param.choices:
         choices = "|".join(str(item) for item in param.choices)
         token = f"{name}={choices}"
+    elif param.type.lower() in {"rest", "greedy_string"}:
+        token = f"{name}…"
     else:
         token = name
     if param.required:

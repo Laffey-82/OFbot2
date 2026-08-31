@@ -178,7 +178,17 @@ class RecordService:
         offset: int = 0,
         status: str | None = None,
         order: str = "desc",
+        filters: dict[str, Any] | None = None,
+        sort_by: str | None = None,
+        max_scan: int = 2000,
     ) -> list[Record]:
+        """查询记录。
+
+        filters 支持字段等值或操作符：
+        {"field": value} 或 {"field": {"gte":.., "lte":.., "gt":.., "lt":..,
+        "contains": "..", "in": [..]}}；sort_by 指定 data 内字段排序；
+        过滤在内存中进行（max_scan 内），大数据量建议自建模型。
+        """
         async with session_factory()() as session:
             query = select(Record)
             if record_type:
@@ -189,8 +199,49 @@ class RecordService:
                 query = query.order_by(Record.created_at.asc())
             else:
                 query = query.order_by(Record.created_at.desc())
-            query = query.offset(offset).limit(limit)
-            return list((await session.scalars(query)).all())
+            query = query.limit(max(1, min(int(max_scan), 10000)))
+            rows = list((await session.scalars(query)).all())
+
+        if filters:
+            rows = [
+                record
+                for record in rows
+                if all(
+                    self._match_filter(record.data, field, spec)
+                    for field, spec in filters.items()
+                )
+            ]
+        if sort_by:
+            rows.sort(
+                key=lambda record: str(record.data.get(sort_by, "")),
+                reverse=order != "asc",
+            )
+        return rows[offset : offset + limit]
+
+    @staticmethod
+    def _match_filter(data: dict[str, Any], field: str, spec: Any) -> bool:
+        value = data.get(field)
+        if isinstance(spec, dict):
+            operators = ("gte", "lte", "gt", "lt", "contains", "in")
+            if not any(op in spec for op in operators):
+                return value == spec
+            try:
+                if "gte" in spec and not (value is not None and value >= spec["gte"]):
+                    return False
+                if "lte" in spec and not (value is not None and value <= spec["lte"]):
+                    return False
+                if "gt" in spec and not (value is not None and value > spec["gt"]):
+                    return False
+                if "lt" in spec and not (value is not None and value < spec["lt"]):
+                    return False
+                if "contains" in spec and str(spec["contains"]) not in str(value or ""):
+                    return False
+                if "in" in spec and value not in spec["in"]:
+                    return False
+            except TypeError:
+                return False
+            return True
+        return value == spec
 
     async def update(self, record_id: int, data: dict[str, Any]) -> Record | None:
         async with session_factory()() as session:

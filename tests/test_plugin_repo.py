@@ -272,6 +272,7 @@ async def test_plugin_repo_seed_plugins_load(tmp_path) -> None:
         "system_status",
         "anti_spam",
         "reminder",
+        "order_ledger",
     }
     scheduler = SchedulerService()
     manager = PluginManager(

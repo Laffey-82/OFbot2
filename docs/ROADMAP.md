@@ -4,6 +4,20 @@
 按「先稳后进」分四个批次推进。每批都通过全部门禁：
 `compileall` + `ruff check` + `pytest` + `scripts/e2e_smoke.py`。
 
+## 批次 5（v1.4.0）— 复杂插件开发体验（OFbot 重写问题修复）
+
+依据 [OFBOT2_PLUGIN_ISSUES.md](OFBOT2_PLUGIN_ISSUES.md) 的 13 项问题分三阶段修复：
+
+- [x] 阶段一（P1）：权限角色映射（`permission_roles`）、配置模板化任务 +
+  `ctx.register_managed_task`、jsonschema 配置校验 + 递归表单、指令冲突检测与
+  「后加载者命名空间化」解决（`plugin conflicts` / `plugin check` 预览 / Web 徽标 / API）。
+- [x] 阶段二（P2）：records 过滤增强（`filters` / `sort_by`）、`register_models` 随
+  `init_db(extra_models=...)` 建表、命令参数 `type: "rest"` 贪婪字符串。
+- [x] 阶段三（P3）：`ctx.text_image` + OneBot `upload_group_file`、handler `ctx` 注入、
+  任务 `target` 列表按群门控、热重载结构性变更告警、`app/testing.FakeBotHarness` +
+  `plugin e2e`、命令级 `max_arg_length`。
+- [x] 门禁：全量 303 项测试 + `scripts/e2e_order_ledger_smoke.py`（12 条指令）+ ruff/compileall 通过。
+
 ## 批次 1（v1.0.8）— 稳定与卫生
 
 - [x] 第 1 项：数据库引擎/事件总线重置显式释放

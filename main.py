@@ -77,6 +77,7 @@ from app.services.records import (
 )
 from app.services.scaffold import ScaffoldService
 from app.services.state_machine import StateMachineService
+from app.services.textimg import TextImageService
 from app.services.webhook import WebhookService
 from app.services.workflow import WorkflowEngine
 from app.services.workflow_templates import WorkflowTemplateService
@@ -378,6 +379,7 @@ async def run(settings: Settings) -> None:
         "agent_permission": permission_manager.has_permission,
         "rules": rule_registry,
         "session": session_manager,
+        "textimg": TextImageService(ROOT / "data" / "textimg"),
     }
     subscriptions = EventSubscriptionRegistry()
 
@@ -490,9 +492,15 @@ async def run(settings: Settings) -> None:
         settings.runtime.plugin_tasks
     )
     services["plugin_manager"] = plugin_manager
+    command_registry.set_plugin_context_resolver(plugin_manager.get_context)
     plugin_manager.load_enabled(settings.plugins, settings.plugin_configs)
 
-    await init_db(settings.database.url)
+    plugin_models = [
+        model
+        for loaded in plugin_manager.loaded.values()
+        for model in loaded.context._models
+    ]
+    await init_db(settings.database.url, extra_models=plugin_models)
     migration_paths = [
         migration
         for loaded in plugin_manager.loaded.values()

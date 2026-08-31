@@ -24,6 +24,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 架构分层、消息流、作用域判定、插件生命周期 |
 | [API.md](API.md) | REST 接口清单（自动生成） |
 | [GLOSSARY.md](GLOSSARY.md) | 术语表 |
+| [OFBOT2_PLUGIN_ISSUES.md](OFBOT2_PLUGIN_ISSUES.md) | 插件开发问题与 v1.4 修复路线（实测 13 项） |
 
 ## 运维（部署与长期运行）
 

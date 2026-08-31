@@ -71,6 +71,11 @@
             {{ feature.label }}{{ '（默认开）' if feature.enable_on_default else '（默认关）' }}
           </span>
           {% else %}<span class="muted">—</span>{% endfor %}
+          {% for conflict in plugin.get('conflicts', []) %}
+          <span class="badge warning" title="命令 /{{ conflict.get('command', '') }}{{ ' 别名 /' + conflict.get('alias', '') if conflict.get('alias') else '' }}：{{ '重命名' if conflict.get('action') == 'rename' else ('跳过' if conflict.get('action') == 'skip' else '别名丢弃') }}{{ ' → /' + conflict.get('effective', '') if conflict.get('effective') else '' }}">
+            命令冲突
+          </span>
+          {% endfor %}
         </td>
         <td>{{ plugin.description or '—' }}</td>
         <td>
@@ -161,6 +166,54 @@
 </div>
 
 <script>
+  function renderFieldInput(path, def, value) {
+    const wrap = document.createElement("div");
+    wrap.className = "form-row";
+    const label = document.createElement("label");
+    label.htmlFor = "plugin-field-" + path.join("-");
+    label.textContent = path[path.length - 1] + "（" + (def.type || "any") + "）";
+    let input;
+    if (def.enum && Array.isArray(def.enum)) {
+      input = document.createElement("select");
+      def.enum.forEach((opt) => {
+        const option = document.createElement("option");
+        option.value = String(opt);
+        option.textContent = String(opt);
+        input.appendChild(option);
+      });
+      input.value = String(value);
+    } else if (def.type === "boolean") {
+      input = document.createElement("select");
+      input.innerHTML = '<option value="true">true</option><option value="false">false</option>';
+      if (value === false) input.value = "false";
+    } else if (def.type === "number" || def.type === "integer") {
+      input = document.createElement("input");
+      input.type = "number";
+      input.step = "any";
+      if (value !== "" && value !== null && value !== undefined) input.value = value;
+    } else if (def.type === "array" || (def.type === "object" && !def.properties)) {
+      input = document.createElement("textarea");
+      input.rows = 3;
+      input.value = JSON.stringify(value, null, 2);
+      input.classList.add("mono");
+    } else {
+      input = document.createElement("input");
+      if (value !== "" && value !== null && value !== undefined) input.value = value;
+    }
+    input.id = "plugin-field-" + path.join("-");
+    input.dataset.fieldPath = JSON.stringify(path);
+    input.dataset.fieldType = def.type || "any";
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    if (def.description) {
+      const hint = document.createElement("span");
+      hint.className = "hint";
+      hint.textContent = def.description;
+      wrap.appendChild(hint);
+    }
+    return wrap;
+  }
+
   function renderPluginFields(container) {
     let schema, config;
     try {
@@ -170,61 +223,37 @@
       return;
     }
     container.innerHTML = "";
-    const properties = (schema.properties || {});
-    Object.entries(properties).forEach(([key, def]) => {
-      const wrap = document.createElement("div");
-      wrap.className = "form-row";
-      const label = document.createElement("label");
-      label.htmlFor = "plugin-field-" + key;
-      label.textContent = key + "（" + (def.type || "any") + "）";
-      let input;
-      const value = config[key] !== undefined ? config[key] : (def.default !== undefined ? def.default : "");
-      if (def.enum && Array.isArray(def.enum)) {
-        input = document.createElement("select");
-        def.enum.forEach((opt) => {
-          const option = document.createElement("option");
-          option.value = String(opt);
-          option.textContent = String(opt);
-          input.appendChild(option);
-        });
-        input.value = String(value);
-      } else if (def.type === "boolean") {
-        input = document.createElement("select");
-        input.innerHTML = '<option value="true">true</option><option value="false">false</option>';
-        if (value === false) input.value = "false";
-      } else if (def.type === "number" || def.type === "integer") {
-        input = document.createElement("input");
-        input.type = "number";
-        input.step = "any";
-        if (value !== "" && value !== null && value !== undefined) input.value = value;
-      } else if (def.type === "array" || def.type === "object") {
-        input = document.createElement("textarea");
-        input.rows = 3;
-        input.value = JSON.stringify(value, null, 2);
-        input.classList.add("mono");
-      } else {
-        input = document.createElement("input");
-        if (value !== "" && value !== null && value !== undefined) input.value = value;
-      }
-      input.id = "plugin-field-" + key;
-      input.dataset.fieldName = key;
-      input.dataset.fieldType = def.type || "any";
-      wrap.appendChild(label);
-      wrap.appendChild(input);
-      if (def.description) {
-        const hint = document.createElement("span");
-        hint.className = "hint";
-        hint.textContent = def.description;
-        wrap.appendChild(hint);
-      }
-      container.appendChild(wrap);
-    });
+    const render = (properties, current, path, target) => {
+      Object.entries(properties).forEach(([key, def]) => {
+        const value = current[key] !== undefined ? current[key] : (def.default !== undefined ? def.default : "");
+        if (def.type === "object" && def.properties) {
+          const fieldset = document.createElement("fieldset");
+          fieldset.className = "plugin-nested";
+          const legend = document.createElement("legend");
+          legend.textContent = key + "（object）";
+          fieldset.appendChild(legend);
+          const inner = document.createElement("div");
+          inner.className = "form-grid";
+          fieldset.appendChild(inner);
+          target.appendChild(fieldset);
+          render(
+            def.properties,
+            (value && typeof value === "object") ? value : {},
+            path.concat(key),
+            inner
+          );
+        } else {
+          target.appendChild(renderFieldInput(path.concat(key), def, value));
+        }
+      });
+    };
+    render((schema.properties || {}), config || {}, [], container);
   }
 
   function collectPluginJson(container) {
     const data = {};
-    container.querySelectorAll("[data-field-name]").forEach((el) => {
-      const key = el.dataset.fieldName;
+    container.querySelectorAll("[data-field-path]").forEach((el) => {
+      const path = JSON.parse(el.dataset.fieldPath);
       const type = el.dataset.fieldType;
       let value = el.value;
       if (type === "number" || type === "integer") value = value === "" ? null : Number(value);
@@ -232,7 +261,13 @@
       else if (type === "array" || type === "object") {
         try { value = JSON.parse(value); } catch (e) { value = null; }
       }
-      data[key] = value;
+      let target = data;
+      for (let i = 0; i < path.length - 1; i++) {
+        const key = path[i];
+        if (typeof target[key] !== "object" || target[key] === null) target[key] = {};
+        target = target[key];
+      }
+      target[path[path.length - 1]] = value;
     });
     return JSON.stringify(data, null, 2);
   }

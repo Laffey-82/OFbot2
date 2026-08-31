@@ -1,6 +1,31 @@
 # Changelog
 
-## 未发布 — 文档与 GitHub 仓库专业化
+## v1.4.0（2026-09）— 复杂插件开发体验（OFbot 重写问题修复）
+
+- **指令冲突检测与解决**：`plugin conflicts` 全量扫描；加载期不再因冲突失败——
+  先加载者保留原名，后加载插件冲突命令自动注册为 `<插件名>.<命令>`，`system` 插件命令保留，
+  冲突别名丢弃；manifest 支持 `conflicts: {"命令": "rename"|"skip"}` 显式覆盖；
+  命令解析支持点分命令名精确匹配；Web「插件」页冲突徽标 + `GET /api/v1/plugins/conflicts`。
+- **权限角色映射**：manifest 新增 `permission_roles`，可将权限点只授予指定角色；
+  未声明时保持原有“授予 user”行为（向后兼容）。
+- **配置驱动定时任务**：任务参数支持 `${a.b.c}` 配置模板，保存配置重载即更新 cron；
+  新增 `ctx.register_managed_task()`，运行时任务进入 Web 定时任务页（可见、可启停）。
+- **配置强校验**：新增 `jsonschema` 依赖，Web 保存插件配置按 `config_schema` 校验并补默认值，
+  失败返回字段级错误；插件配置表单支持递归渲染嵌套对象。
+- **records 查询增强**：`list()` 新增 `filters`（等值 / gte / lte / contains / in）与 `sort_by`。
+- **`register_models` 落地**：插件注册的模型随 `init_db(extra_models=...)` 建表。
+- **贪婪字符串参数**：命令参数新增 `type: "rest"`（剩余参数合并为字符串）。
+- **文本转图与群文件上传**：新增 `jsonschema`/`Pillow` 依赖、
+  `ctx.text_image()`（`app/services/textimg.py`）、OneBot `upload_group_file` 与 `BotClient` 透传。
+- **handler ctx 注入**：命令/任务/监听 handler 声明 `ctx` 参数即自动注入 `PluginContext`。
+- **任务按群门控**：`DeclaredTask.target` 支持 `["group:a", "group:b", "private:*"]`。
+- **热重载告警**：重载时模型/任务声明变化给出“需重启生效”的明确日志。
+- **插件 e2e 工具**：新增 `app/testing/harness.py`（`FakeBotHarness`）与 CLI `plugin e2e <name>`。
+- **命令级参数长度**：命令支持 `max_arg_length` 覆盖全局限制。
+- 新增 order_ledger 插件（代打单管理，OFbot 重写），内置并收录插件市场（`general` 分类）；
+  与市场 commission/stats 插件共存时命令自动命名空间化，不会加载失败。
+
+## v1.3.1（2026-09） — 文档与 GitHub 仓库专业化
 
 - README 重构：徽章行、界面截图（登录/仪表盘/连接中心/监听环境/插件市场/流程）、
   mermaid 架构图、TOC、安全提示与贡献/License 区块。

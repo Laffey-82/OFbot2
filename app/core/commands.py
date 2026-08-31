@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import inspect
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -101,6 +102,7 @@ class Command:
     subcommands: list[SubcommandSpec] = field(default_factory=list)
     rules: list[RuleSpec] = field(default_factory=list)
     session: bool = False
+    max_arg_length: int | None = None
 
 
 class CommandRegistry:
@@ -115,6 +117,7 @@ class CommandRegistry:
         self.unknown_command_hint: bool = True
         self.rules: RuleRegistry | None = None
         self.session_manager: Any = None
+        self.plugin_context_resolver: Callable[[str], Any] | None = None
 
     def set_scope_policy(self, policy: Any) -> None:
         self.scope_policy = policy
@@ -124,6 +127,10 @@ class CommandRegistry:
 
     def set_session_manager(self, manager: Any) -> None:
         self.session_manager = manager
+
+    def set_plugin_context_resolver(self, resolver: Callable[[str], Any] | None) -> None:
+        """设置按插件名解析 PluginContext 的回调，用于 handler 的 ctx 注入。"""
+        self.plugin_context_resolver = resolver
 
     def set_command_start(self, prefixes: list[str]) -> None:
         self.command_start = prefixes
@@ -156,6 +163,7 @@ class CommandRegistry:
         subcommands: Iterable[SubcommandSpec] | None = None,
         rules: Iterable[RuleSpec] | None = None,
         session: bool = False,
+        max_arg_length: int | None = None,
     ) -> Callable[[CommandHandler], CommandHandler]:
         def decorator(func: CommandHandler) -> CommandHandler:
             self.register(
@@ -176,6 +184,7 @@ class CommandRegistry:
                 subcommands=self._coerce_subcommands(subcommands),
                 rules=self._coerce_rules(rules),
                 session=session,
+                max_arg_length=max_arg_length,
             )
             return func
 
@@ -234,6 +243,7 @@ class CommandRegistry:
         subcommands: Iterable[SubcommandSpec] | None = None,
         rules: Iterable[RuleSpec] | None = None,
         session: bool = False,
+        max_arg_length: int | None = None,
     ) -> Command:
         command = Command(
             name=name,
@@ -253,6 +263,7 @@ class CommandRegistry:
             subcommands=self._coerce_subcommands(subcommands),
             rules=self._coerce_rules(rules),
             session=session,
+            max_arg_length=max_arg_length,
         )
         self._commands[name] = command
         if plugin_name:
@@ -292,6 +303,9 @@ class CommandRegistry:
                 parts = content.split(maxsplit=1)
                 name = parts[0]
                 args = parts[1] if len(parts) > 1 else ""
+                # 优先精确匹配（支持插件命名空间式的点分命令名，如 order_ledger.分账）
+                if name in self._commands:
+                    return name, args
                 for sep in self.command_sep:
                     if sep and sep in name:
                         head, _, tail = name.partition(sep)
@@ -454,6 +468,24 @@ class CommandRegistry:
                 )
                 await _safe_reply(event, f"【×】{reason}")
                 return command.block
+
+        if (
+            command.max_arg_length is not None
+            and len(args) > command.max_arg_length
+        ):
+            reason = "参数过长"
+            bus.dispatch(
+                CommandRejected(
+                    bot_id=getattr(event, "bot_id", ""),
+                    self_id=getattr(event, "self_id", ""),
+                    user_id=user_id,
+                    group_id=group_id,
+                    command_name=command.name,
+                    reason=reason,
+                )
+            )
+            await _safe_reply(event, f"【×】{reason}")
+            return command.block
             rate_spec = (
                 parse_rate_limit(command.rate_limit)
                 if command.rate_limit
@@ -625,7 +657,16 @@ class CommandRegistry:
                     plugin_name=command.plugin_name,
                 )
             )
-            await command.handler(event, Message(args), context)
+            handler_kwargs: dict[str, Any] = {}
+            if (
+                self.plugin_context_resolver is not None
+                and command.plugin_name
+                and "ctx" in inspect.signature(command.handler).parameters
+            ):
+                plugin_ctx = self.plugin_context_resolver(command.plugin_name)
+                if plugin_ctx is not None:
+                    handler_kwargs["ctx"] = plugin_ctx
+            await command.handler(event, Message(args), context, **handler_kwargs)
             if self.stat_callback:
                 await self.stat_callback(
                     user_id=user_id,

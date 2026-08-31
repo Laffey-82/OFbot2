@@ -59,7 +59,7 @@ def test_command_conflict_detection() -> None:
 
 
 @pytest.mark.asyncio
-async def test_plugin_load_conflict_fails_plugin() -> None:
+async def test_plugin_load_conflict_resolves_with_namespace() -> None:
     import tempfile
 
     from app.adapters.base import BotClient
@@ -132,8 +132,21 @@ async def test_plugin_load_conflict_fails_plugin() -> None:
         loaded = manager.load_enabled(
             {"plugin_a": True, "plugin_b": True}, {}
         )
-        assert [item.name for item in loaded] == ["plugin_a"]
+        # 冲突不再导致加载失败：先加载者保留原名，后加载者命名空间化
+        assert [item.name for item in loaded] == ["plugin_a", "plugin_b"]
         assert manager.loaded["plugin_a"].state == "loaded"
+        assert manager.loaded["plugin_b"].state == "loaded"
+        assert "conflict_cmd" in commands._commands
+        assert commands._commands["conflict_cmd"].plugin_name == "plugin_a"
+        assert "plugin_b.conflict_cmd" in commands._commands
+        assert commands._commands["plugin_b.conflict_cmd"].plugin_name == "plugin_b"
+        rename_log = [
+            item
+            for item in manager.loaded["plugin_b"].conflicts
+            if item.get("command") == "conflict_cmd"
+            and item.get("action") == "rename"
+        ]
+        assert rename_log and rename_log[0]["effective"] == "plugin_b.conflict_cmd"
         try:
             await get_bus().stop(clear=True)
         except Exception:

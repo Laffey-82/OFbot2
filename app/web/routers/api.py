@@ -643,6 +643,21 @@ async def api_plugin_unload(request: Request, name: str) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"plugin not loaded: {name}")
     return {"success": True, "name": name}
 
+@router.get(
+    "/api/v1/plugins/conflicts", dependencies=[Depends(require_api_key)]
+)
+async def api_plugin_conflicts(request: Request) -> dict[str, Any]:
+    manager = getattr(request.app.state, "plugin_manager", None)
+    if manager is None:
+        raise HTTPException(status_code=404, detail="plugin manager unavailable")
+    return {
+        "conflicts": [
+            {"plugin": item["name"], "conflicts": item.get("conflicts", [])}
+            for item in manager.get_loaded_plugins()
+            if item.get("conflicts")
+        ]
+    }
+
 @router.get("/api/v1/backups", dependencies=[Depends(require_api_key)])
 async def api_backups(request: Request, ) -> dict[str, Any]:
     service = request.app.state.services.get("backup")

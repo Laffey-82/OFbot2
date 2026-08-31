@@ -293,6 +293,8 @@ ofbot2 plugin new <name> [--preset] [--with-task] [--with-listener] [--with-web]
                                  # 生成声明式插件（可附带任务/监听/Web/模型示例）
 ofbot2 plugin features <name>      # 查看插件功能清单（命令/任务/监听）
 ofbot2 plugin check <name>         # 静态校验清单、handler 符号与依赖
+ofbot2 plugin conflicts            # 全量扫描命令冲突与解决策略
+ofbot2 plugin e2e <name>           # 运行插件 e2e/ 端到端脚本
 ofbot2 plugin dev <name>           # 开发模式：文件变更自动重载
 ofbot2 plugin test <name>          # 运行插件自带 tests/ 测试
 ofbot2 plugin install <zip>        # 安装打包插件（zip 属于代码执行，确认来源可信）
@@ -308,6 +310,32 @@ ofbot2 capabilities                # 列出框架能力
 ofbot2 workflow list               # 列出流程
 ofbot2 workflow run <id>           # 立即运行流程
 ```
+
+## v1.4 新增能力速览
+
+- **权限角色映射**：manifest 声明
+  `"permission_roles": {"my_plugin.admin": ["admin", "superadmin"]}` 后，该权限只授予
+  指定角色；未声明的权限仍默认授予 `user`（向后兼容）。管理员命令无需在 handler 里自查角色。
+- **指令冲突解决**：多个插件声明同名/同别名命令时不再加载失败。先加载者保留原名，
+  后加载者冲突主命令自动注册为 `<插件名>.<命令>`（如 `/order_ledger.分账`），冲突别名丢弃；
+  `system` 插件命令保留。manifest 可用 `conflicts: {"命令": "rename"|"skip"}` 覆盖。
+  开发期用 `plugin conflicts` 查看全量策略，`plugin check` 预览本插件解决结果。
+- **配置驱动任务**：任务参数支持 `${插件配置点分路径}` 模板，如
+  `"cron": "${tasks.daily_commission.cron}"`；Web 保存配置后自动重载并重注册任务。
+  运行时任务用 `ctx.register_managed_task(...)` 注册后进入 Web「定时任务」页（可启停）。
+- **records 过滤**：`ctx.records.list(record_type, filters={"status": "done",
+  "amount": {"gte": 10}}, sort_by="amount")`；过滤器支持等值 / `gte` / `lte` / `gt` /
+  `lt` / `contains` / `in`。
+- **rest 参数**：命令参数 `{"name": "content", "type": "rest"}` 会把剩余全部参数合并为
+  一个字符串，适合多词自由文本。
+- **ctx 注入**：命令/任务/监听 handler 若声明 `ctx` 参数，框架自动注入 `PluginContext`，
+  不再需要模块级全局变量。
+- **文本转图与群文件上传**：`ctx.text_image(text)` 生成 PNG；
+  `await ctx.bot.upload_group_file(group_id, file_path, name)`（OneBot 适配器实现，
+  其余协议返回 False）。
+- **插件 e2e**：`app.testing.FakeBotHarness` 启动假 Chronocat + 真实机器人子进程，
+  插件可放 `e2e/*.py` 脚本并用 `plugin e2e <name>` 一键运行。
+- **命令级参数长度**：命令声明 `max_arg_length` 可覆盖全局 `security.max_arg_length`。
 
 ## 插件生命周期与热更新
 

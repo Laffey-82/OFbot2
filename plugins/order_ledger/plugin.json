@@ -1,0 +1,335 @@
+{
+  "name": "order_ledger",
+  "api_version": 1,
+  "version": "1.0.0",
+  "description": "订单管理与分账（OFbot 重写）：订单录入/接单/完成/统计/分账/排行/账目/导出与定时任务",
+  "author": "OFbot 2 Contributors",
+  "dependencies": {},
+  "permissions": [
+    "order_ledger.use",
+    "order_ledger.admin"
+  ],
+  "permission_roles": {
+    "order_ledger.admin": ["admin", "superadmin"]
+  },
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "commission_ratio": {
+        "type": "object",
+        "description": "分账比例（总和需为 1，允许 ±0.001 误差）",
+        "properties": {
+          "打手": {"type": "number", "default": 0.69, "minimum": 0, "maximum": 1},
+          "接单人": {"type": "number", "default": 0.26, "minimum": 0, "maximum": 1},
+          "OF": {"type": "number", "default": 0.0, "minimum": 0, "maximum": 1},
+          "应急公款": {"type": "number", "default": 0.05, "minimum": 0, "maximum": 1}
+        },
+        "required": ["打手", "接单人", "OF", "应急公款"]
+      },
+      "order_settings": {
+        "type": "object",
+        "description": "订单时效与展示设置",
+        "properties": {
+          "overdue_days": {"type": "integer", "default": 3, "minimum": 1, "description": "已接单订单超时还原天数"},
+          "no_take_remind_hours": {"type": "integer", "default": 2, "minimum": 1, "description": "未接单提醒阈值（小时）"},
+          "page_size": {"type": "integer", "default": 5, "minimum": 1, "maximum": 20, "description": "查询分页大小"}
+        },
+        "required": ["overdue_days", "no_take_remind_hours", "page_size"]
+      },
+      "notify_groups": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "定时任务通知群（留空 = 自动发给所有开启了本插件功能的群）"
+      },
+      "weekly_start_day": {
+        "type": "integer",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 6,
+        "description": "每周起始日：0=周一 … 5=周六（旧群习惯）6=周日"
+      },
+      "archive": {
+        "type": "object",
+        "description": "月度数据归档",
+        "properties": {
+          "enabled": {"type": "boolean", "default": true},
+          "months": {"type": "integer", "default": 3, "minimum": 1, "description": "归档多少个月之前的已完成订单"}
+        }
+      },
+      "tasks": {
+        "type": "object",
+        "description": "定时任务开关（cron 表达式见 plugin.json 声明；启停也可在 Web 定时任务页操作）",
+        "properties": {
+          "no_take_remind": {
+            "type": "object",
+            "properties": {"enabled": {"type": "boolean", "default": true}}
+          },
+          "daily_commission": {
+            "type": "object",
+            "properties": {
+              "enabled": {"type": "boolean", "default": true},
+              "export": {"type": "boolean", "default": false, "description": "每日分账后自动导出昨日订单并发送文件"}
+            }
+          },
+          "weekly_commission": {
+            "type": "object",
+            "properties": {"enabled": {"type": "boolean", "default": true}}
+          },
+          "monthly_archive": {
+            "type": "object",
+            "properties": {"enabled": {"type": "boolean", "default": true}}
+          }
+        }
+      },
+      "message_constants": {
+        "type": "object",
+        "description": "文案定制（可留空使用默认文案）"
+      }
+    }
+  },
+  "web": false,
+  "models": ["models"],
+  "migrations": [],
+  "entry": "create_plugin",
+  "features": [
+    {
+      "id": "order",
+      "label": "订单管理",
+      "description": "录入、查询、接单、完成、备注、改价等订单操作",
+      "enable_on_default": true,
+      "manage_permission": "order_ledger.admin",
+      "listeners": [
+        {
+          "event": "GroupMessageReceived",
+          "handler": "handlers.on_plain_confirm",
+          "rules": [
+            {"name": "regex", "params": {"pattern": "^(确认|完成)\\s+\\d+$"}}
+          ],
+          "description": "兼容旧版：群内直接发送「确认 5」/「完成 5」（无斜杠）确认完成"
+        }
+      ],
+      "commands": [
+        {
+          "name": "录入",
+          "handler": "handlers.record_order",
+          "permission": "order_ledger.use",
+          "description": "录入新订单",
+          "usage": "/录入 <单子信息> <控分0/1> <控dx0/1> <成绩图0/1> <价格> [备注]",
+          "examples": ["/录入 白系理论 1 0 1 100 官机打"]
+        },
+        {
+          "name": "查询",
+          "handler": "handlers.query_orders",
+          "permission": "order_ledger.use",
+          "description": "查询订单（筛选/时间/页码）",
+          "usage": "/查询 [未接单|已接单|已完成|已取消|我的|急单|进行中|全部] [本日|昨日|本周|YYYYMMDD|范围] [页码]",
+          "examples": ["/查询", "/查询 未接单", "/查询 我的 2"]
+        },
+        {
+          "name": "接单",
+          "handler": "handlers.take_order",
+          "permission": "order_ledger.use",
+          "description": "接取指定序号的订单",
+          "params": [{"name": "seq", "type": "int", "required": true, "description": "订单序号"}],
+          "usage": "/接单 <序号>",
+          "examples": ["/接单 3"]
+        },
+        {
+          "name": "完成",
+          "aliases": ["确认"],
+          "handler": "handlers.complete_order",
+          "permission": "order_ledger.use",
+          "description": "确认订单完成（发单人/打手/管理员）",
+          "params": [{"name": "seq", "type": "int", "required": true, "description": "订单序号"}],
+          "usage": "/完成 <序号>",
+          "examples": ["/完成 3"]
+        },
+        {
+          "name": "取消接单",
+          "handler": "handlers.cancel_take",
+          "permission": "order_ledger.use",
+          "description": "取消已接订单（打手/管理员）",
+          "params": [{"name": "seq", "type": "int", "required": true, "description": "订单序号"}],
+          "usage": "/取消接单 <序号>",
+          "examples": ["/取消接单 3"]
+        },
+        {
+          "name": "我的订单",
+          "handler": "handlers.my_orders",
+          "permission": "order_ledger.use",
+          "description": "查看我接的与发布的订单",
+          "usage": "/我的订单",
+          "examples": ["/我的订单"]
+        },
+        {
+          "name": "备注",
+          "handler": "handlers.remark_order",
+          "permission": "order_ledger.use",
+          "description": "修改订单备注（发单人/管理员）",
+          "params": [
+            {"name": "seq", "type": "int", "required": true, "description": "订单序号"},
+            {"name": "content", "type": "string", "required": true, "description": "备注内容"}
+          ],
+          "usage": "/备注 <序号> <内容>",
+          "examples": ["/备注 3 加急处理"]
+        },
+        {
+          "name": "改价",
+          "handler": "handlers.change_price",
+          "permission": "order_ledger.use",
+          "description": "修改订单价格（发单人/管理员）",
+          "params": [
+            {"name": "seq", "type": "int", "required": true, "description": "订单序号"},
+            {"name": "price", "type": "float", "required": true, "description": "新价格"}
+          ],
+          "usage": "/改价 <序号> <新价格>",
+          "examples": ["/改价 3 120"]
+        },
+        {
+          "name": "删除订单",
+          "handler": "handlers.delete_order",
+          "permission": "order_ledger.admin",
+          "description": "删除指定订单（管理员）",
+          "params": [{"name": "seq", "type": "int", "required": true, "description": "订单序号"}],
+          "usage": "/删除订单 <序号>",
+          "examples": ["/删除订单 3"]
+        },
+        {
+          "name": "标记急单",
+          "handler": "handlers.highlight_order",
+          "permission": "order_ledger.admin",
+          "description": "标记订单为急单（管理员）",
+          "params": [{"name": "seq", "type": "int", "required": true, "description": "订单序号"}],
+          "usage": "/标记急单 <序号>",
+          "examples": ["/标记急单 3"]
+        }
+      ]
+    },
+    {
+      "id": "stats",
+      "label": "统计与分账",
+      "description": "统计、导出、分账、分账历史、排行与个人账目",
+      "enable_on_default": true,
+      "manage_permission": "order_ledger.admin",
+      "commands": [
+        {
+          "name": "统计",
+          "handler": "handlers.stats",
+          "permission": "order_ledger.use",
+          "description": "查看指定时间段的统计",
+          "usage": "/统计 [本日|今日|昨日|本周|全部|YYYYMMDD|YYYYMMDD YYYYMMDD]",
+          "examples": ["/统计", "/统计 昨日"]
+        },
+        {
+          "name": "导出订单",
+          "handler": "handlers.export_orders",
+          "permission": "order_ledger.admin",
+          "description": "导出订单为 Excel（管理员）",
+          "usage": "/导出订单 [本日|今日|昨日|本周|全部|YYYYMMDD|YYYYMMDD YYYYMMDD]",
+          "examples": ["/导出订单 昨日"]
+        },
+        {
+          "name": "分账",
+          "handler": "handlers.run_commission",
+          "permission": "order_ledger.admin",
+          "description": "立即执行分账并保存历史（管理员，默认昨日）",
+          "usage": "/分账 [本日|今日|昨日|本周|YYYYMMDD|YYYYMMDD YYYYMMDD]",
+          "examples": ["/分账", "/分账 昨日"]
+        },
+        {
+          "name": "分账历史",
+          "handler": "handlers.commission_history",
+          "permission": "order_ledger.use",
+          "description": "查询分账历史",
+          "usage": "/分账历史 [本日|今日|昨日|本周|全部|YYYYMMDD|YYYYMMDD YYYYMMDD]",
+          "examples": ["/分账历史 昨日"]
+        },
+        {
+          "name": "排行",
+          "handler": "handlers.rank",
+          "permission": "order_ledger.use",
+          "description": "查询接单/派单/收益排行",
+          "usage": "/排行 [全部|本周|本日] [全部|接单数|派单数|总收益]",
+          "examples": ["/排行", "/排行 本周 总收益"]
+        },
+        {
+          "name": "账目",
+          "aliases": ["个人账目"],
+          "handler": "handlers.account",
+          "permission": "order_ledger.use",
+          "description": "查看个人分账历史",
+          "usage": "/账目 [本日|今日|本周|全部|YYYYMMDD|YYYYMMDD YYYYMMDD]",
+          "examples": ["/账目"]
+        }
+      ]
+    },
+    {
+      "id": "basic",
+      "label": "帮助与状态",
+      "description": "插件帮助与订单状态",
+      "enable_on_default": true,
+      "manage_permission": "order_ledger.admin",
+      "commands": [
+        {
+          "name": "插件说明",
+          "aliases": ["使用说明"],
+          "handler": "handlers.help_cmd",
+          "permission": "order_ledger.use",
+          "description": "查看插件功能说明（含当前分账比例）",
+          "usage": "/插件说明",
+          "examples": ["/插件说明"]
+        },
+        {
+          "name": "订单状态",
+          "aliases": ["插件状态"],
+          "handler": "handlers.status_cmd",
+          "permission": "order_ledger.use",
+          "description": "查看本群订单状态",
+          "usage": "/订单状态",
+          "examples": ["/订单状态"]
+        }
+      ]
+    },
+    {
+      "id": "tasks",
+      "label": "定时任务",
+      "description": "未接单提醒、每日/每周分账总结、月度归档",
+      "enable_on_default": true,
+      "manage_permission": "order_ledger.admin",
+      "tasks": [
+        {
+          "id": "no_take_remind",
+          "kind": "interval",
+          "params": {"seconds": 3600},
+          "handler": "tasks.no_take_remind",
+          "target": "all",
+          "description": "每小时检查超时还原与未接单提醒"
+        },
+        {
+          "id": "daily_commission",
+          "kind": "cron",
+          "params": {"cron": "0 1 * * *"},
+          "handler": "tasks.daily_commission",
+          "target": "all",
+          "description": "每日 01:00 生成昨日分账总结（北京时间）"
+        },
+        {
+          "id": "weekly_commission",
+          "kind": "cron",
+          "params": {"cron": "0 1 * * 6"},
+          "handler": "tasks.weekly_commission",
+          "target": "all",
+          "description": "每周六 01:00 生成上周分账总结（北京时间）"
+        },
+        {
+          "id": "monthly_archive",
+          "kind": "cron",
+          "params": {"cron": "0 2 1 * *"},
+          "handler": "tasks.monthly_archive",
+          "target": "all",
+          "description": "每月 1 日 02:00 归档旧订单（北京时间）"
+        }
+      ]
+    }
+  ]
+}

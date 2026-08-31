@@ -50,13 +50,13 @@ def test_registry_metadata_parsed() -> None:
     assert meta.checksum == "abc"
 
 
-def test_official_registry_has_25_plugins_with_checksum() -> None:
+def test_official_registry_has_26_plugins_with_checksum() -> None:
     repo_root = Path(__file__).resolve().parents[1] / "plugin-repo"
     registry_path = repo_root / "registry.json"
     assert registry_path.exists()
     data = json.loads(registry_path.read_text(encoding="utf-8"))
     plugins = data["plugins"]
-    assert len(plugins) == 25
+    assert len(plugins) == 26
     for entry in plugins:
         assert entry["api_version"] == 1
         assert entry["checksum"]

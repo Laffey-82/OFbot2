@@ -45,9 +45,11 @@ security:
 plugins:
   template: true
   system: true
+  order_ledger: true
 plugin_configs:
   template:
     greeting: 你好
   system:
     groups:
       - "200"
+  order_ledger: {}

@@ -273,6 +273,26 @@ class BotClient:
             self._bump(connection_id or self.active_adapter, "sent")
         return ok
 
+    async def upload_group_file(
+        self,
+        group_id: str,
+        file_path: str,
+        name: str,
+        connection_id: str = "",
+    ) -> bool:
+        """群文件上传；适配器未实现时返回 False。"""
+        connection_id = connection_id or self.resolve_connection(group_id=group_id)
+        adapter = self.adapters.get(connection_id or self.active_adapter)
+        if adapter is None:
+            return False
+        method = getattr(adapter, "upload_group_file", None)
+        if method is None:
+            return False
+        ok = await method(group_id, file_path, name)
+        if ok:
+            self._bump(connection_id or self.active_adapter, "sent")
+        return ok
+
     async def handle_bot_event(self, event: MessageEvent) -> bool:
         trace_id = set_trace_id()
         try:
