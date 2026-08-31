@@ -80,21 +80,7 @@ transport:
     port: 8080
     protocol: onebot
     version: v11
-  onebot:
-    access_token: ''
-    enabled: false
-    host: 127.0.0.1
-    mode: forward
-    path: /onebot/v11/ws
-    port: 9090
   protocol: onebot
-  red:
-    api_base: http://127.0.0.1:16530
-    enabled: false
-    host: 127.0.0.1
-    port: 16530
-    reconnect_interval: 3.0
-    token: ''
 web:
   alert_history_retention_days: 30
   alert_min_interval_seconds: 0

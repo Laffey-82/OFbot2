@@ -20,10 +20,22 @@ _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
-def reset_db_engine() -> None:
+async def reset_db_engine() -> None:
+    """关闭旧引擎（归还/释放连接池）后重置全局状态。
+
+    直接丢弃引用会让 AsyncEngine 连同池内连接被垃圾回收，触发
+    SQLAlchemy "non-checked-in connection" 警告；显式 dispose 可避免。
+    """
     global _engine, _session_factory
+    engine = _engine
     _engine = None
     _session_factory = None
+    if engine is not None:
+        try:
+            await engine.dispose()
+        except Exception:
+            # 引擎已不可用（如测试中的临时数据库）时忽略，仅保证引用被清空。
+            pass
 
 
 def resolve_database_url(url: str) -> str:

@@ -65,7 +65,7 @@ async def test_custom_command_prefix_applies_live() -> None:
     assert await registry.handle_message(event_old) is False
     assert event_old.replies == []
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -84,7 +84,7 @@ async def test_unknown_command_hint_uses_active_prefix() -> None:
     assert event.replies and "未找到命令 #pin" in event.replies[0]
     assert "#ping" in event.replies[0]
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -134,7 +134,7 @@ async def test_declared_params_parsed_and_validated() -> None:
     assert await registry.handle_message(event_missing) is True
     assert event_missing.replies and "缺少必填参数" in event_missing.replies[0]
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -188,7 +188,7 @@ async def test_subcommand_dispatch() -> None:
     assert await registry.handle_message(event3) is True
     assert event3.replies and "未知子命令" in event3.replies[0]
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -207,7 +207,7 @@ async def test_command_registry_runs_handler() -> None:
     assert handled is True
     assert event.replies == ["ok"]
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -236,4 +236,4 @@ async def test_normal_user_can_run_plugin_permission_command() -> None:
     assert await registry.handle_message(event) is True
     assert event.replies == ["pong"]
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()

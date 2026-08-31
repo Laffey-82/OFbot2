@@ -46,7 +46,7 @@ async def test_system_plugin_registers_commands() -> None:
         await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -96,7 +96,7 @@ async def test_help_lists_commands_dynamically() -> None:
         await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -148,7 +148,7 @@ async def test_help_text_follows_custom_prefix() -> None:
         await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -238,7 +238,7 @@ async def test_feature_toggle_command_updates_scope() -> None:
         await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -287,7 +287,7 @@ async def test_about_command_reports_version_and_capabilities() -> None:
         await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -335,7 +335,7 @@ async def test_echo_command_echoes_with_sender() -> None:
         await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -348,7 +348,7 @@ async def test_plugin_context_developer_apis() -> None:
         await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
 
     commands = CommandRegistry()
     permissions = PermissionManager()
@@ -398,4 +398,4 @@ async def test_plugin_context_developer_apis() -> None:
         await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()

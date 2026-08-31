@@ -80,4 +80,4 @@ async def test_onebot_forward_connects_and_sends() -> None:
                 await get_bus().stop(clear=True)
             except Exception:
                 pass
-            reset_bus()
+            await reset_bus()

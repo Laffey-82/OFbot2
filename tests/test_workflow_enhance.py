@@ -17,7 +17,7 @@ from app.services.workflow_templates import (
 async def test_workflow_dry_run_valid_and_invalid() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         workflow_engine = WorkflowEngine()
@@ -52,14 +52,14 @@ async def test_workflow_dry_run_valid_and_invalid() -> None:
         assert any("cron" in error for error in report["errors"])
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
 async def test_workflow_step_timing_recorded() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         workflow_engine = WorkflowEngine()
@@ -79,7 +79,7 @@ async def test_workflow_step_timing_recorded() -> None:
         fetched = await workflow_engine.get_run(run.id)
         assert fetched is not None and fetched.status == "succeeded"
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 def test_workflow_templates_builtin() -> None:
@@ -94,7 +94,7 @@ def test_workflow_templates_builtin() -> None:
 async def test_workflow_template_import() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         workflow_engine = WorkflowEngine()
@@ -105,7 +105,7 @@ async def test_workflow_template_import() -> None:
         assert workflow.name.endswith("（导入）")
         assert workflow.definition["trigger"]["type"] == "message"
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 def test_builtin_templates_have_required_fields() -> None:

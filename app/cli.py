@@ -262,6 +262,13 @@ def _plugin_check(args: argparse.Namespace) -> int:
         for error in errors:
             print(f"[FAIL] {error}")
         return 1
+    from app.services.plugin_installer import audit_plugin_dir
+
+    findings = audit_plugin_dir(plugin_dir)
+    if findings:
+        print("安全审计：")
+        for item in findings:
+            print(f"  [{item['level']}] {item['check']}: {item['detail']}")
     print(f"[PASS] 插件 {args.name} 清单与处理器符号校验通过")
     return 0
 

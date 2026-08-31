@@ -80,7 +80,7 @@ async def test_keyword_rule_matches() -> None:
     assert await registry.handle_message(event) is True
     assert event.replies and event.replies[0] == "ok"
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -92,7 +92,7 @@ async def test_keyword_rule_mismatch_blocks() -> None:
     assert await registry.handle_message(event) is True
     assert not event.replies
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -106,7 +106,7 @@ async def test_to_me_rule_private_and_at() -> None:
     assert await registry.handle_message(event2) is True
     assert event2.replies
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -122,7 +122,7 @@ async def test_in_group_rule() -> None:
     assert await registry.handle_message(bad_event) is True
     assert not bad_event.replies
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -145,4 +145,4 @@ async def test_regex_rule() -> None:
     assert await registry.handle_message(event) is True
     assert event.replies
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()

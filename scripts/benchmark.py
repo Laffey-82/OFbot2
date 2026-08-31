@@ -86,7 +86,7 @@ def build_registry() -> CommandRegistry:
 
 
 class NoopBus:
-    """隔离事件总线：dispatch 直接返回，避免 bubus 库级竞态影响测量。"""
+    """隔离事件总线：dispatch 直接返回，只测量框架自身链路。"""
 
     def dispatch(self, event: Any) -> Any:
         return event
@@ -98,8 +98,7 @@ class NoopBus:
 async def bench_chain(rounds: int, concurrency: int) -> dict[str, float]:
     registry = build_registry()
     event = make_event(registry, "/echo hello echo")
-    # 事件总线（bubus）在大量 pending 事件时存在库级竞态，且 stop() 在
-    # 高积压时会挂起。基准用 NoopBus 隔离，只测量框架自身链路：
+    # 基准用 NoopBus 隔离事件总线开销，只测量框架自身链路：
     # 解析 → 作用域门控 → 规则匹配 → 参数绑定 → handler → 回复。
     # 生产路径适配器收包天然串行，每次消息仅派发 2-4 个事件，不构成瓶颈。
     import app.core.commands as commands_module
@@ -182,8 +181,8 @@ async def run(rounds: int, concurrency: int) -> dict[str, Any]:
         "rounds": rounds,
         "concurrency": concurrency,
         "note": (
-            "事件总线（bubus）在大量 pending 事件时存在库级竞态；"
-            "基准隔离总线只测量框架链路（生产路径适配器收包天然串行）。"
+            "基准隔离事件总线只测量框架链路"
+            "（生产路径适配器收包天然串行，每次消息仅派发 2-4 个事件）。"
         ),
         "chain": chain,
         "split": split,

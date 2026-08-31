@@ -11,6 +11,8 @@
 | `version` | string | 是 | SemVer |
 | `description` / `author` | string | 否 | 展示信息 |
 | `dependencies` | object | 否 | 依赖插件及版本范围 |
+| `sandbox` | string | 否 | 运行模式：`inline`（默认，进程内）或 `process`（子进程隔离） |
+| `sandbox_policy` | object | 否 | 沙箱能力白名单，见「沙箱模式（sandbox）」 |
 | `permissions` | string[] | 否 | 插件声明/消费的权限点 |
 | `config_schema` | object | 否 | JSON Schema，Web 自动生成配置表单 |
 | `web` | bool | 否 | 是否注册 Web 路由 |
@@ -19,6 +21,33 @@
 | `entry` | string | 否 | 入口函数名，默认 `create_plugin` |
 | `features` | object[] | 否 | 功能分组（见下） |
 | `commands` / `tasks` / `listeners` | object[] | 否 | 顶层声明，无 `features` 时回落 `<plugin>.default` |
+
+## 沙箱模式（sandbox）
+
+`sandbox` 默认 `inline`：插件在机器人进程内加载，适合官方/可信插件。
+设置为 `process` 时，插件在**独立子进程**中加载执行，通过 JSON-RPC 与主进程通信：
+
+- 命令、定时任务、监听器仍按 features 声明式注册，handler 由主进程代理到子进程执行；
+- 插件内对框架能力的访问（如 `ctx.records`、`ctx.ai`）反向 RPC 到主进程执行；
+- `sandbox_policy.allow_services` 白名单之外的敏感能力（`files` / `export` /
+  `backup` / `webhook` / `ai`）会被直接拒绝，插件侧收到 `PermissionError`。
+
+```json
+{
+  "name": "my_plugin",
+  "api_version": 1,
+  "sandbox": "process",
+  "sandbox_policy": {
+    "allow_services": ["records", "state_machine", "audit"]
+  },
+  "features": []
+}
+```
+
+限制：
+- `process` 插件不支持 `models`（无法注册 SQLAlchemy 模型）与运行时 `ctx.subscribe`；
+- 子进程崩溃不影响主进程，但插件数据会随子进程重启丢失，请通过框架能力读写；
+- 文件系统/网络仍以操作系统权限为界，严格隔离请配合容器/系统级沙箱部署。
 
 ## features（功能分组）
 

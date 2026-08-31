@@ -23,10 +23,15 @@
 
 ## 自动化审计辅助
 
-安装时框架自动执行静态审计（`PluginInstaller.audit_zip`），输出文件白名单、网络库引用、执行模式、secret 直赋与循环发送风控提示；审计记录保存在 `plugins/.audit/`，评审时可运行：
+安装时框架自动执行静态审计（`PluginInstaller.audit_zip`），输出文件白名单、网络库引用、
+执行模式（`eval/exec/subprocess/ctypes` 等）、文件系统变更（`os.remove/shutil.move` 等）、
+secret 直赋、循环发送风控与依赖白名单（`dependencies` 未知第三方库告警），并给出
+`low/medium/high` 风险分级；`plugin check` 对已安装插件执行同样的目录级静态扫描。
+审计记录保存在 `plugins/.audit/`，评审时可运行：
 
 ```powershell
 py -m ofbot2 plugin audit plugin-repo/packages/<name>.zip
 ```
 
-> 进程沙箱（限制文件系统/网络访问）列为远期选项，当前以静态审计 + 评审清单为主。
+> 第三方插件可选用 `sandbox: "process"` 子进程沙箱（能力白名单），
+> 配合本评审清单与静态审计使用；严格的文件系统/网络隔离建议叠加容器部署。

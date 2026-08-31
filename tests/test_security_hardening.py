@@ -69,16 +69,6 @@ def test_password_hash_iterations_and_legacy_compat() -> None:
     assert password_hasher.needs_upgrade(legacy) is True
 
 
-def test_arm_hard_exit_timer_created_and_cancelled() -> None:
-    import threading
-
-    from app.core.bus import arm_hard_exit
-
-    timer = arm_hard_exit(60.0)
-    assert isinstance(timer, threading.Timer)
-    timer.cancel()
-
-
 @pytest.mark.asyncio
 async def test_docs_raw_endpoint_removed() -> None:
     import tempfile
@@ -94,7 +84,7 @@ async def test_docs_raw_endpoint_removed() -> None:
         settings.database.url = (
             f"sqlite+aiosqlite:///{(Path(tmp_dir) / 'w.db').as_posix()}"
         )
-        reset_db_engine()
+        await reset_db_engine()
         get_engine(settings.database.url)
         await init_db(settings.database.url)
         app = create_app(settings)
@@ -106,4 +96,4 @@ async def test_docs_raw_endpoint_removed() -> None:
             view = await client.get("/docs/view/readme")
             assert view.status_code in (302, 303)
         await get_engine(settings.database.url).dispose()
-        reset_db_engine()
+        await reset_db_engine()

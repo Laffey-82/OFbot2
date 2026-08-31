@@ -25,7 +25,7 @@ async def test_execute_task_finds_record_by_task_id() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         db_path = Path(tmp_dir) / "tasks.db"
         url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         async with session_factory()() as session:
@@ -57,7 +57,7 @@ async def test_execute_task_finds_record_by_task_id() -> None:
             assert run is not None
             assert run.status == "succeeded"
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -71,11 +71,11 @@ async def test_task_auto_disabled_after_consecutive_failures() -> None:
         await get_bus().stop(clear=True)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         db_path = Path(tmp_dir) / "tasks.db"
         url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
 
@@ -126,6 +126,6 @@ async def test_task_auto_disabled_after_consecutive_failures() -> None:
         assert received and received[0].task_id == "flaky"
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         await get_bus().stop(clear=True)
-        reset_bus()
+        await reset_bus()

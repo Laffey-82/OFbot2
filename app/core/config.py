@@ -368,6 +368,11 @@ def save_settings(settings: Settings, path: str | Path | None = None) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     data = settings.model_dump(mode="json")
     data.pop("config_path", None)
+    transport = data.get("transport", {})
+    if transport.get("connections"):
+        # connections 已是唯一事实来源：旧 red/onebot 键仅用于首次播种，保存时移除。
+        transport.pop("red", None)
+        transport.pop("onebot", None)
     tmp.write_text(
         yaml.safe_dump(data, allow_unicode=True, indent=4),
         encoding="utf-8",

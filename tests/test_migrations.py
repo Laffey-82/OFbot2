@@ -38,7 +38,7 @@ async def test_migration_runner_persists_and_skips() -> None:
             encoding="utf-8",
         )
         url = f"sqlite+aiosqlite:///{(Path(tmp_dir) / 'm.db').as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
 
@@ -57,7 +57,7 @@ async def test_migration_runner_persists_and_skips() -> None:
         assert not marker.exists()
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 async def test_migration_runner_failure_not_recorded() -> None:
@@ -79,7 +79,7 @@ async def test_migration_runner_failure_not_recorded() -> None:
             encoding="utf-8",
         )
         url = f"sqlite+aiosqlite:///{(Path(tmp_dir) / 'm.db').as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
 
@@ -91,4 +91,4 @@ async def test_migration_runner_failure_not_recorded() -> None:
         assert str(path) not in rows
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()

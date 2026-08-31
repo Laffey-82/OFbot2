@@ -21,7 +21,7 @@ async def test_roles_web_flow() -> None:
         settings.database.url = (
             f"sqlite+aiosqlite:///{(Path(tmp_dir) / 'w.db').as_posix()}"
         )
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -55,7 +55,7 @@ async def test_roles_web_flow() -> None:
             assert removed.status_code == 303
             assert "10001" not in settings.runtime.user_roles
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -67,7 +67,7 @@ async def test_plugin_state_roundtrip() -> None:
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{(Path(tmp_dir) / 's.db').as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         await save_plugin_state("demo", "loaded", version="1.0.0")
@@ -76,7 +76,7 @@ async def test_plugin_state_roundtrip() -> None:
         assert states["demo"]["state"] == "error"
         assert states["demo"]["error"] == "boom"
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 def test_capability_setup_registers_builtins() -> None:
@@ -138,4 +138,4 @@ async def test_example_ai_plugin_declarative() -> None:
         await get_bus().stop(clear=True)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()

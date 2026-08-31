@@ -70,7 +70,7 @@ async def test_doctor_reports_disk_and_plugins() -> None:
         settings = load_settings()
         settings.config_path = str(root / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{root.as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
 
@@ -95,4 +95,4 @@ async def test_doctor_reports_disk_and_plugins() -> None:
         assert plugins.get("href") == "/plugins"
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()

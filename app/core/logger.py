@@ -53,18 +53,28 @@ def _ensure_log_dir() -> Path:
 def prune_log_files(
     retention_days: int = 14, max_files: int = 60
 ) -> int:
-    """清理 logs/ 下进程级日志（ofbot2-*.log），返回删除数量。
+    """清理 logs/ 下的日志文件，返回删除数量。
 
+    覆盖进程级日志（ofbot2-*.log 及轮转后缀 .log.1~.log.N）与历史遗留格式
+    （bot*.log、web-*.log、diag_fh.log、ofbot2.log）。
     规则：超过保留天数的删除；若仍超出文件数上限，按修改时间删除最旧的。
     """
     from datetime import UTC, datetime, timedelta
 
     log_dir = _ensure_log_dir()
-    files = [
-        path
-        for path in log_dir.glob("ofbot2-*.log")
-        if path.is_file()
-    ]
+    files: list[Path] = []
+    seen: set[Path] = set()
+    for pattern in (
+        "ofbot2-*.log*",
+        "ofbot2.log*",
+        "bot*.log*",
+        "web-*.log*",
+        "diag_fh.log*",
+    ):
+        for path in log_dir.glob(pattern):
+            if path.is_file() and path not in seen:
+                seen.add(path)
+                files.append(path)
     if not files:
         return 0
     files.sort(key=lambda path: path.stat().st_mtime, reverse=True)
@@ -90,7 +100,7 @@ def prune_log_files(
     return removed
 
 
-def setup_logging(level: str = "INFO", *, file_level: str = "DEBUG") -> None:
+def setup_logging(level: str = "INFO", *, file_level: str = "INFO") -> None:
     global _configured
     if _configured:
         return

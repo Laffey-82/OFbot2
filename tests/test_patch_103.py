@@ -16,7 +16,7 @@ from app.web.app import create_app, ensure_default_admin
 async def test_workflow_execute_skips_when_disabled() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{(Path(tmp_dir) / 'wf.db').as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         workflow_engine = WorkflowEngine()
@@ -44,7 +44,7 @@ async def test_workflow_execute_skips_when_disabled() -> None:
         assert run.status == "skipped"
         assert run.result.get("reason") == "workflow disabled"
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 async def _login_and_get_csrf(client, base_url: str) -> str:
@@ -75,7 +75,7 @@ async def test_web_workflow_create_schedule_registers_cron() -> None:
         settings.database.url = (
             f"sqlite+aiosqlite:///{(Path(tmp_dir) / 'w.db').as_posix()}"
         )
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -107,7 +107,7 @@ async def test_web_workflow_create_schedule_registers_cron() -> None:
         assert scheduler.scheduler.get_job(f"workflow-{workflows[0].id}") is not None
         scheduler.shutdown(wait=False)
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -122,7 +122,7 @@ async def test_web_workflow_enable_registers_cron() -> None:
         settings.database.url = (
             f"sqlite+aiosqlite:///{(Path(tmp_dir) / 'w.db').as_posix()}"
         )
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -161,7 +161,7 @@ async def test_web_workflow_enable_registers_cron() -> None:
         assert scheduler.scheduler.get_job(f"workflow-{created.id}") is not None
         scheduler.shutdown(wait=False)
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 def test_apply_security_settings_rebuilds_policy() -> None:

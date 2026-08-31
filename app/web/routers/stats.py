@@ -94,43 +94,49 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                         .order_by(func.date(CommandStat.timestamp))
                     )
                 ).all()
+                hourly_rows: list[Any] = []
+                if day:
+                    try:
+                        day_dt = datetime.fromisoformat(day)
+                    except ValueError:
+                        day_dt = None
+                    if day_dt is not None:
+                        hour_start = day_dt.replace(
+                            hour=0, minute=0, second=0, microsecond=0
+                        )
+                        hour_end = hour_start + timedelta(days=1)
+                        hourly_rows = (
+                            await session.execute(
+                                select(
+                                    func.strftime(
+                                        "%H", CommandStat.timestamp
+                                    ).label("hour"),
+                                    func.count().label("cnt"),
+                                )
+                                .where(
+                                    CommandStat.command_name == command,
+                                    CommandStat.timestamp >= hour_start,
+                                    CommandStat.timestamp < hour_end,
+                                )
+                                .group_by(
+                                    func.strftime(
+                                        "%H", CommandStat.timestamp
+                                    )
+                                )
+                                .order_by(
+                                    func.strftime(
+                                        "%H", CommandStat.timestamp
+                                    )
+                                )
+                            )
+                        ).all()
             command_trend = [
                 {"date": str(day), "count": cnt} for day, cnt in daily_rows
             ]
-            hourly: list[dict[str, Any]] = []
-            if day:
-                try:
-                    day_dt = datetime.fromisoformat(day)
-                except ValueError:
-                    day_dt = None
-                if day_dt is not None:
-                    hour_start = day_dt.replace(
-                        hour=0, minute=0, second=0, microsecond=0
-                    )
-                    hour_end = hour_start + timedelta(days=1)
-                    hourly_rows = (
-                        await session.execute(
-                            select(
-                                func.strftime("%H", CommandStat.timestamp).label(
-                                    "hour"
-                                ),
-                                func.count().label("cnt"),
-                            )
-                            .where(
-                                CommandStat.command_name == command,
-                                CommandStat.timestamp >= hour_start,
-                                CommandStat.timestamp < hour_end,
-                            )
-                            .group_by(func.strftime("%H", CommandStat.timestamp))
-                            .order_by(
-                                func.strftime("%H", CommandStat.timestamp)
-                            )
-                        )
-                    ).all()
-                    hourly = [
-                        {"hour": int(h or 0), "count": cnt}
-                        for h, cnt in hourly_rows
-                    ]
+            hourly = [
+                {"hour": int(h or 0), "count": cnt}
+                for h, cnt in hourly_rows
+            ]
             return templates.TemplateResponse(
                 request,
                 "stats_command.html",

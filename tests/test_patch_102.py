@@ -138,7 +138,7 @@ async def test_plugin_load_conflict_fails_plugin() -> None:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
 
 
 @pytest.mark.asyncio

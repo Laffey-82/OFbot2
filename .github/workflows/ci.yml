@@ -53,3 +53,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install pip-audit
           pip-audit -r requirements.txt
+  e2e-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest pytest-asyncio pytest-playwright playwright
+      - name: Install chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Web E2E
+        run: python -m pytest tests/e2e -m e2e -q

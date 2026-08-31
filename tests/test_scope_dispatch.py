@@ -74,7 +74,7 @@ async def test_feature_disabled_denies_with_hint() -> None:
     assert await registry.handle_message(event) is True
     assert event.replies and "未开启" in event.replies[0]
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -86,7 +86,7 @@ async def test_feature_disabled_silent_deny() -> None:
     assert await registry.handle_message(event) is True
     assert event.replies == []
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -97,7 +97,7 @@ async def test_unknown_command_suggestion() -> None:
     assert event.replies and "是否想用" in event.replies[0]
     assert "/greet" in event.replies[0]
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -109,7 +109,7 @@ async def test_scope_permission_override() -> None:
     assert await registry.handle_message(event) is True
     assert event.replies and "权限不足" in event.replies[0]
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -119,7 +119,7 @@ async def test_at_self_trigger() -> None:
     assert await registry.handle_message(event) is True
     assert event.replies == ["ok"]
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -165,4 +165,4 @@ async def test_help_detail_shows_usage_and_examples() -> None:
     assert "示例：" in event.replies[0]
     await manager.unload_plugin("system")
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()

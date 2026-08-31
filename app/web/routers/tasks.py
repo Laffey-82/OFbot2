@@ -83,14 +83,14 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             runs_select = select(TaskRun)
             if runs_where:
                 runs_select = runs_select.where(*runs_where)
-        runs = (
-            await session.scalars(
-                runs_select
-                .order_by(TaskRun.created_at.desc())
-                .offset((runs_page - 1) * runs_per_page)
-                .limit(runs_per_page)
-            )
-        ).all()
+            runs = (
+                await session.scalars(
+                    runs_select
+                    .order_by(TaskRun.created_at.desc())
+                    .offset((runs_page - 1) * runs_per_page)
+                    .limit(runs_per_page)
+                )
+            ).all()
         manager = getattr(app.state, "plugin_manager", None)
         plugin_tasks = (
             manager.task_registry.list()

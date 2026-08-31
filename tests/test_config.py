@@ -58,5 +58,37 @@ def test_load_settings_creates_defaults_for_missing_path() -> None:
         assert settings.basic.log_retention_days == 14
         save_settings(settings)
         assert path.exists()
+
+
+def test_save_settings_drops_legacy_transport_keys_when_connections_exist() -> None:
+    """connections 非空时保存不再写回旧 transport.red/onebot 播种键。"""
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+        path = Path(tmp_dir) / "config.yaml"
+        path.write_text(
+            yaml.safe_dump(
+                {
+                    "transport": {
+                        "red": {"enabled": True, "token": "x"},
+                        "onebot": {"enabled": True},
+                        "connections": [
+                            {
+                                "id": "napcat_main",
+                                "protocol": "onebot",
+                                "version": "v11",
+                                "mode": "reverse_ws",
+                            }
+                        ],
+                    }
+                },
+                allow_unicode=True,
+            ),
+            encoding="utf-8",
+        )
+        settings = load_settings(path)
+        save_settings(settings)
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        assert "connections" in data["transport"]
+        assert "red" not in data["transport"]
+        assert "onebot" not in data["transport"]
         reloaded = load_settings(path)
         assert reloaded.basic.command_start == settings.basic.command_start

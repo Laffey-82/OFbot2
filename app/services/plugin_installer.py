@@ -29,9 +29,26 @@ _EXEC_PATTERNS = (
     "exec(",
     "subprocess",
     "os.system",
+    "os.popen",
+    "os.spawn",
+    "pty.spawn",
+    "ctypes",
     "shutil.rmtree",
     "__import__",
+    "compile(",
+    "marshal.loads",
     "pickle.loads",
+    "yaml.load(",
+)
+_FS_MUTATION_PATTERNS = (
+    "os.remove",
+    "os.unlink",
+    "os.rmdir",
+    "os.rename",
+    "shutil.move",
+    ".write_text(",
+    ".write_bytes(",
+    ".unlink(",
 )
 _SECRET_PATTERNS = ("api_key", "access_token", "secret", "password")
 _SEND_METHODS = ("send_group_message", "send_private_message", "send_message")
@@ -57,6 +74,36 @@ _ALLOWED_EXTENSIONS = {
     ".ttf",
     ".csv",
 }
+_DEPENDENCY_ALLOWLIST = {
+    "app",
+    "pydantic",
+    "httpx",
+    "yaml",
+    "jinja2",
+    "sqlalchemy",
+    "apscheduler",
+    "openpyxl",
+    "docx",
+    "qrcode",
+    "PIL",
+    "asyncio",
+    "datetime",
+    "json",
+    "re",
+    "pathlib",
+    "typing",
+    "collections",
+    "time",
+    "random",
+    "math",
+    "uuid",
+    "base64",
+    "hashlib",
+    "hmac",
+    "logging",
+    "os",
+    "sys",
+}
 
 
 def validate_plugin_name(name: str) -> str:
@@ -69,18 +116,83 @@ def validate_plugin_name(name: str) -> str:
     return name
 
 
+def audit_plugin_dir(plugin_dir: str | Path) -> list[dict[str, Any]]:
+    """静态扫描插件目录 .py 源码中的高危 API 与敏感模式（供 plugin check 使用）。"""
+    plugin_dir = Path(plugin_dir)
+    checks: list[dict[str, Any]] = []
+    for path in sorted(plugin_dir.rglob("*.py")):
+        if ".audit" in path.parts or "__pycache__" in path.parts:
+            continue
+        try:
+            source = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            logger.warning("读取插件源码失败 %s：%s", path, exc)
+            continue
+        lowered = source.lower()
+        rel = str(path.relative_to(plugin_dir))
+        for module in _NETWORK_IMPORTS:
+            if re.search(
+                rf"^\s*(import|from)\s+{re.escape(module)}",
+                source,
+                re.MULTILINE,
+            ):
+                checks.append(
+                    {
+                        "level": "info",
+                        "check": "network.access",
+                        "detail": f"{rel} 引用了网络库 {module}",
+                    }
+                )
+        for pattern in _EXEC_PATTERNS:
+            if pattern in lowered:
+                checks.append(
+                    {
+                        "level": "warn",
+                        "check": "code.execution",
+                        "detail": f"{rel} 包含 {pattern}",
+                    }
+                )
+        for pattern in _FS_MUTATION_PATTERNS:
+            if pattern in lowered:
+                checks.append(
+                    {
+                        "level": "warn",
+                        "check": "filesystem.mutation",
+                        "detail": f"{rel} 包含 {pattern}",
+                    }
+                )
+        for pattern in _SECRET_PATTERNS:
+            if pattern in lowered and re.search(
+                rf"\b{re.escape(pattern)}\b\s*[=:]\s*['\"\d{{]",
+                source,
+            ):
+                checks.append(
+                    {
+                        "level": "info",
+                        "check": "secret.handling",
+                        "detail": (
+                            f"{rel} 直接赋值 {pattern}，"
+                            "建议改用 config_schema 配置"
+                        ),
+                    }
+                )
+    return checks
+
+
 class PluginInstaller:
     def __init__(self, plugins_dir: str | Path) -> None:
         self.plugins_dir = Path(plugins_dir)
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
 
     def audit_zip(self, archive_path: str | Path) -> dict[str, Any]:
-        """安装前安全审计：文件白名单、网络访问、执行、secret、发送频率。"""
+        """安装前安全审计：文件白名单、网络访问、执行、文件变更、secret、
+        发送频率与依赖白名单。"""
         archive_path = Path(archive_path)
         checks: list[dict[str, Any]] = []
         file_count = 0
         total_size = 0
         py_sources: list[str] = []
+        manifest_data: dict[str, Any] | None = None
         with zipfile.ZipFile(archive_path) as archive:
             for info in archive.infolist():
                 if info.is_dir():
@@ -88,6 +200,13 @@ class PluginInstaller:
                 file_count += 1
                 total_size += info.file_size
                 name = info.filename.rsplit("/", 1)[-1]
+                if name == "plugin.json":
+                    try:
+                        manifest_data = json.loads(
+                            archive.read(info.filename).decode("utf-8")
+                        )
+                    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+                        manifest_data = None
                 suffix = Path(name).suffix.lower()
                 if suffix not in _ALLOWED_EXTENSIONS:
                     checks.append(
@@ -144,6 +263,15 @@ class PluginInstaller:
                                 "detail": f"{name} 包含 {pattern}",
                             }
                         )
+                for pattern in _FS_MUTATION_PATTERNS:
+                    if pattern in lowered:
+                        checks.append(
+                            {
+                                "level": "warn",
+                                "check": "filesystem.mutation",
+                                "detail": f"{name} 包含 {pattern}",
+                            }
+                        )
                 for pattern in _SECRET_PATTERNS:
                     if pattern in lowered and re.search(
                         rf"\b{re.escape(pattern)}\b\s*[=:]\s*['\"\d{{]",
@@ -165,11 +293,28 @@ class PluginInstaller:
                                 "detail": f"{name} 存在循环发送且未发现 sleep，注意风控",
                             }
                         )
+        dependencies = manifest_data.get("dependencies", []) if manifest_data else []
+        if isinstance(dependencies, list):
+            for dep in dependencies:
+                dep_name = str(dep).split(".", 1)[0]
+                if dep_name not in _DEPENDENCY_ALLOWLIST:
+                    checks.append(
+                        {
+                            "level": "warn",
+                            "check": "dependency.unknown",
+                            "detail": f"依赖 {dep} 不在白名单，请确认来源可信",
+                        }
+                    )
         warnings = sum(1 for item in checks if item["level"] == "warn")
         infos = sum(1 for item in checks if item["level"] == "info")
+        high_risk = any(
+            item["check"] in {"code.execution", "filesystem.mutation"}
+            for item in checks
+        )
         return {
             "file_count": file_count,
             "total_size": total_size,
+            "risk": "high" if high_risk else ("medium" if warnings else "low"),
             "warnings": warnings,
             "infos": infos,
             "checks": checks[:50],

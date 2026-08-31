@@ -12,7 +12,7 @@ from types import ModuleType
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from app.core.bus import get_bus
 from app.core.cache import TTLCache
@@ -84,6 +84,8 @@ class PluginManifest(BaseModel):
     version: str = "0.1.0"
     description: str = ""
     author: str = ""
+    sandbox: str = "inline"  # inline | process（子进程隔离 + 能力白名单）
+    sandbox_policy: dict[str, Any] = Field(default_factory=dict)
     dependencies: dict[str, str] = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
     config_schema: dict[str, Any] = Field(default_factory=dict)
@@ -95,6 +97,14 @@ class PluginManifest(BaseModel):
     commands: list[DeclaredCommand] = Field(default_factory=list)
     tasks: list[DeclaredTask] = Field(default_factory=list)
     listeners: list[DeclaredListener] = Field(default_factory=list)
+
+    @field_validator("sandbox")
+    @classmethod
+    def _validate_sandbox(cls, value: Any) -> str:
+        value = str(value or "inline").strip()
+        if value not in {"inline", "process"}:
+            raise ValueError("sandbox 仅支持 inline 或 process")
+        return value
 
     def effective_features(self) -> list[FeatureSpec]:
         """无 features 时，顶层声明回落 <plugin>.default。"""
@@ -453,6 +463,9 @@ class PluginManager:
             self.permissions.register_permission(permission)
             self.permissions.grant_role_permission("user", permission)
 
+        if manifest.sandbox == "process":
+            return self._load_plugin_process(name, path, manifest, config)
+
         module_name = f"plugins.{name}"
         spec = importlib.util.spec_from_file_location(module_name, path / "__init__.py")
         if spec is None or spec.loader is None:
@@ -471,9 +484,31 @@ class PluginManager:
         instance.name = name
         instance.version = manifest.version
 
-        ctx = PluginContext(
+        ctx = self._build_context(name, config or {})
+        for migration in manifest.migrations:
+            ctx.register_migrations(str(path / migration))
+        instance.setup(ctx)
+        loaded = LoadedPlugin(
             name=name,
-            config=config or {},
+            path=path,
+            manifest=manifest,
+            module=module,
+            instance=instance,
+            context=ctx,
+        )
+        self.loaded[name] = loaded
+        loaded.features = self._register_declarative(loaded)
+        self.bus().dispatch(
+            PluginLoaded(plugin_name=name, version=manifest.version)
+        )
+        logger.info("plugin loaded: %s %s", name, manifest.version)
+        return loaded
+
+    def _build_context(self, name: str, config: dict[str, Any]) -> PluginContext:
+        """构建父进程侧 PluginContext（inline 与 process 模式共用）。"""
+        return PluginContext(
+            name=name,
+            config=config,
             bus=get_bus(),
             commands=self.commands,
             db=self.db,
@@ -495,14 +530,42 @@ class PluginManager:
             rules=self.rules,
             session=self.session,
         )
-        for migration in manifest.migrations:
-            ctx.register_migrations(str(path / migration))
-        instance.setup(ctx)
+
+    def _load_plugin_process(
+        self,
+        name: str,
+        path: Path,
+        manifest: PluginManifest,
+        config: dict[str, Any] | None,
+    ) -> LoadedPlugin:
+        """process 模式：父进程只持有模块代理与 IPC 桥，插件在子进程运行。"""
+        from app.core.plugin_ipc import (
+            PluginProcessBridge,
+            RemotePluginInstance,
+            RemotePluginModule,
+        )
+
+        if manifest.models:
+            raise ValueError(
+                "process 沙箱插件不支持注册 SQLAlchemy 模型（models 字段）"
+            )
+        ctx = self._build_context(name, config or {})
+        bridge = PluginProcessBridge(
+            name=name,
+            plugin_dir=path,
+            manifest=manifest,
+            config=config or {},
+            context=ctx,
+        )
+        module: Any = RemotePluginModule(bridge)
+        module_name = f"plugins.{name}"
+        sys.modules[module_name] = module
+        instance = RemotePluginInstance(bridge)
         loaded = LoadedPlugin(
             name=name,
             path=path,
             manifest=manifest,
-            module=module,
+            module=module,  # type: ignore[arg-type]
             instance=instance,
             context=ctx,
         )
@@ -511,7 +574,7 @@ class PluginManager:
         self.bus().dispatch(
             PluginLoaded(plugin_name=name, version=manifest.version)
         )
-        logger.info("plugin loaded: %s %s", name, manifest.version)
+        logger.info("plugin loaded (sandbox=process): %s %s", name, manifest.version)
         return loaded
 
     def _register_declarative(self, loaded: LoadedPlugin) -> dict[str, FeatureSpec]:

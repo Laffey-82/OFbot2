@@ -37,7 +37,7 @@ async def test_prune_audit_logs() -> None:
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         async with session_factory()() as session:
@@ -66,7 +66,7 @@ async def test_prune_audit_logs() -> None:
         assert await prune_audit_logs(retention_days=0) == 0
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -88,7 +88,7 @@ async def test_auto_reenable_disabled_with_cooldown() -> None:
         await get_bus().stop(clear=True)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
     received: list[Any] = []
     registry = EventSubscriptionRegistry()
     registry.subscribe(
@@ -104,7 +104,7 @@ async def test_auto_reenable_disabled_with_cooldown() -> None:
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         old = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
@@ -187,9 +187,9 @@ async def test_auto_reenable_disabled_with_cooldown() -> None:
         )
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         await get_bus().stop(clear=True)
-        reset_bus()
+        await reset_bus()
 
 
 def test_build_ai_service_defaults_to_mock() -> None:

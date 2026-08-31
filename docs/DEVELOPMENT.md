@@ -314,6 +314,9 @@ ofbot2 workflow run <id>           # 立即运行流程
 - 插件状态：`disabled / loaded / error / unloaded`。安装后默认禁用，需在 Web「插件」页或 `plugin list` 后启用。
 - `reload` / `unload` 会清理该插件的命令、事件订阅、定时任务与 Web 路由引用；`PluginLoaded / PluginUnloaded / PluginReloaded / PluginFailed` 事件会广播，其他插件可订阅联动。
 - **模型表结构不支持热更新**：插件注册了新模型或改动 `models.py` 后，必须重启服务（`create_all` 建表）并按需执行迁移。
+- **process 沙箱模式**：`plugin.json` 声明 `"sandbox": "process"` 后插件在独立子进程运行，
+  命令/任务/监听仍按声明式注册，能力访问经白名单（`sandbox_policy.allow_services`）代理；
+  该模式不支持 `models` 与运行时 `ctx.subscribe`，详见 [PLUGIN_MANIFEST.md](PLUGIN_MANIFEST.md)。
 - 插件配置通过 `plugin.json` 的 `config_schema` 强类型校验，Web「插件」页可自动生成表单。
 
 ## 功能清单声明规范（features）

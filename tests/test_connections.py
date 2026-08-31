@@ -215,7 +215,7 @@ async def test_onebot_v11_notice_dispatch() -> None:
         for event in captured
     )
     await get_bus().stop(clear=True)
-    reset_bus()
+    await reset_bus()
 
 
 def test_segment_factories_and_message_concat() -> None:

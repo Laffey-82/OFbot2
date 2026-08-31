@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.3.0（2026-09）— 插件子进程沙箱
+
+- `plugin.json` 新增 `sandbox: "inline" | "process"`（默认 inline）与
+  `sandbox_policy.allow_services` 能力白名单。
+- process 模式：插件在独立子进程加载执行，命令/任务/监听仍按声明式注册，
+  能力访问经 JSON-RPC 代理并受白名单约束（`files/export/backup/webhook/ai`
+  默认拒绝）；子进程崩溃不影响主进程。
+- 限制：process 插件不支持 `models` 与运行时 `ctx.subscribe`（文档已同步）。
+
+## v1.2.0（2026-09）— 插件审计加固 + Web E2E
+
+- 插件安装审计扩展：文件系统变更扫描（`os.remove/shutil.move` 等）、
+  `ctypes/os.popen/pty.spawn/marshal` 等高危执行模式、依赖白名单（未知第三方库告警）、
+  `low/medium/high` 风险分级；`plugin check` 对已安装插件执行同源目录级静态扫描。
+- 新增 Playwright 浏览器端 E2E（`tests/e2e`）：登录 → 仪表盘 → 连接中心 →
+  监听环境 → 插件 → 任务 → 流程，默认被 `-m "not e2e"` 跳过，CI 独立 job 运行。
+
+## v1.1.0（2026-09）— 自研事件总线替换 bubus
+
+- 用轻量异步 pub/sub 替换 bubus：`isinstance` 类型匹配（父类订阅兼容）、
+  每 handler 独立任务、异常隔离、`stop(timeout)` 优雅排空 + 超时取消。
+- 移除 `arm_hard_exit()` 与 `os._exit` 强制退出兜底；bubus 依赖从 requirements/pyproject 移除。
+- `BaseEvent` 改为继承 pydantic `BaseModel`，插件与订阅代码零改动。
+- 新增高负载测试：数千事件 + 慢 handler 下关闭不阻塞、任务不泄漏。
+
+## v1.0.8（2026-09）— 稳定与运维卫生
+
+- 数据库引擎/事件总线重置显式释放：`reset_db_engine()` 异步 `dispose()`、
+  `reset_bus()` 先停旧实例再重建，消除 GC 连接警告与 bubus 同名告警（测试警告清零）。
+- 修复真实连接泄漏：`/tasks` 与 `/stats` 页面在 `async with` 块外使用 session，
+  每次访问泄漏一条数据库连接（SQLAlchemy 池耗尽风险）。
+- 日志轮转清理覆盖 `ofbot2-*.log*` 轮转后缀与历史遗留格式
+  （`bot*.log*`、`web-*.log*`、`diag_fh.log*`），文件日志默认级别 DEBUG → INFO。
+- `transport.connections` 收敛为唯一事实来源：保存配置时不再写回旧 `red/onebot`
+  播种键，`config.example.yaml` 同步更新。
+- 新增 `docs/ROADMAP.md`，GOALS 测试数更新为 271。
+
 ## v1.0.7（2026-08）— 审查修复（API 鉴权收紧 / 事件入口校验）
 
 - `/api/v1/*` 默认不再裸奔：未配置 `web.api_keys` 时改为要求后台管理员登录会话；配置后维持 `X-API-Key` 鉴权（恒定时间比较）。

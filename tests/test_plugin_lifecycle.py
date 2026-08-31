@@ -59,4 +59,4 @@ async def test_plugin_load_and_unload_cleans_commands() -> None:
         await asyncio.wait_for(get_bus().stop(clear=True), timeout=1)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()

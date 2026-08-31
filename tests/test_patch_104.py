@@ -102,7 +102,7 @@ async def test_qq_official_heartbeat_single_task() -> None:
         await get_bus().stop(clear=True)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
 
 
 def test_file_service_resolve_rejects_traversal() -> None:
@@ -130,7 +130,7 @@ async def test_scopes_add_validation() -> None:
         settings.database.url = (
             f"sqlite+aiosqlite:///{(Path(tmp_dir) / 'w.db').as_posix()}"
         )
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -163,4 +163,4 @@ async def test_scopes_add_validation() -> None:
             assert good.status_code == 303
             assert "group:200" in settings.runtime.scopes
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()

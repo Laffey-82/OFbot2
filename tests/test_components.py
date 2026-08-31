@@ -105,7 +105,7 @@ async def test_openai_provider_chat() -> None:
 async def test_record_service_with_schema() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         schemas = SchemaRegistry()
@@ -121,19 +121,19 @@ async def test_record_service_with_schema() -> None:
         records = await service.list("note")
         assert len(records) == 1
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         try:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
 
 
 @pytest.mark.asyncio
 async def test_workflow_engine_executes_actions() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         workflow = WorkflowEngine()
@@ -151,14 +151,14 @@ async def test_workflow_engine_executes_actions() -> None:
         assert run.status == "succeeded"
         assert calls == ["hi"]
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
 async def test_workflow_engine_condition() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         workflow = WorkflowEngine()
@@ -214,14 +214,14 @@ async def test_workflow_engine_condition() -> None:
         assert calls == ["hi", "hi"]
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
 async def test_workflow_engine_trigger() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         workflow = WorkflowEngine()
@@ -241,7 +241,7 @@ async def test_workflow_engine_trigger() -> None:
         assert len(runs) == 1
         assert runs[0].status == "succeeded"
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -253,7 +253,7 @@ async def test_workflow_failure_dispatches_event() -> None:
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         workflow = WorkflowEngine()
@@ -273,9 +273,9 @@ async def test_workflow_failure_dispatches_event() -> None:
         assert received and received[0].workflow_name == "bad-flow"
         assert received[0].run_id == run.id
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         await get_bus().stop(clear=True)
-        reset_bus()
+        await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -289,10 +289,10 @@ async def test_workflow_auto_disabled_after_consecutive_failures() -> None:
         await get_bus().stop(clear=True)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         workflow = WorkflowEngine(auto_disable_after_failures=2)
@@ -338,6 +338,6 @@ async def test_workflow_auto_disabled_after_consecutive_failures() -> None:
         assert runs == []
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         await get_bus().stop(clear=True)
-        reset_bus()
+        await reset_bus()

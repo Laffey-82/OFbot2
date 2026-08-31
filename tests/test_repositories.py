@@ -16,7 +16,7 @@ async def test_unit_of_work_commits() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         db_path = Path(tmp_dir) / "uow.db"
         url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
 
@@ -29,5 +29,5 @@ async def test_unit_of_work_commits() -> None:
             assert user.nickname == "tester"
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 

@@ -104,4 +104,4 @@ async def test_handle_bot_event_sets_trace_and_command_context() -> None:
     finally:
         command_registry.handle_message = original
         await get_bus().stop(clear=True)
-        reset_bus()
+        await reset_bus()

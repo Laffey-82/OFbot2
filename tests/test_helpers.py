@@ -58,14 +58,14 @@ async def test_web_task_executor_delegates_to_runtime() -> None:
         await get_bus().stop(clear=True)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         db_path = Path(tmp_dir) / "tasks.db"
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
         settings.scheduler.auto_disable_after_failures = 2
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
 
@@ -122,9 +122,9 @@ async def test_web_task_executor_delegates_to_runtime() -> None:
             assert task.params.get("auto_disabled") is not None
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         await get_bus().stop(clear=True)
-        reset_bus()
+        await reset_bus()
 
 
 def test_parse_date_range() -> None:

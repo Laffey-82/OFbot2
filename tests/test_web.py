@@ -21,7 +21,7 @@ async def test_web_login_and_dashboard() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -270,7 +270,7 @@ async def test_web_login_and_dashboard() -> None:
                 assert response.cookies.get("ofbot2_session")
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -281,7 +281,7 @@ async def test_web_ai_and_plugin_config_routes() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -343,7 +343,7 @@ async def test_web_ai_and_plugin_config_routes() -> None:
             assert response.status_code == 303
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -384,7 +384,7 @@ async def test_web_all_pages_render() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -407,7 +407,7 @@ async def test_web_all_pages_render() -> None:
             assert "function initExportButton" in app_js.text
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -432,7 +432,7 @@ async def test_web_commands_page_lists_commands() -> None:
             settings = load_settings()
             settings.config_path = str(Path(tmp_dir) / "config.yaml")
             settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-            reset_db_engine()
+            await reset_db_engine()
             engine = get_engine(settings.database.url)
             await init_db(settings.database.url)
             await ensure_default_admin(settings)
@@ -484,7 +484,7 @@ async def test_web_commands_page_lists_commands() -> None:
                 )
 
             await engine.dispose()
-            reset_db_engine()
+            await reset_db_engine()
     finally:
         command_registry.unregister_plugin("test_command_page")
 
@@ -512,7 +512,7 @@ async def test_web_logs_tail_and_page() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -535,7 +535,7 @@ async def test_web_logs_tail_and_page() -> None:
             assert traversal.status_code == 200
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -547,7 +547,7 @@ async def test_web_records_alerts_workflow_scaffold() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -581,7 +581,7 @@ async def test_web_records_alerts_workflow_scaffold() -> None:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
 
         record = await records.create("order", {"title": "test"})
         async with session_factory()() as session:
@@ -757,12 +757,12 @@ async def test_web_records_alerts_workflow_scaffold() -> None:
             assert (Path(tmp_dir) / "plugins" / "testplug" / "plugin.json").exists()
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         try:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -829,7 +829,7 @@ async def test_web_webhook_secret_required() -> None:
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
         settings.web.webhook_secret = "s3cret"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
 
@@ -859,12 +859,12 @@ async def test_web_webhook_secret_required() -> None:
             assert service.history.get("test_hook")
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         try:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -876,7 +876,7 @@ async def test_web_api_keys_unauth_redirects_to_login() -> None:
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
         settings.web.api_keys = ["test-key"]
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -924,7 +924,7 @@ async def test_web_api_keys_unauth_redirects_to_login() -> None:
             )
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -935,7 +935,7 @@ async def test_web_reconnect_stats_and_bulk_delete() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -1147,7 +1147,7 @@ async def test_web_reconnect_stats_and_bulk_delete() -> None:
                 await get_bus().stop(clear=True)
             except Exception:
                 pass
-            reset_bus()
+            await reset_bus()
             response = await client.post(
                 "/connections/fake/test",
                 data={"csrf_token": match.group(1)},
@@ -1197,12 +1197,12 @@ async def test_web_reconnect_stats_and_bulk_delete() -> None:
             assert "较昨日" in dashboard.text
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         try:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -1213,7 +1213,7 @@ async def test_web_setup_wizard_and_export_retry() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -1377,7 +1377,7 @@ async def test_web_setup_wizard_and_export_retry() -> None:
             assert jobs[-1]["attempts"] == 1
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -1388,7 +1388,7 @@ async def test_web_management_api_and_file_delete() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -1558,7 +1558,7 @@ async def test_web_management_api_and_file_delete() -> None:
             assert file_service.list_files() == []
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -1569,7 +1569,7 @@ async def test_web_audit_filter_and_record_types_api() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -1679,7 +1679,7 @@ async def test_web_audit_filter_and_record_types_api() -> None:
             assert "api_type" not in names
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -1690,7 +1690,7 @@ async def test_web_state_machine_and_metrics() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -1800,7 +1800,7 @@ async def test_web_state_machine_and_metrics() -> None:
             assert "34.2" in export_response.text
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -1811,7 +1811,7 @@ async def test_web_stats_user_filter() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -1854,7 +1854,7 @@ async def test_web_stats_user_filter() -> None:
             assert "功能开关矩阵" in scopes_page.text
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -1865,7 +1865,7 @@ async def test_web_executions_unified_view() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -1927,7 +1927,7 @@ async def test_web_executions_unified_view() -> None:
             assert "t1" in export.text
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -1944,7 +1944,7 @@ async def test_web_login_lockout() -> None:
         settings.security.max_login_attempts = 3
         settings.security.login_lock_seconds = 1
         settings.security.login_failure_delay_seconds = 0
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -1982,7 +1982,7 @@ async def test_web_login_lockout() -> None:
             assert response.cookies.get("ofbot2_session")
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
     clear_login_states()
 
 
@@ -1994,7 +1994,7 @@ async def test_web_config_advanced_fields() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2081,7 +2081,7 @@ async def test_web_config_advanced_fields() -> None:
             assert settings.security.rate_limit_default == "30/minute"
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -2099,7 +2099,7 @@ async def test_web_plugin_install_upload() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2182,7 +2182,7 @@ async def test_web_plugin_install_upload() -> None:
             assert "安装失败" in error_page.text
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -2224,7 +2224,7 @@ async def test_web_plugin_load_error_surfaced() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2279,7 +2279,7 @@ async def test_web_plugin_load_error_surfaced() -> None:
             assert ">错误<" in plugins_page.text
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -2292,7 +2292,7 @@ async def test_web_task_run_disabled_rejected() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2336,12 +2336,12 @@ async def test_web_task_run_disabled_rejected() -> None:
             assert "已禁用" in unquote(response.headers["location"])
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
-def test_web_webhook_history_replay() -> None:
+@pytest.mark.asyncio
+async def test_web_webhook_history_replay() -> None:
     """Webhook 历史记录可一键重放（真实载荷再次触发）。"""
-    import asyncio
     from urllib.parse import unquote
 
     async def run() -> None:
@@ -2353,7 +2353,7 @@ def test_web_webhook_history_replay() -> None:
             settings = load_settings()
             settings.config_path = str(Path(tmp_dir) / "config.yaml")
             settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-            reset_db_engine()
+            await reset_db_engine()
             engine = get_engine(settings.database.url)
             await init_db(settings.database.url)
             await ensure_default_admin(settings)
@@ -2416,16 +2416,16 @@ def test_web_webhook_history_replay() -> None:
                 )
 
             await engine.dispose()
-            reset_db_engine()
+            await reset_db_engine()
             from app.core.bus import get_bus, reset_bus
 
             try:
                 await get_bus().stop(clear=True)
             except Exception:
                 pass
-            reset_bus()
+            await reset_bus()
 
-    asyncio.run(run())
+    await run()
 
 
 @pytest.mark.asyncio
@@ -2436,7 +2436,7 @@ async def test_web_account_error_surfaced() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2485,7 +2485,7 @@ async def test_web_account_error_surfaced() -> None:
             assert "新密码至少 6 位" in (await client.get("/account?error=1")).text
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -2502,7 +2502,7 @@ async def test_web_files_bulk_download() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2554,7 +2554,7 @@ async def test_web_files_bulk_download() -> None:
             assert "请选择" in unquote(response.headers["location"])
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -2580,7 +2580,7 @@ async def test_web_alert_test_notify() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2625,7 +2625,7 @@ async def test_web_alert_test_notify() -> None:
             assert "error=" in response.headers["location"]
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -2636,7 +2636,7 @@ async def test_web_self_heal_center() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2716,7 +2716,7 @@ async def test_web_self_heal_center() -> None:
             assert "1 天 0 小时" in page.text
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -2727,7 +2727,7 @@ async def test_web_record_state_machine_transition() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2762,7 +2762,7 @@ async def test_web_record_state_machine_transition() -> None:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
         record = await records.create("order", {"title": "hello"})
         await records.set_status(record.id, "pending")
 
@@ -2802,12 +2802,12 @@ async def test_web_record_state_machine_transition() -> None:
             assert still is not None and still.status == "done"
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         try:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -2818,7 +2818,7 @@ async def test_web_backups_and_webhook() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -2978,7 +2978,7 @@ async def test_web_backups_and_webhook() -> None:
                 await get_bus().stop(clear=True)
             except Exception:
                 pass
-            reset_bus()
+            await reset_bus()
             response = await client.post(
                 "/webhooks/filtered_hook/history/bulk-delete",
                 data={
@@ -3049,12 +3049,12 @@ async def test_web_backups_and_webhook() -> None:
                 assert count == 2
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         try:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -3065,7 +3065,7 @@ async def test_web_exports_tasks_workflow_edit() -> None:
         settings = load_settings()
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -3456,9 +3456,9 @@ async def test_web_exports_tasks_workflow_edit() -> None:
             assert not any(t.get("name") == "order2" for t in saved_types)
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         try:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()

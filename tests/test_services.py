@@ -105,7 +105,7 @@ async def test_audit_service_persists_record() -> None:
         db_path = Path(tmp_dir) / "test.db"
         settings = load_settings()
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
 
@@ -132,7 +132,7 @@ async def test_audit_service_persists_record() -> None:
             assert row is not None and row.actor == "admin"
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio

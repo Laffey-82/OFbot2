@@ -186,7 +186,7 @@ async def test_web_plugin_market_page_and_install(tmp_path) -> None:
     settings.database.url = (
         f"sqlite+aiosqlite:///{(tmp_path / 'test.db').as_posix()}"
     )
-    reset_db_engine()
+    await reset_db_engine()
     engine = get_engine(settings.database.url)
     await init_db(settings.database.url)
     await ensure_default_admin(settings)
@@ -217,7 +217,7 @@ async def test_web_plugin_market_page_and_install(tmp_path) -> None:
         assert (plugins_dir / "demo" / "plugin.json").exists()
 
     await engine.dispose()
-    reset_db_engine()
+    await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -300,7 +300,7 @@ async def test_plugin_repo_seed_plugins_load(tmp_path) -> None:
         await get_bus().stop(clear=True)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -350,7 +350,7 @@ async def test_plugin_repo_install_replace_and_update_flag(tmp_path) -> None:
     settings.database.url = (
         f"sqlite+aiosqlite:///{(tmp_path / 'test.db').as_posix()}"
     )
-    reset_db_engine()
+    await reset_db_engine()
     engine = get_engine(settings.database.url)
     await init_db(settings.database.url)
     await ensure_default_admin(settings)
@@ -381,4 +381,4 @@ async def test_plugin_repo_install_replace_and_update_flag(tmp_path) -> None:
         assert response.status_code == 303
 
     await engine.dispose()
-    reset_db_engine()
+    await reset_db_engine()

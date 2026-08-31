@@ -20,7 +20,7 @@ async def test_api_records_and_tasks_pagination() -> None:
         await get_bus().stop(clear=True)
     except Exception:
         pass
-    reset_bus()
+    await reset_bus()
     from app.db.base import session_factory
     from app.db.models import Task
     from app.services.records import (
@@ -36,7 +36,7 @@ async def test_api_records_and_tasks_pagination() -> None:
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
         settings.web.api_keys = ["test-key"]
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
 
@@ -93,12 +93,12 @@ async def test_api_records_and_tasks_pagination() -> None:
             assert body["tasks"][0]["task_id"] == "t1"
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
         try:
             await get_bus().stop(clear=True)
         except Exception:
             pass
-        reset_bus()
+        await reset_bus()
 
 
 @pytest.mark.asyncio
@@ -156,7 +156,7 @@ async def test_plugin_install_api() -> None:
 async def test_read_only_api_endpoints() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         url = f"sqlite+aiosqlite:///{Path(tmp_dir).as_posix()}/test.db"
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(url)
         await init_db(url)
         settings = load_settings()
@@ -176,7 +176,7 @@ async def test_read_only_api_endpoints() -> None:
                 response = await client.get(path, headers=headers)
                 assert response.status_code == 200
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
 
 
 @pytest.mark.asyncio
@@ -190,7 +190,7 @@ async def test_api_requires_admin_session_when_no_keys() -> None:
         settings.config_path = str(Path(tmp_dir) / "config.yaml")
         settings.database.url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
         settings.web.api_keys = []
-        reset_db_engine()
+        await reset_db_engine()
         engine = get_engine(settings.database.url)
         await init_db(settings.database.url)
         await ensure_default_admin(settings)
@@ -231,4 +231,4 @@ async def test_api_requires_admin_session_when_no_keys() -> None:
             assert response.json()["installed"] == "installed"
 
         await engine.dispose()
-        reset_db_engine()
+        await reset_db_engine()
