@@ -32,8 +32,17 @@ class ScopePolicyService:
     """配置存于 settings.runtime.scopes，修改后调用方 save_settings 持久化即可即时生效。"""
 
     def __init__(self, settings: Settings | None = None) -> None:
+        self._settings: Settings | None = settings
         self.runtime: RuntimeSettings = settings.runtime if settings else RuntimeSettings()
         self.ensure_defaults()
+
+    def persist(self) -> None:
+        """将包含当前 runtime.scopes 变更的 Settings 写回磁盘。"""
+        if self._settings is None:
+            return
+        from app.core.config import save_settings
+
+        save_settings(self._settings)
 
     def reload(self, settings: Settings) -> None:
         self.runtime = settings.runtime

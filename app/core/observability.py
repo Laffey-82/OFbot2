@@ -9,6 +9,8 @@ from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
+_PROCESS_START = time.monotonic()
+
 
 class MetricsRegistry:
     def __init__(self, history_size: int = 1000) -> None:
@@ -76,5 +78,5 @@ def get_system_metrics() -> dict[str, float]:
         "thread_count": thread_count,
         "process_count": process_count,
         "active_tasks": active_tasks,
-        "uptime_seconds": time.monotonic(),
+        "uptime_seconds": time.monotonic() - _PROCESS_START,
     }

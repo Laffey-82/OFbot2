@@ -17,6 +17,7 @@ class Base(DeclarativeBase):
 
 
 _engine: AsyncEngine | None = None
+_engine_url: str | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
@@ -26,9 +27,10 @@ async def reset_db_engine() -> None:
     直接丢弃引用会让 AsyncEngine 连同池内连接被垃圾回收，触发
     SQLAlchemy "non-checked-in connection" 警告；显式 dispose 可避免。
     """
-    global _engine, _session_factory
+    global _engine, _engine_url, _session_factory
     engine = _engine
     _engine = None
+    _engine_url = None
     _session_factory = None
     if engine is not None:
         try:
@@ -49,20 +51,57 @@ def resolve_database_url(url: str) -> str:
     return url
 
 
+def resolve_sqlite_path(url: str) -> Path:
+    """从 SQLite 连接 URL 解析出本地文件绝对路径。
+
+    支持 sqlite+aiosqlite:/// 和 sqlite:/// 两种前缀；非 SQLite URL
+    时抛出 ValueError。
+    """
+    for prefix in ("sqlite+aiosqlite:///", "sqlite:///"):
+        if url.startswith(prefix):
+            raw = url[len(prefix) :]
+            path = Path(raw)
+            if not path.is_absolute():
+                project_root = Path(__file__).resolve().parents[2]
+                path = project_root / path
+            return path
+    raise ValueError(f"not a sqlite URL: {url}")
+
+
 def get_engine(url: str) -> AsyncEngine:
-    global _engine, _session_factory
+    global _engine, _engine_url, _session_factory
+    resolved = resolve_database_url(url)
+    if _engine is not None and _engine_url != resolved:
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_dispose_engine(_engine))
+        except RuntimeError:
+            pass
+        _engine = None
+        _session_factory = None
     if _engine is None:
         _engine = create_async_engine(
-            resolve_database_url(url),
+            resolved,
             echo=False,
             future=True,
         )
+        _engine_url = resolved
         _session_factory = async_sessionmaker(
             _engine,
             expire_on_commit=False,
             autoflush=False,
         )
     return _engine
+
+
+async def _dispose_engine(engine: AsyncEngine) -> None:
+    """显式 dispose 旧引擎，释放连接池。"""
+    try:
+        await engine.dispose()
+    except Exception:
+        pass
 
 
 def session_factory() -> async_sessionmaker[AsyncSession]:

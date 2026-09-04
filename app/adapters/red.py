@@ -107,6 +107,7 @@ class RedAdapter(BaseAdapter):
             auth_data = connect_data.get("payload", {}).get("authData", {})
             self.self_id = str(auth_data.get("uin", self.self_id))
             self.bot_client.status[self.bot_id] = "connected"
+            self._mark_connected()
             self.bot_client.details[self.bot_id] = {
                 "self_id": self.self_id,
                 "connected_at": time.time(),
@@ -136,6 +137,14 @@ class RedAdapter(BaseAdapter):
         for item in data.get("payload", []):
             await self._handle_message(item)
 
+    @staticmethod
+    def _safe_int(value: Any, default: int) -> int:
+        """容错数值转换：载荷字段非数值时返回默认值，不打断收包循环。"""
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
     def _dispatch_notice(self, data: dict[str, Any]) -> None:
         """Red 通知载荷 best-effort 映射；未知载荷不丢弃，落 NoticeReceived。"""
         from app.core.bus import get_bus
@@ -160,7 +169,7 @@ class RedAdapter(BaseAdapter):
             "operator_id": operator_id,
             "target_id": target_id,
             "file_name": str(data.get("fileName", "") or ""),
-            "file_size": int(data.get("fileSize", 0) or 0),
+            "file_size": self._safe_int(data.get("fileSize", 0) or 0, 0),
             "raw_event": data,
         }
         if "poke" in notice_type.lower():
@@ -183,7 +192,7 @@ class RedAdapter(BaseAdapter):
             get_bus().dispatch(NoticeReceived(**common))
 
     async def _handle_message(self, data: dict[str, Any]) -> None:
-        chat_type = int(data.get("chatType", 0))
+        chat_type = self._safe_int(data.get("chatType", 0), 2)
         if chat_type not in (1, 2):
             return
         sender_uin = str(data.get("senderUin") or data.get("senderUid") or "")

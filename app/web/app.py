@@ -62,6 +62,51 @@ def create_app(
     app.state.export_jobs: dict[str, dict[str, Any]] = {}
     app.state.adapter_test_history: dict[str, list[dict[str, Any]]] = {}
     app.state.http_handlers: list[tuple[str, Any]] = list(http_routes or [])
+    app.state.http_route_paths: set[str] = set()
+
+    def register_http_event_route(path: str) -> None:
+        """注册单个 HTTP 事件路由，跳过已注册的 path。"""
+        if path in app.state.http_route_paths:
+            return
+
+        @app.post(path)
+        async def http_event(request: Request) -> JSONResponse:
+            req_path = request.url.path
+            _handler = next(
+                (
+                    handler
+                    for route_path, handler in app.state.http_handlers
+                    if route_path == req_path
+                ),
+                None,
+            )
+            if _handler is None:
+                return JSONResponse(
+                    status_code=404, content={"status": "not found"}
+                )
+            expected_token = getattr(
+                getattr(_handler, "settings", None), "access_token", ""
+            )
+            if expected_token:
+                supplied = request.headers.get("authorization", "")
+                if not supplied or not hmac.compare_digest(
+                    supplied, f"Bearer {expected_token}"
+                ):
+                    return JSONResponse(
+                        status_code=401, content={"status": "unauthorized"}
+                    )
+            try:
+                payload = await request.json()
+            except Exception:
+                return JSONResponse(
+                    status_code=400, content={"status": "bad json"}
+                )
+            await _handler.handle_http_event(payload)
+            return JSONResponse(status_code=200, content={"status": "ok"})
+
+        app.state.http_route_paths.add(path)
+
+    app.state._register_http_event_route = register_http_event_route
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(
@@ -176,39 +221,6 @@ def create_app(
             await handler(websocket)
 
     for http_path, _http_handler in http_routes or []:
-
-        @app.post(http_path)
-        async def http_event(request: Request) -> JSONResponse:
-            # 动态查找当前 handler（FastAPI 会深拷贝闭包默认值，
-            # 不能通过函数签名传入适配器实例）。
-            path = request.url.path
-            _handler = next(
-                (handler for route_path, handler in app.state.http_handlers
-                 if route_path == path),
-                None,
-            )
-            if _handler is None:
-                return JSONResponse(
-                    status_code=404, content={"status": "not found"}
-                )
-            # 与反向 WS 一致：配置了 access_token 时校验 Authorization，
-            # 防止未授权客户端伪造事件（消息/notice/request）。
-            expected_token = getattr(
-                getattr(_handler, "settings", None), "access_token", ""
-            )
-            if expected_token:
-                supplied = request.headers.get("authorization", "")
-                if not supplied or not hmac.compare_digest(
-                    supplied, f"Bearer {expected_token}"
-                ):
-                    return JSONResponse(
-                        status_code=401, content={"status": "unauthorized"}
-                    )
-            try:
-                payload = await request.json()
-            except Exception:
-                return JSONResponse(status_code=400, content={"status": "bad json"})
-            await _handler.handle_http_event(payload)
-            return JSONResponse(status_code=200, content={"status": "ok"})
+        register_http_event_route(http_path)
 
     return app

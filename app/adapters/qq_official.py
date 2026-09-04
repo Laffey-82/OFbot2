@@ -115,6 +115,7 @@ class OfficialQQAdapter(BaseAdapter):
             self._ws = ws
             self._reconnects += 1
             self.bot_client.status[self.bot_id] = "connected"
+            self._mark_connected()
             self.bot_client.details[self.bot_id] = {
                 "self_id": self.self_id,
                 "connected_at": time.time(),
@@ -146,7 +147,13 @@ class OfficialQQAdapter(BaseAdapter):
                     self._heartbeat_task = None
 
     async def _handle_raw_frame(self, raw: str) -> None:
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "qq official 收到无法解析的帧，已跳过: %.120s (%s)", raw, exc
+            )
+            return
         op = data.get("op")
         if op == 10:
             interval = (

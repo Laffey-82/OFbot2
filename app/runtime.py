@@ -84,6 +84,7 @@ async def _execute_task(
             if group_id and message and bot_client is not None:
                 await bot_client.send_group_message(str(group_id), message)
             task.status = "succeeded"
+            task.params = {k: v for k, v in task.params.items() if k != "last_error"}
             metrics.inc("tasks_completed_total")
         except Exception as exc:
             logger.exception("task execution failed: %s", task.name)

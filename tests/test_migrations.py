@@ -48,7 +48,7 @@ async def test_migration_runner_persists_and_skips() -> None:
 
         async with session_factory()() as session:
             rows = (await session.scalars(select(MigrationRecord.name))).all()
-        assert str(path) in rows
+        assert str(path) in rows or f"{path.parent.name}/{path.name}" in rows
 
         # 重建 runner（模拟重启）：不重复执行
         marker.unlink()

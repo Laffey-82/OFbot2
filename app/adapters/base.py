@@ -26,6 +26,8 @@ from app.core.messages import (
 
 logger = get_logger(__name__)
 
+RECONNECT_RESET_SECONDS = 60.0
+
 __all__ = ["BotClient", "ProtocolAdapter", "make_http_client"]
 
 
@@ -79,6 +81,8 @@ class BaseAdapter(ProtocolAdapter):
     ) -> None:
         self._running = False
         self._reconnects = 0
+        self._generation = 0
+        self._connected_since: float | None = None
         self.bot_client = bot_client
         self.reconnect_interval = float(
             getattr(settings, "reconnect_interval", 3.0) or 3.0
@@ -90,15 +94,27 @@ class BaseAdapter(ProtocolAdapter):
             getattr(settings, "reconnect_max_attempts", 0) or 0
         )
 
+    def _mark_connected(self) -> None:
+        """子类在连接真正建立后调用，用于稳定连接断开后的退避重置判定。"""
+        self._connected_since = time.monotonic()
+
     async def run_reconnect_loop(
         self,
         connect: Callable[[], Awaitable[None]],
         bot_id: str,
     ) -> None:
-        """指数退避 + 抖动重连；达到 max_attempts 后进入 disabled 状态。"""
+        """指数退避 + 抖动重连；达到 max_attempts 后进入 disabled 状态。
+
+        每次调用（即每次 start()）自增代际计数；被新 start 取代的旧循环
+        在退避等待或断线后检测到代际变化即退出，避免双收包循环并存。
+        连接曾稳定保持超过 RECONNECT_RESET_SECONDS 后断开时，attempt 归零。
+        """
+        self._generation += 1
+        generation = self._generation
         self._running = True
         attempt = 0
-        while self._running:
+        while self._running and self._generation == generation:
+            started_at = time.monotonic()
             try:
                 await connect()
                 attempt = 0
@@ -109,7 +125,24 @@ class BaseAdapter(ProtocolAdapter):
                 if self.bot_client is not None:
                     self.bot_client.status[bot_id] = "disconnected"
                     self.bot_client._bump(bot_id, "reconnects")
-            if not self._running:
+                held_since = (
+                    self._connected_since
+                    if self._connected_since is not None
+                    else started_at
+                )
+                if (
+                    attempt > 0
+                    and (time.monotonic() - held_since) >= RECONNECT_RESET_SECONDS
+                ):
+                    logger.info(
+                        "adapter %s connection held over %ss, reset backoff",
+                        bot_id,
+                        RECONNECT_RESET_SECONDS,
+                    )
+                    attempt = 0
+            finally:
+                self._connected_since = None
+            if not (self._running and self._generation == generation):
                 break
             attempt += 1
             if (

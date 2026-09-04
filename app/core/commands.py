@@ -265,10 +265,24 @@ class CommandRegistry:
             session=session,
             max_arg_length=max_arg_length,
         )
+        if name in self._commands and self._commands[name] is not command:
+            logger.warning(
+                "command %r overwritten by plugin %r (was %r)",
+                name,
+                plugin_name,
+                self._commands[name].plugin_name,
+            )
         self._commands[name] = command
         if plugin_name:
             self._by_plugin.setdefault(plugin_name, set()).add(name)
         for alias in command.aliases:
+            if alias in self._commands and self._commands[alias] is not command:
+                logger.warning(
+                    "command alias %r overwritten by plugin %r (was %r)",
+                    alias,
+                    plugin_name,
+                    self._commands[alias].plugin_name,
+                )
             self._commands[alias] = command
             if plugin_name:
                 self._by_plugin[plugin_name].add(alias)
@@ -486,6 +500,8 @@ class CommandRegistry:
             )
             await _safe_reply(event, f"【×】{reason}")
             return command.block
+
+        if policy:
             rate_spec = (
                 parse_rate_limit(command.rate_limit)
                 if command.rate_limit

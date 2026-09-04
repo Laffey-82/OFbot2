@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -32,6 +33,7 @@ from app.services.records import (
 )
 from app.web.deps import require_admin, require_api_key
 from app.web.helpers import (
+    MAX_UPLOAD_BYTES,
     PROJECT_ROOT,
     _task_executor,
 )
@@ -671,7 +673,8 @@ async def api_create_backup(request: Request, ) -> dict[str, Any]:
     if service is None:
         raise HTTPException(status_code=404, detail="backup service unavailable")
     root = PROJECT_ROOT
-    target = service.create_backup(
+    target = await asyncio.to_thread(
+        service.create_backup,
         root / "config.yaml",
         root / "data" / "ofbot2.db",
         root / "plugins",
@@ -687,11 +690,20 @@ async def api_install_plugin(request: Request, file: UploadFile = File(...)) -> 
     from pathlib import Path
 
     suffix = Path(file.filename or "plugin.zip").suffix or ".zip"
+    if file.size is not None and file.size > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413, detail="upload too large (max 100MB)"
+        )
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413, detail="upload too large (max 100MB)"
+        )
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir) / f"plugin{suffix}"
-        tmp_path.write_bytes(await file.read())
+        tmp_path.write_bytes(data)
         try:
-            target = installer.install_zip(tmp_path)
+            target = await asyncio.to_thread(installer.install_zip, tmp_path)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"installed": target.name, "path": str(target)}

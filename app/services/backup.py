@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -30,9 +32,28 @@ class BackupService:
             if source_path.is_dir():
                 shutil.copytree(source_path, target / source_path.name)
             elif source_path.exists():
-                shutil.copy2(source_path, target / source_path.name)
+                dest = target / source_path.name
+                if source_path.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
+                    self._sqlite_backup(source_path, dest)
+                else:
+                    shutil.copy2(source_path, dest)
         self._prune()
         return target
+
+    async def create_backup_async(self, *sources: str | Path) -> Path:
+        return await asyncio.to_thread(self.create_backup, *sources)
+
+    @staticmethod
+    def _sqlite_backup(source: Path, dest: Path) -> None:
+        src_conn = sqlite3.connect(str(source))
+        try:
+            dst_conn = sqlite3.connect(str(dest))
+            try:
+                src_conn.backup(dst_conn)
+            finally:
+                dst_conn.close()
+        finally:
+            src_conn.close()
 
     def list_backups(self) -> list[dict[str, Any]]:
         items = []

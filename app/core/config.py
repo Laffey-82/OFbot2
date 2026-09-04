@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -360,21 +361,24 @@ def _seed_legacy_blocked(settings: Settings) -> None:
     entry.blocked_users = list(settings.security.blocked_users)
 
 
+_save_lock = threading.Lock()
+
+
 def save_settings(settings: Settings, path: str | Path | None = None) -> None:
-    if path is None:
-        path = Path(settings.config_path or Path(__file__).resolve().parents[2] / "config.yaml")
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    data = settings.model_dump(mode="json")
-    data.pop("config_path", None)
-    transport = data.get("transport", {})
-    if transport.get("connections"):
-        # connections 已是唯一事实来源：旧 red/onebot 键仅用于首次播种，保存时移除。
-        transport.pop("red", None)
-        transport.pop("onebot", None)
-    tmp.write_text(
-        yaml.safe_dump(data, allow_unicode=True, indent=4),
-        encoding="utf-8",
-    )
-    os.replace(tmp, path)
+    with _save_lock:
+        if path is None:
+            path = Path(settings.config_path or Path(__file__).resolve().parents[2] / "config.yaml")
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        data = settings.model_dump(mode="json")
+        data.pop("config_path", None)
+        transport = data.get("transport", {})
+        if transport.get("connections"):
+            transport.pop("red", None)
+            transport.pop("onebot", None)
+        tmp.write_text(
+            yaml.safe_dump(data, allow_unicode=True, indent=4),
+            encoding="utf-8",
+        )
+        os.replace(tmp, path)

@@ -4,6 +4,7 @@ import platform
 import shutil
 import socket
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -45,8 +46,14 @@ async def run_environment_checks(
     config_path = Path(settings.config_path) if settings.config_path else root / "config.yaml"
     config_ok = True
     try:
-        with config_path.open("a", encoding="utf-8"):
-            pass
+        if config_path.exists():
+            with config_path.open("a", encoding="utf-8"):
+                pass
+        else:
+            with tempfile.NamedTemporaryFile(
+                dir=config_path.parent, delete=True
+            ):
+                pass
     except Exception:
         config_ok = False
     checks.append(
@@ -290,19 +297,18 @@ async def run_environment_checks(
 
     port_in_use = True
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.bind(("127.0.0.1", settings.web.port))
+        with socket.create_connection(("127.0.0.1", settings.web.port), timeout=1):
+            port_in_use = True
+    except (ConnectionRefusedError, OSError):
         port_in_use = False
-    except OSError:
-        port_in_use = True
     checks.append(
         {
             "name": "Web 端口",
             "status": "info",
             "detail": (
-                f"端口 {settings.web.port} 已被本服务监听（正常）"
+                f"端口 {settings.web.port} 已被占用"
                 if port_in_use
-                else f"端口 {settings.web.port} 当前未被监听"
+                else f"端口 {settings.web.port} 当前空闲"
             ),
         }
     )

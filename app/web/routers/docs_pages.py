@@ -56,7 +56,10 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         request: Request,
         user: Any = Depends(get_current_user),
     ) -> HTMLResponse:
-        path = PROJECT_ROOT / _DOC_MAPPING.get(name, "")
+        relative = _DOC_MAPPING.get(name)
+        if relative is None:
+            raise HTTPException(status_code=404, detail="document not found")
+        path = PROJECT_ROOT / relative
         if not path.exists():
             raise HTTPException(status_code=404, detail="document not found")
         content = render_markdown_light(path.read_text(encoding="utf-8"))

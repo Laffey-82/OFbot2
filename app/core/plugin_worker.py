@@ -149,6 +149,8 @@ def _plain(args: tuple) -> list[Any]:
 async def _resolve_and_run(
     module: Any, params: dict[str, Any]
 ) -> dict[str, Any]:
+    import inspect
+
     from app.core.plugin import PluginManager
 
     handler = PluginManager.resolve_dotted(module, params["handler"])
@@ -158,16 +160,28 @@ async def _resolve_and_run(
     async def reply_cb(text: str) -> None:
         replies.append(text)
 
+    sig = inspect.signature(handler)
+    needs_ctx = "ctx" in sig.parameters
+
     if len(raw_args) == 3:
         event = RemoteEvent(raw_args[0], reply_cb)
         args_msg = message_from_plain(raw_args[1])
         context = RemoteCommandContext(raw_args[2])
-        await handler(event, args_msg, context)
+        if needs_ctx:
+            await handler(event, args_msg, context, ctx=RemoteContext(name="", config={}))
+        else:
+            await handler(event, args_msg, context)
     elif len(raw_args) == 1:
         event = RemoteEvent(raw_args[0], reply_cb)
-        await handler(event)
+        if needs_ctx:
+            await handler(event, ctx=RemoteContext(name="", config={}))
+        else:
+            await handler(event)
     else:
-        await handler()
+        if needs_ctx:
+            await handler(ctx=RemoteContext(name="", config={}))
+        else:
+            await handler()
     return {"replies": replies}
 
 
@@ -205,7 +219,11 @@ async def _read_loop() -> None:
         raw = await loop.run_in_executor(None, sys.stdin.readline)
         if not raw:
             break
-        msg = json.loads(raw)
+        try:
+            msg = json.loads(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.warning("worker: malformed JSON from parent: %s", exc)
+            continue
         if "result" in msg or "error" in msg:
             future = _pending.pop(msg.get("id"), None)
             if future is not None and not future.done():

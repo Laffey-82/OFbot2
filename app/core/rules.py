@@ -50,7 +50,7 @@ async def _rule_keyword(event: Any, params: dict[str, Any]) -> bool:
     text = _plain_text(event)
     raw = params.get("value") or params.get("keyword")
     keywords = raw if isinstance(raw, list) else [str(raw or "")]
-    return any(str(kw) and kw in text for kw in keywords)
+    return any(str(kw) in text for kw in keywords)
 
 
 async def _rule_regex(event: Any, params: dict[str, Any]) -> bool:

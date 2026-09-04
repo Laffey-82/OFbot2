@@ -132,7 +132,6 @@ def bind_params(
                 bound[param.name] = param.default
                 continue
         if param.type.lower() in {"rest", "greedy_string"}:
-            # 贪婪字符串：吞掉剩余全部位置参数，合并为一个字符串
             rest_tokens = [token, *list(positional_iter)]
             bound[param.name] = " ".join(rest_tokens)
             break
@@ -143,6 +142,10 @@ def bind_params(
         if choice_error:
             return {}, choice_error
         bound[param.name] = value
+
+    for param in params:
+        if param.name not in bound and param.required:
+            return {}, f"缺少必填参数：{param.name}"
 
     leftover = list(positional_iter)
     if leftover:

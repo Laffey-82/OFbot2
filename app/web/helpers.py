@@ -23,6 +23,9 @@ logger = get_logger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+# Web 上传大小上限（100MB），超出直接拒绝，避免全量读入内存
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+
 
 def apply_security_settings(settings: Settings) -> None:
     """把配置中的安全字段重建为运行中的 SecurityPolicy（即时生效）。"""
@@ -188,7 +191,7 @@ def flash_redirect(
     if message:
         params.append(f"msg={quote(message)}")
     if error:
-        params.append(f"error={error}")
+        params.append(f"error={quote(error)}")
     if params:
         url = f"{url}{'&' if '?' in url else '?'}{'&'.join(params)}"
     return RedirectResponse(url, status_code=303)
@@ -212,6 +215,10 @@ async def ensure_default_admin(settings: Settings) -> None:
         logger.warning("default admin account created: admin/admin; change it immediately")
 
 
+# admin 默认密码检测结果缓存：key 为 admin 当前密码哈希，密码变更后 key 变化自然失效
+_default_password_checks: dict[str, bool] = {}
+
+
 async def admin_uses_default_password() -> bool:
     async with session_factory()() as session:
         admin = await session.scalar(
@@ -219,7 +226,16 @@ async def admin_uses_default_password() -> bool:
         )
         if admin is None:
             return False
-        return password_hasher.verify_password("admin", admin.password_hash)
+        cached = _default_password_checks.get(admin.password_hash)
+        if cached is not None:
+            return cached
+        uses_default = password_hasher.verify_password(
+            "admin", admin.password_hash
+        )
+        # 只保留当前哈希的结果，缓存大小恒为 1
+        _default_password_checks.clear()
+        _default_password_checks[admin.password_hash] = uses_default
+        return uses_default
 
 
 def _task_executor(task_id: str, app: FastAPI, message_override: str = ""):

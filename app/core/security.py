@@ -10,6 +10,8 @@ from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
+_audit_persist_tasks: set[asyncio.Task[None]] = set()
+
 
 class SlidingWindowRateLimiter:
     def __init__(self, max_windows: int = 10_000) -> None:
@@ -30,9 +32,21 @@ class SlidingWindowRateLimiter:
     def _trim(self) -> None:
         if len(self._windows) <= self.max_windows:
             return
-        excess = len(self._windows) - self.max_windows
-        for key in list(self._windows.keys())[:excess]:
-            self._windows.pop(key, None)
+        now = time.monotonic()
+        expired = [
+            k for k, w in self._windows.items()
+            if not w or w[-1] <= now - 3600
+        ]
+        for k in expired:
+            self._windows.pop(k, None)
+        if len(self._windows) > self.max_windows:
+            excess = len(self._windows) - self.max_windows
+            oldest = sorted(
+                self._windows,
+                key=lambda k: self._windows[k][0] if self._windows[k] else 0.0,
+            )[:excess]
+            for k in oldest:
+                self._windows.pop(k, None)
 
 
 @dataclass
@@ -104,8 +118,28 @@ class SecurityPolicy:
             return False
         self._last_command[key] = now
         if len(self._last_command) > 10_000:
-            self._last_command.clear()
+            self._evict_cooldown(now, cooldown)
         return True
+
+    def _evict_cooldown(self, now: float, cooldown: float) -> None:
+        expired = [k for k, t in self._last_command.items() if now - t >= cooldown]
+        for k in expired:
+            self._last_command.pop(k, None)
+        if len(self._last_command) > 10_000:
+            oldest_keys = sorted(
+                self._last_command, key=lambda k: self._last_command[k]
+            )[: len(self._last_command) - 10_000]
+            for k in oldest_keys:
+                self._last_command.pop(k, None)
+
+
+def _on_audit_task_done(task: asyncio.Task[None]) -> None:
+    _audit_persist_tasks.discard(task)
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.warning("audit persist task failed: %s", exc)
 
 
 class AuditLogger:
@@ -145,7 +179,7 @@ class AuditLogger:
         )
         if self._persist_callback is not None:
             try:
-                asyncio.create_task(
+                task = asyncio.create_task(
                     self._persist_callback(
                         action=action,
                         actor=actor,
@@ -154,6 +188,8 @@ class AuditLogger:
                         detail=detail or {},
                     )
                 )
+                _audit_persist_tasks.add(task)
+                task.add_done_callback(_on_audit_task_done)
             except RuntimeError:
                 pass
 

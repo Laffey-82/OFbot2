@@ -70,7 +70,13 @@ class MigrationRunner:
     async def run(self, migration_paths: list[str]) -> None:
         persisted = await self._load_applied()
         for path in migration_paths:
-            if path in self._applied or path in persisted:
+            path_obj = Path(path)
+            record_name = f"{path_obj.parent.name}/{path_obj.name}"
+            if (
+                path in self._applied
+                or path in persisted
+                or record_name in persisted
+            ):
                 self._applied.add(path)
                 continue
             module = load_migration_module(path)
@@ -82,5 +88,5 @@ class MigrationRunner:
                 await result
             self._applied.add(path)
             persisted.add(path)
-            await self._record(path)
+            await self._record(record_name)
             logger.info("migration applied: %s", path)

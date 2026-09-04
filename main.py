@@ -45,7 +45,13 @@ from app.core.security import SecurityPolicy, audit_logger
 from app.core.sessions import SessionManager
 from app.core.subscriptions import EventSubscriptionRegistry
 from app.core.whitelist import GroupWhitelistService
-from app.db.base import get_engine, init_db, session_factory
+from app.db.base import (
+    get_engine,
+    init_db,
+    reset_db_engine,
+    resolve_sqlite_path,
+    session_factory,
+)
 from app.db.migrations import MigrationRunner
 from app.runtime import (
     _now,
@@ -513,7 +519,13 @@ async def run(settings: Settings) -> None:
         permission_manager.upsert_principal(
             str(user_id), role="superadmin", scopes={"*"}
         )
+    superuser_set = {str(uid) for uid in settings.basic.superusers}
     for user_id, role in settings.runtime.user_roles.items():
+        if str(user_id) in superuser_set:
+            logger.warning(
+                "user_roles 中的 %s 与 superusers 重叠，superusers 的 superadmin 角色将被覆盖",
+                user_id,
+            )
         permission_manager.upsert_principal(
             str(user_id),
             role=str(role or "user"),
@@ -539,9 +551,11 @@ async def run(settings: Settings) -> None:
             if not settings.scheduler.auto_backup_enabled:
                 continue
             try:
-                backup_service.create_backup(
+                db_path = resolve_sqlite_path(settings.database.url)
+                await asyncio.to_thread(
+                    backup_service.create_backup,
                     ROOT / "config.yaml",
-                    ROOT / "data" / "ofbot2.db",
+                    db_path,
                 )
                 logger.info("auto backup completed")
                 settings.plugin_configs.setdefault("backup", {})[
@@ -700,6 +714,18 @@ async def run(settings: Settings) -> None:
         await connection_manager.reconfigure(new_adapters)
         adapters.clear()
         adapters.extend(new_adapters)
+
+        new_http_routes = [
+            (getattr(a, "http_path", "/onebot/v11/http"), a)
+            for a in new_adapters
+            if hasattr(a, "handle_http_event")
+        ]
+        web_app.state.http_handlers.clear()
+        web_app.state.http_handlers.extend(new_http_routes)
+        register_http = web_app.state._register_http_event_route
+        for new_path, _handler in new_http_routes:
+            register_http(new_path)
+
         web_app.state.last_reconfigured = _now().isoformat(timespec="seconds")
         return {
             "adapters": [getattr(a, "bot_id", "?") for a in new_adapters]
@@ -746,6 +772,10 @@ async def run(settings: Settings) -> None:
             await get_bus().stop(timeout=4, clear=True)
         except Exception:
             logger.warning("event bus did not stop cleanly", exc_info=True)
+        try:
+            await reset_db_engine()
+        except Exception:
+            logger.exception("database engine disposal failed")
 
 
 async def main(config_path: str | None = None) -> None:

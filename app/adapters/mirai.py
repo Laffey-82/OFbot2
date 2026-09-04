@@ -23,6 +23,8 @@ from app.core.messages import (
 
 logger = get_logger(__name__)
 
+MIRAI_REAUTH_MAX_FAILURES = 3
+
 
 class MiraiAdapter(BaseAdapter):
     def __init__(
@@ -33,6 +35,7 @@ class MiraiAdapter(BaseAdapter):
         self.bot_id = bot_id
         self.self_id = settings.self_id
         self._session_key = ""
+        self._reauth_failures = 0
         self._http: httpx.AsyncClient | None = None
         self.api_base = settings.api_base or f"http://{settings.host}:{settings.port}"
         self.verify_key = settings.token or settings.access_token
@@ -47,6 +50,7 @@ class MiraiAdapter(BaseAdapter):
 
     async def _connect_loop(self) -> None:
         await self._ensure_session()
+        self._mark_connected()
         self.bot_client.status[self.bot_id] = "connected"
         self.bot_client.details[self.bot_id] = {
             "self_id": self.self_id,
@@ -79,9 +83,11 @@ class MiraiAdapter(BaseAdapter):
                 pass
             self._http = None
 
-    async def _ensure_session(self) -> None:
-        if self._session_key:
+    async def _ensure_session(self, force: bool = False) -> None:
+        if self._session_key and not force:
             return
+        if force:
+            self._session_key = ""
         response = await self._http_client().post(
             f"{self.api_base}/verify",
             json={"verifyKey": self.verify_key},
@@ -104,10 +110,36 @@ class MiraiAdapter(BaseAdapter):
                 params={"sessionKey": self._session_key},
             )
             response.raise_for_status()
-        except Exception:
+        except Exception as exc:
+            logger.warning("mirai fetchMessage failed bot=%s: %s", self.bot_id, exc)
             return
         data = response.json()
-        if data.get("code") not in (0, None):
+        code = data.get("code")
+        if code not in (0, None):
+            logger.warning(
+                "mirai poll code=%s bot=%s, session 失效，强制重新认证",
+                code,
+                self.bot_id,
+            )
+            self._session_key = ""
+            try:
+                await self._ensure_session(force=True)
+            except Exception as exc:
+                self._reauth_failures += 1
+                if self._reauth_failures >= MIRAI_REAUTH_MAX_FAILURES:
+                    self._reauth_failures = 0
+                    raise RuntimeError(
+                        f"mirai 重新认证连续 {MIRAI_REAUTH_MAX_FAILURES} 次失败: {exc}"
+                    ) from exc
+                logger.warning(
+                    "mirai re-auth failed %s/%s bot=%s: %s",
+                    self._reauth_failures,
+                    MIRAI_REAUTH_MAX_FAILURES,
+                    self.bot_id,
+                    exc,
+                )
+                return
+            self._reauth_failures = 0
             return
         for item in data.get("data") or []:
             await self._handle_event(item)

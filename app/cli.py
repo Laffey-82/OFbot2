@@ -79,11 +79,14 @@ def _logs(args: argparse.Namespace) -> None:
 
 
 def _backup(args: argparse.Namespace) -> None:
+    from app.db.base import resolve_sqlite_path
     from app.services.backup import BackupService
 
+    settings = _settings()
+    db_path = resolve_sqlite_path(settings.database.url)
     target = BackupService(ROOT / "data" / "backups").create_backup(
         ROOT / "config.yaml",
-        ROOT / "data" / "ofbot2.db",
+        db_path,
         ROOT / "plugins",
     )
     print(f"备份完成: {target}")
@@ -282,6 +285,7 @@ def _plugin_check(args: argparse.Namespace) -> int:
             spec.loader.exec_module(module)
     except Exception as exc:
         errors.append(f"插件模块导入失败: {exc}")
+        sys.modules.pop(module_name, None)
     if module is not None:
         for feature in manifest.effective_features():
             for command in feature.commands:
@@ -529,9 +533,12 @@ def _plugin_install(args: argparse.Namespace) -> None:
     )
     for item in report["checks"]:
         print(f"  [{item['level'].upper()}] {item['check']}: {item['detail']}")
-    if report["warnings"]:
-        print("提示：存在警告项，请确认插件来源可信后继续安装。")
-    target = installer.install_zip(args.zip, audit=False)
+    if report["warnings"] and not getattr(args, "yes", False):
+        answer = input("存在警告项，确认来源可信后继续安装？[y/N] ").strip().lower()
+        if answer not in ("y", "yes"):
+            print("已取消安装")
+            return
+    target = installer.install_zip(args.zip, audit=True)
     print(f"插件已安装: {target}")
 
 
@@ -787,6 +794,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     install = plugin_sub.add_parser("install", help="安装插件 zip")
     install.add_argument("zip", help="zip 路径")
+    install.add_argument(
+        "-y", "--yes", action="store_true", help="跳过警告确认直接安装"
+    )
     install.set_defaults(func=_plugin_install)
 
     audit = plugin_sub.add_parser(

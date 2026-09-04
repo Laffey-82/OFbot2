@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -36,7 +37,7 @@ from app.web.deps import (
     require_admin,
     require_csrf,
 )
-from app.web.helpers import flash_redirect
+from app.web.helpers import MAX_UPLOAD_BYTES, flash_redirect
 
 logger = get_logger(__name__)
 
@@ -101,9 +102,13 @@ def _repo_service(app: FastAPI, settings: Settings):
             token=settings.web.plugin_repo_token,
         )
         app.state.plugin_repo_service = service
-    service.repo_url = (settings.web.plugin_repo_url or "").strip()
-    service.token = (settings.web.plugin_repo_token or "").strip()
-    service._cache = None
+    repo_url = (settings.web.plugin_repo_url or "").strip()
+    token = (settings.web.plugin_repo_token or "").strip()
+    # 尊重服务层 60s TTL 缓存；仅在仓库地址/令牌实际变化（配置修改）时失效
+    if service.repo_url != repo_url or service.token != token:
+        service.repo_url = repo_url
+        service.token = token
+        service._cache = None
     return service
 
 
@@ -325,12 +330,15 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         csrf_token: str = Depends(get_csrf_token),
         q: str = "",
         category: str = "",
+        refresh: str = "",
     ) -> HTMLResponse:
         service = _repo_service(app, settings)
         plugins: list[dict] = []
         error = ""
         try:
-            for meta in await service.list_plugins():
+            for meta in await service.list_plugins(
+                force_refresh=refresh == "1"
+            ):
                 data = meta.model_dump()
                 installed_version = service.installed_version(data["name"])
                 data["installed_version"] = installed_version or ""
@@ -583,11 +591,18 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         from pathlib import Path
 
         suffix = Path(file.filename or "plugin.zip").suffix or ".zip"
+        if file.size is not None and file.size > MAX_UPLOAD_BYTES:
+            return flash_redirect("/plugins", error="上传文件超过 100MB 限制")
+        data = await file.read()
+        if len(data) > MAX_UPLOAD_BYTES:
+            return flash_redirect("/plugins", error="上传文件超过 100MB 限制")
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir) / f"plugin{suffix}"
-            tmp_path.write_bytes(await file.read())
+            tmp_path.write_bytes(data)
             try:
-                target = installer.install_zip(tmp_path)
+                target = await asyncio.to_thread(
+                    installer.install_zip, tmp_path
+                )
             except ValueError as exc:
                 audit_logger.record(
                     "plugin.install_failed",

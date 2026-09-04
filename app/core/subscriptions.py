@@ -36,11 +36,17 @@ class EventSubscriptionRegistry:
 
     def unsubscribe_plugin(self, plugin_name: str) -> int:
         removed = 0
-        for entries in self._entries.values():
-            for entry in entries:
-                if entry.plugin_name == plugin_name:
-                    entry.active = False
-                    removed += 1
+        for event_type in list(self._entries):
+            original = self._entries[event_type]
+            filtered = [
+                entry for entry in original
+                if entry.plugin_name != plugin_name
+            ]
+            removed += len(original) - len(filtered)
+            if filtered:
+                self._entries[event_type] = filtered
+            else:
+                del self._entries[event_type]
         return removed
 
     def _ensure_forwarder(self, event_type: Any) -> None:

@@ -211,7 +211,11 @@ class PluginProcessBridge:
                 raw = await reader.readline()
                 if not raw:
                     break
-                msg = json.loads(raw.decode("utf-8", "replace"))
+                try:
+                    msg = json.loads(raw.decode("utf-8", "replace"))
+                except (json.JSONDecodeError, ValueError) as exc:
+                    logger.warning("sandbox 插件 %s 收到无效 JSON: %s", self.name, exc)
+                    continue
                 if "result" in msg or "error" in msg:
                     future = self._pending.pop(msg.get("id"), None)
                     if future is not None and not future.done():
@@ -221,6 +225,12 @@ class PluginProcessBridge:
                             future.set_result(msg.get("result"))
                 elif msg.get("method") == "capability":
                     asyncio.create_task(self._serve_capability(msg))
+                elif msg.get("method") == "worker_error":
+                    logger.warning(
+                        "sandbox 插件 %s worker 报错: %s",
+                        self.name,
+                        msg.get("params", {}).get("error", ""),
+                    )
         except (asyncio.CancelledError, ConnectionError, OSError):
             pass
         except Exception:
@@ -263,7 +273,6 @@ class PluginProcessBridge:
     async def stop(self) -> None:
         if self._closed:
             return
-        self._closed = True
         if self._proc is not None and self._proc.returncode is None:
             try:
                 await self.request("shutdown", timeout=3.0)
@@ -277,6 +286,7 @@ class PluginProcessBridge:
                     self._proc.kill()
                 except Exception:
                     pass
+        self._closed = True
         if self._reader_task is not None:
             self._reader_task.cancel()
             try:

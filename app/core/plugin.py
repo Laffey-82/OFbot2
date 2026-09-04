@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import functools
 import importlib
 import importlib.util
@@ -74,7 +75,7 @@ class DeclaredTask(BaseModel):
         entries = value if isinstance(value, list) else [value]
         for entry in entries:
             if not isinstance(entry, str):
-                raise TypeError(f"task target 必须为字符串或字符串列表：{entry!r}")
+                raise ValueError(f"task target 必须为字符串或字符串列表：{entry!r}")  # noqa: TRY004
             if entry != "all" and not (
                 entry.startswith("group:") or entry == "private:*"
             ):
@@ -328,9 +329,10 @@ class PluginContext:
     ) -> str:
         """注册一次性延迟任务，delay 秒后执行（返回 job_id）。"""
         import time
+        import uuid
         from datetime import UTC, datetime, timedelta
 
-        job_id = f"{self.name}.once.{int(time.time() * 1000)}"
+        job_id = f"{self.name}.once.{int(time.time() * 1000)}.{uuid.uuid4().hex[:8]}"
         run_date = datetime.now(UTC) + timedelta(
             seconds=max(0.1, float(delay_seconds))
         )
@@ -359,12 +361,14 @@ class PluginContext:
     async def send_private(self, user_id: str, message: Any) -> bool:
         return await self.bot.send_private_message(str(user_id), message)
 
-    def text_image(self, text: str, **kwargs: Any) -> Path:
+    async def render_text_image(self, text: str, **kwargs: Any) -> Path:
         """把文本渲染为 PNG 图片（依赖 textimg 服务，Pillow 可选）。"""
+        import asyncio
+
         service = self.services.get("textimg")
         if service is None:
             raise RuntimeError("textimg service unavailable")
-        return service.render(text, **kwargs)
+        return await asyncio.to_thread(service.render, text, **kwargs)
 
 
 class Plugin:
@@ -393,6 +397,7 @@ class LoadedPlugin:
     error: str = ""
     features: dict[str, FeatureSpec] = field(default_factory=dict)
     conflicts: list[dict[str, Any]] = field(default_factory=list)
+    background_tasks: list[asyncio.Task[Any]] = field(default_factory=list)
 
 
 class PluginManager:
@@ -638,15 +643,6 @@ class PluginManager:
         if manifest.api_version != PLUGIN_API_VERSION:
             raise ValueError("incompatible plugin api version")
         self.validate_rules(manifest)
-        for permission in manifest.permissions:
-            self.permissions.register_permission(permission)
-            roles = manifest.permission_roles.get(permission)
-            if roles:
-                for role in roles:
-                    self.permissions.grant_role_permission(role, permission)
-            else:
-                # 默认行为保持不变：未指定角色映射的权限授予 user
-                self.permissions.grant_role_permission("user", permission)
 
         if manifest.sandbox == "process":
             return self._load_plugin_process(name, path, manifest, config)
@@ -657,32 +653,54 @@ class PluginManager:
             raise ImportError(f"cannot load plugin module: {name}")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-        for model_module in manifest.models:
-            importlib.import_module(f"{module_name}.{model_module}")
-        factory = getattr(module, manifest.entry, None)
-        if factory is None:
-            raise ValueError(f"plugin entry {manifest.entry} not found")
-        instance = factory()
-        if not isinstance(instance, Plugin):
-            raise TypeError("plugin entry must return a Plugin instance")
-        instance.name = name
-        instance.version = manifest.version
+        try:
+            spec.loader.exec_module(module)
+            for model_module in manifest.models:
+                importlib.import_module(f"{module_name}.{model_module}")
+            factory = getattr(module, manifest.entry, None)
+            if factory is None:
+                raise ValueError(f"plugin entry {manifest.entry} not found")
+            instance = factory()
+            if not isinstance(instance, Plugin):
+                raise TypeError("plugin entry must return a Plugin instance")
+            instance.name = name
+            instance.version = manifest.version
 
-        ctx = self._build_context(name, config or {})
-        for migration in manifest.migrations:
-            ctx.register_migrations(str(path / migration))
-        instance.setup(ctx)
-        loaded = LoadedPlugin(
-            name=name,
-            path=path,
-            manifest=manifest,
-            module=module,
-            instance=instance,
-            context=ctx,
-        )
+            ctx = self._build_context(name, config or {})
+            for migration in manifest.migrations:
+                ctx.register_migrations(str(path / migration))
+            instance.setup(ctx)
+            for permission in manifest.permissions:
+                self.permissions.register_permission(permission)
+                roles = manifest.permission_roles.get(permission)
+                if roles:
+                    for role in roles:
+                        self.permissions.grant_role_permission(role, permission)
+                else:
+                    self.permissions.grant_role_permission("user", permission)
+            loaded = LoadedPlugin(
+                name=name,
+                path=path,
+                manifest=manifest,
+                module=module,
+                instance=instance,
+                context=ctx,
+            )
+            loaded.features = self._register_declarative(loaded)
+        except Exception:
+            self.commands.unregister_plugin(name)
+            self.subscriptions.unsubscribe_plugin(name)
+            for mod_key in list(sys.modules):
+                if mod_key == module_name or mod_key.startswith(f"{module_name}."):
+                    sys.modules.pop(mod_key, None)
+            raise
         self.loaded[name] = loaded
-        loaded.features = self._register_declarative(loaded)
+        for factory in ctx._background_tasks:
+            try:
+                task = asyncio.create_task(factory())
+                loaded.background_tasks.append(task)
+            except Exception as exc:
+                logger.warning("background task start failed for %s: %s", name, exc)
         self.bus().dispatch(
             PluginLoaded(plugin_name=name, version=manifest.version)
         )
@@ -743,8 +761,6 @@ class PluginManager:
             context=ctx,
         )
         module: Any = RemotePluginModule(bridge)
-        module_name = f"plugins.{name}"
-        sys.modules[module_name] = module
         instance = RemotePluginInstance(bridge)
         loaded = LoadedPlugin(
             name=name,
@@ -754,8 +770,24 @@ class PluginManager:
             instance=instance,
             context=ctx,
         )
+        for permission in manifest.permissions:
+            self.permissions.register_permission(permission)
+            roles = manifest.permission_roles.get(permission)
+            if roles:
+                for role in roles:
+                    self.permissions.grant_role_permission(role, permission)
+            else:
+                self.permissions.grant_role_permission("user", permission)
+        module_name = f"plugins.{name}"
+        sys.modules[module_name] = module
+        try:
+            loaded.features = self._register_declarative(loaded)
+        except Exception:
+            self.commands.unregister_plugin(name)
+            self.subscriptions.unsubscribe_plugin(name)
+            sys.modules.pop(module_name, None)
+            raise
         self.loaded[name] = loaded
-        loaded.features = self._register_declarative(loaded)
         self.bus().dispatch(
             PluginLoaded(plugin_name=name, version=manifest.version)
         )
@@ -769,6 +801,7 @@ class PluginManager:
         actions = self._resolution_for(name, loaded.manifest)
         registered_names: set[str] = set()
         conflict_log: list[dict[str, Any]] = []
+        claims = self._current_claims()
         for feature in loaded.manifest.effective_features():
             key = feature_key(name, feature.id)
             features[key] = feature
@@ -790,7 +823,6 @@ class PluginManager:
                     raise ValueError(
                         f"插件 {name} 内部命令名重复：/{effective}"
                     )
-                claims = self._current_claims()
                 kept_aliases: set[str] = set()
                 for alias in set(declared.aliases):
                     if alias in registered_names:
@@ -1070,6 +1102,10 @@ class PluginManager:
         loaded = self.loaded.pop(name, None)
         if loaded is None:
             return False
+        for task in loaded.background_tasks:
+            task.cancel()
+        if loaded.background_tasks:
+            await asyncio.gather(*loaded.background_tasks, return_exceptions=True)
         try:
             await loaded.instance.stop()
         except Exception as exc:
@@ -1100,12 +1136,36 @@ class PluginManager:
     ) -> bool:
         if name not in self.loaded:
             return False
-        loaded = self.loaded[name]
+        old_loaded = self.loaded[name]
+        old_manifest = old_loaded.manifest
         if config is None:
-            config = loaded.context.config
-        old_manifest = loaded.manifest
-        await self.unload_plugin(name)
-        self.load_plugin(name, loaded.path, config=config)
+            config = old_loaded.context.config
+        try:
+            await self.unload_plugin(name)
+        except Exception:
+            logger.exception("reload_plugin: unload %s failed, aborting", name)
+            return False
+        try:
+            self.load_plugin(name, old_loaded.path, config=config)
+        except Exception:
+            logger.exception("reload_plugin: load %s failed, attempting rollback", name)
+            try:
+                self._resolution = {name: self._resolution_for(name, old_manifest)}
+                self.loaded[name] = old_loaded
+                for event_type, entry in old_loaded.context._subscriptions:
+                    entry.active = True
+                self.loaded[name].features = self._register_declarative(old_loaded)
+                self._resolution = None
+                module_name = f"plugins.{name}"
+                sys.modules[module_name] = old_loaded.module
+                self.bus().dispatch(
+                    PluginLoaded(plugin_name=name, version=old_manifest.version)
+                )
+                logger.warning("reload_plugin: rolled back to old %s", name)
+            except Exception:
+                logger.exception("reload_plugin: rollback %s also failed", name)
+                return False
+            return False
         await self.start_plugin(name)
         new_manifest = self.loaded[name].manifest
         if old_manifest.models != new_manifest.models:

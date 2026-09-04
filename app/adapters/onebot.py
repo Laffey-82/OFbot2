@@ -154,8 +154,10 @@ class OneBotAdapter(BaseAdapter):
             while True:
                 raw = await websocket.receive_text()
                 await self._handle_raw(raw)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "onebot v11 反向 WS 连接断开（bot=%s）：%s", self.bot_id, exc
+            )
         finally:
             self._ws = None
             if websocket in self._reverse_connections:
@@ -164,6 +166,7 @@ class OneBotAdapter(BaseAdapter):
 
     async def handle_http_event(self, data: dict[str, Any]) -> None:
         """OneBot v11 反向 HTTP 事件入口（NapCat 将事件 POST 到本服务）。"""
+        self._sync_self_id(data)
         if self.bot_id in self.bot_client.details:
             self.bot_client.details[self.bot_id]["last_heartbeat"] = time.time()
         post_type = data.get("post_type")
@@ -177,6 +180,7 @@ class OneBotAdapter(BaseAdapter):
             data = json.loads(raw)
         except json.JSONDecodeError:
             return
+        self._sync_self_id(data)
         if self.bot_id in self.bot_client.details:
             self.bot_client.details[self.bot_id]["last_heartbeat"] = time.time()
         post_type = data.get("post_type")
@@ -184,6 +188,18 @@ class OneBotAdapter(BaseAdapter):
             await self._handle_message(data)
         elif post_type in {"notice", "request"}:
             await self._handle_notice_or_request(data)
+
+    def _sync_self_id(self, data: dict[str, Any]) -> None:
+        """从事件数据回填 self_id（幂等；@机器人识别依赖该值）。"""
+        raw_self_id = data.get("self_id")
+        if raw_self_id is None or raw_self_id == "":
+            return
+        value = str(raw_self_id)
+        if self.self_id == value:
+            return
+        self.self_id = value
+        if self.bot_id in self.bot_client.details:
+            self.bot_client.details[self.bot_id]["self_id"] = value
 
     async def _handle_notice_or_request(self, data: dict[str, Any]) -> None:
         from app.core.bus import get_bus
@@ -468,7 +484,7 @@ class OneBotAdapter(BaseAdapter):
                 sent = True
             except Exception:
                 logger.exception("onebot send action failed: %s", action)
-        if self._ws is not None:
+        if self._ws is not None and self._ws not in self._reverse_connections:
             try:
                 if hasattr(self._ws, "send_text"):
                     await self._ws.send_text(payload)

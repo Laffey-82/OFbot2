@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import time
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -77,7 +79,7 @@ class PluginRepoService:
         if self.repo_url:
             plugins = await self._fetch_registry()
         else:
-            plugins = self._scan_local()
+            plugins = await self._scan_local()
         self._cache = plugins
         self._cache_at = time.time()
         return plugins
@@ -105,7 +107,10 @@ class PluginRepoService:
             raise RuntimeError("插件仓库注册表不是有效 JSON") from exc
         return [PluginMeta.model_validate(item) for item in data.get("plugins", [])]
 
-    def _scan_local(self) -> list[PluginMeta]:
+    async def _scan_local(self) -> list[PluginMeta]:
+        return await asyncio.to_thread(self._scan_local_sync)
+
+    def _scan_local_sync(self) -> list[PluginMeta]:
         registry_path = self.repo_dir / "registry.json"
         if registry_path.exists():
             try:
@@ -179,7 +184,8 @@ class PluginRepoService:
         if meta.zip_url.startswith(("http://", "https://")):
             archive = await self._download(meta.zip_url)
             if meta.checksum:
-                digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+                data = await asyncio.to_thread(archive.read_bytes)
+                digest = hashlib.sha256(data).hexdigest()
                 if digest != meta.checksum.lower():
                     archive.unlink(missing_ok=True)
                     raise RuntimeError(
@@ -190,7 +196,8 @@ class PluginRepoService:
             if not archive.exists():
                 raise FileNotFoundError(f"插件包不存在：{archive}")
             if meta.checksum:
-                digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+                data = await asyncio.to_thread(archive.read_bytes)
+                digest = hashlib.sha256(data).hexdigest()
                 if digest != meta.checksum.lower():
                     raise RuntimeError(
                         f"插件包校验失败（checksum 不匹配）：{plugin_id}"
@@ -234,7 +241,9 @@ class PluginRepoService:
         if self.token:
             headers["Authorization"] = f"token {self.token}"
         try:
-            response = await self._http().get(url, headers=headers)
+            response = await self._http().get(
+                url, headers=headers, follow_redirects=True
+            )
         except Exception as exc:
             raise RuntimeError(f"插件包下载失败：{exc}") from exc
         if response.status_code != 200:
@@ -243,6 +252,14 @@ class PluginRepoService:
             )
         tmp_dir = self.plugins_dir.parent / ".plugin_repo_tmp"
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        target = tmp_dir / f"{int(time.time() * 1000)}.zip"
-        target.write_bytes(response.content)
+        target = tmp_dir / f"{uuid.uuid4()}.zip"
+        _MAX_SIZE = 64 * 1024 * 1024
+        written = 0
+        with target.open("wb") as f:
+            for chunk in response.iter_bytes(chunk_size=8192):
+                written += len(chunk)
+                if written > _MAX_SIZE:
+                    target.unlink(missing_ok=True)
+                    raise RuntimeError("插件包超过 64 MB 上限")
+                f.write(chunk)
         return target

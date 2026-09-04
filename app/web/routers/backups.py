@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from pathlib import Path
 from typing import Any
 
 from fastapi import (
@@ -30,6 +32,19 @@ from app.web.deps import (
 from app.web.helpers import PROJECT_ROOT, flash_redirect
 
 logger = get_logger(__name__)
+
+
+def _zip_directory(path: Path) -> bytes:
+    """把备份目录同步打包为 zip 字节流（在线程池中执行，避免阻塞事件循环）。"""
+    import io
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for file in path.rglob("*"):
+            if file.is_file():
+                archive.write(file, file.relative_to(path))
+    return buffer.getvalue()
 
 
 def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRouter:
@@ -70,7 +85,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         if service is None:
             return RedirectResponse("/backups?error=1", status_code=303)
         root = PROJECT_ROOT
-        service.create_backup(
+        await asyncio.to_thread(
+            service.create_backup,
             root / "config.yaml",
             root / "data" / "ofbot2.db",
         )
@@ -126,9 +142,6 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         name: str,
         user: Any = Depends(get_current_user),
     ) -> Any:
-        import io
-        import zipfile
-
         service = app.state.services.get("backup")
         if service is None:
             raise HTTPException(status_code=404, detail="backup service unavailable")
@@ -136,14 +149,9 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
             path = service.resolve_backup(name)
         except Exception:
             raise HTTPException(status_code=404, detail="backup not found")
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-            for file in path.rglob("*"):
-                if file.is_file():
-                    archive.write(file, file.relative_to(path))
-        buffer.seek(0)
+        data = await asyncio.to_thread(_zip_directory, path)
         return Response(
-            buffer.getvalue(),
+            data,
             media_type="application/zip",
             headers={
                 "Content-Disposition": f'attachment; filename="{name}.zip"'
@@ -201,8 +209,10 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         root = PROJECT_ROOT
         rollback_name = ""
         try:
-            rollback = service.create_backup(
-                root / "config.yaml", root / "data" / "ofbot2.db"
+            rollback = await asyncio.to_thread(
+                service.create_backup,
+                root / "config.yaml",
+                root / "data" / "ofbot2.db",
             )
             rollback_name = rollback.name
         except Exception as exc:
@@ -214,7 +224,8 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
                 detail={"error": str(exc)},
             )
         try:
-            results = service.restore(
+            results = await asyncio.to_thread(
+                service.restore,
                 name,
                 {
                     "config.yaml": root / "config.yaml",

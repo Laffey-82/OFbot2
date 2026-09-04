@@ -281,6 +281,7 @@ async def execute_task(task_id: str) -> None:
             if group_id and message:
                 await _ctx.bot.send_group_message(str(group_id), message)
             task.status = "succeeded"
+            task.params = {k: v for k, v in task.params.items() if k != "last_error"}
         except Exception as exc:
             task.status = "failed"
             task.params = {**task.params, "last_error": str(exc)}
@@ -325,8 +326,8 @@ async def task_command(
         task_id = uuid4().hex
         if task_type == "interval":
             seconds = parts[4]
-            if not seconds.isdigit():
-                await event.reply("间隔时间必须为数字")
+            if not seconds.isdigit() or int(seconds) <= 0:
+                await event.reply("间隔时间必须为正整数")
                 return
             async with _ctx.db() as session:
                 session.add(
@@ -340,11 +341,22 @@ async def task_command(
                     )
                 )
                 await session.commit()
-            _ctx.scheduler.add_interval_job(
-                functools.partial(execute_task, task_id),
-                job_id=task_id,
-                seconds=int(seconds),
-            )
+            try:
+                _ctx.scheduler.add_interval_job(
+                    functools.partial(execute_task, task_id),
+                    job_id=task_id,
+                    seconds=int(seconds),
+                )
+            except Exception as exc:
+                async with _ctx.db() as session:
+                    task = await session.scalar(
+                        select(Task).where(Task.task_id == task_id)
+                    )
+                    if task:
+                        await session.delete(task)
+                        await session.commit()
+                await event.reply(f"任务创建失败：{exc}")
+                return
             await event.reply(f"任务已创建：{task_id[:8]}")
             return
         if task_type == "cron":
@@ -425,10 +437,30 @@ async def task_command(
             await event.reply("任务已停用")
         return
 
+    if action == "run" and len(parts) >= 2:
+        task_id = parts[1]
+        async with _ctx.db() as session:
+            task = await session.scalar(
+                select(Task).where(Task.task_id == task_id)
+            )
+            if task is None:
+                task = await session.scalar(
+                    select(Task)
+                    .where(Task.task_id.startswith(task_id))
+                    .limit(1)
+                )
+            if task is None:
+                await event.reply("任务不存在")
+                return
+            task_id = task.task_id
+        await execute_task(task_id)
+        await event.reply(f"任务 {task_id[:8]} 已手动执行")
+        return
+
     await event.reply(
         f"用法：{_prefix()}task list ｜ {_prefix()}task run <id> ｜ "
         f"{_prefix()}task enable|disable|remove <id> ｜ "
-        f"{_prefix()}task add interval|cron <名称> <群号> <参数> <消息>"
+        f"{_prefix()}task add interval|cron <名称> <群号> <间隔/表达式> <消息>"
     )
 
 
@@ -455,15 +487,7 @@ async def _set_feature(
     scope = f"group:{group_id}"
     policy.set_feature(scope, feature, enabled)
     try:
-        from pathlib import Path
-
-        from app.core.config import load_settings, save_settings
-
-        root = Path(__file__).resolve().parents[2]
-        config_path = root / "config.yaml"
-        if config_path.exists():
-            settings = load_settings(config_path)
-            save_settings(settings)
+        policy.persist()
     except Exception as exc:
         _ctx.logger.warning("持久化功能开关失败：%s", exc)
     state = "启用" if enabled else "禁用"

@@ -17,6 +17,55 @@ from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
+_shared_client: httpx.AsyncClient | None = None
+_shared_client_config: str = ""
+
+
+def _get_shared_client(timeout: float = 60, config_key: str = "") -> httpx.AsyncClient:
+    global _shared_client, _shared_client_config
+    if _shared_client is not None and _shared_client_config == config_key:
+        return _shared_client
+    if _shared_client is not None:
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_shared_client.aclose())
+        except RuntimeError:
+            pass
+    _shared_client = httpx.AsyncClient(timeout=timeout)
+    _shared_client_config = config_key
+    return _shared_client
+
+
+def _response_text(data: dict[str, Any], provider: str) -> str:
+    """从 chat 响应中安全提取文本，choices 或 content 为空时抛 RuntimeError。"""
+    try:
+        if provider == "openai":
+            choices = data.get("choices") or []
+            if not choices:
+                raise RuntimeError(f"OpenAI 响应缺少 choices: {data}")
+            content = choices[0].get("message", {}).get("content")
+            if not content:
+                raise RuntimeError(f"OpenAI 响应 content 为空: {data}")
+            return content
+        if provider == "gemini":
+            candidates = data.get("candidates") or []
+            if not candidates:
+                raise RuntimeError(f"Gemini 响应缺少 candidates: {data}")
+            parts = candidates[0].get("content", {}).get("parts") or []
+            if not parts or not parts[0].get("text"):
+                raise RuntimeError(f"Gemini 响应 text 为空: {data}")
+            return parts[0]["text"]
+        if provider == "anthropic":
+            content = data.get("content") or []
+            if not content:
+                raise RuntimeError(f"Anthropic 响应缺少 content: {data}")
+            return "".join(block.get("text", "") for block in content)
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        raise RuntimeError(f"解析 {provider} 响应失败: {exc}") from exc
+    return ""
+
 
 class AIServiceError(Exception):
     """AI 能力不可用或不支持时的明确错误。"""
@@ -77,126 +126,100 @@ class OpenAIChatProvider(AIProvider):
         self.model = model
         self._client = client
 
+    def _config_key(self) -> str:
+        return f"{self.base_url}|{self.api_key}|{self.model}"
+
     async def chat(self, messages: list[dict[str, str]], **kwargs: Any) -> str:
-        client = self._client or httpx.AsyncClient(timeout=60)
-        try:
-            response = await client.post(
-                f"{self.base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    **kwargs,
-                },
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
-        finally:
-            if self._client is None:
-                await client.aclose()
+        client = self._client or _get_shared_client(60, self._config_key())
+        response = await client.post(
+            f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            json={"model": self.model, "messages": messages, **kwargs},
+        )
+        response.raise_for_status()
+        return _response_text(response.json(), "openai")
 
     async def chat_response(
         self, messages: list[dict[str, str]], **kwargs: Any
     ) -> dict[str, Any]:
-        client = self._client or httpx.AsyncClient(timeout=60)
-        try:
-            response = await client.post(
-                f"{self.base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    **kwargs,
-                },
+        client = self._client or _get_shared_client(60, self._config_key())
+        response = await client.post(
+            f"{self.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            json={"model": self.model, "messages": messages, **kwargs},
+        )
+        response.raise_for_status()
+        data = response.json()
+        choices = data.get("choices") or []
+        if not choices:
+            raise RuntimeError(f"OpenAI chat_response 缺少 choices: {data}")
+        message = choices[0].get("message", {})
+        content = message.get("content") or ""
+        tool_calls: list[dict[str, Any]] = []
+        for call in message.get("tool_calls") or []:
+            function = call.get("function", {})
+            try:
+                arguments = json.loads(function.get("arguments") or "{}")
+            except json.JSONDecodeError:
+                arguments = {}
+            tool_calls.append(
+                {
+                    "name": function.get("name", ""),
+                    "arguments": arguments,
+                }
             )
-            response.raise_for_status()
-            data = response.json()
-            message = (data.get("choices") or [{}])[0].get("message", {})
-            content = message.get("content") or ""
-            tool_calls: list[dict[str, Any]] = []
-            for call in message.get("tool_calls") or []:
-                function = call.get("function", {})
-                try:
-                    arguments = json.loads(function.get("arguments") or "{}")
-                except json.JSONDecodeError:
-                    arguments = {}
-                tool_calls.append(
-                    {
-                        "name": function.get("name", ""),
-                        "arguments": arguments,
-                    }
-                )
-            return {"content": content, "tool_calls": tool_calls}
-        finally:
-            if self._client is None:
-                await client.aclose()
+        return {"content": content, "tool_calls": tool_calls}
 
     async def embeddings(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
-        client = self._client or httpx.AsyncClient(timeout=60)
-        try:
-            response = await client.post(
-                f"{self.base_url}/embeddings",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                json={"model": self.model, "input": texts, **kwargs},
-            )
-            response.raise_for_status()
-            data = response.json()
-            return [
-                item.get("embedding", [])
-                for item in sorted(data.get("data", []), key=lambda x: x.get("index", 0))
-            ]
-        finally:
-            if self._client is None:
-                await client.aclose()
+        client = self._client or _get_shared_client(60, self._config_key())
+        response = await client.post(
+            f"{self.base_url}/embeddings",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            json={"model": self.model, "input": texts, **kwargs},
+        )
+        response.raise_for_status()
+        data = response.json()
+        return [
+            item.get("embedding", [])
+            for item in sorted(data.get("data", []), key=lambda x: x.get("index", 0))
+        ]
 
     async def image(self, prompt: str, **kwargs: Any) -> str:
-        client = self._client or httpx.AsyncClient(timeout=120)
-        try:
-            response = await client.post(
-                f"{self.base_url}/images/generations",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                json={"model": self.model, "prompt": prompt, **kwargs},
-            )
-            response.raise_for_status()
-            data = response.json()
-            item = (data.get("data") or [{}])[0]
-            return str(
-                item.get("url")
-                or item.get("b64_json")
-                or ""
-            )
-        finally:
-            if self._client is None:
-                await client.aclose()
+        client = self._client or _get_shared_client(120, self._config_key())
+        response = await client.post(
+            f"{self.base_url}/images/generations",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            json={"model": self.model, "prompt": prompt, **kwargs},
+        )
+        response.raise_for_status()
+        data = response.json()
+        item = (data.get("data") or [{}])[0]
+        return str(
+            item.get("url")
+            or item.get("b64_json")
+            or ""
+        )
 
     async def speech_to_text(self, audio: bytes, **kwargs: Any) -> str:
-        client = self._client or httpx.AsyncClient(timeout=120)
-        try:
-            response = await client.post(
-                f"{self.base_url}/audio/transcriptions",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                data={"model": self.model, **kwargs},
-                files={"file": ("audio.bin", audio, "application/octet-stream")},
-            )
-            response.raise_for_status()
-            return str(response.json().get("text", ""))
-        finally:
-            if self._client is None:
-                await client.aclose()
+        client = self._client or _get_shared_client(120, self._config_key())
+        response = await client.post(
+            f"{self.base_url}/audio/transcriptions",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            data={"model": self.model, **kwargs},
+            files={"file": ("audio.bin", audio, "application/octet-stream")},
+        )
+        response.raise_for_status()
+        return str(response.json().get("text", ""))
 
     async def text_to_speech(self, text: str, **kwargs: Any) -> bytes:
-        client = self._client or httpx.AsyncClient(timeout=120)
-        try:
-            response = await client.post(
-                f"{self.base_url}/audio/speech",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                json={"model": self.model, "input": text, **kwargs},
-            )
-            response.raise_for_status()
-            return response.content
-        finally:
-            if self._client is None:
-                await client.aclose()
+        client = self._client or _get_shared_client(120, self._config_key())
+        response = await client.post(
+            f"{self.base_url}/audio/speech",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            json={"model": self.model, "input": text, **kwargs},
+        )
+        response.raise_for_status()
+        return response.content
 
 
 class OllamaProvider(AIProvider):
@@ -210,37 +233,31 @@ class OllamaProvider(AIProvider):
         self.model = model
         self._client = client
 
+    def _config_key(self) -> str:
+        return f"ollama|{self.base_url}|{self.model}"
+
     async def chat(self, messages: list[dict[str, str]], **kwargs: Any) -> str:
-        client = self._client or httpx.AsyncClient(timeout=60)
-        try:
-            response = await client.post(
-                f"{self.base_url}/api/chat",
-                json={"model": self.model, "messages": messages},
-            )
-            response.raise_for_status()
-            return response.json().get("message", {}).get("content", "")
-        finally:
-            if self._client is None:
-                await client.aclose()
+        client = self._client or _get_shared_client(60, self._config_key())
+        response = await client.post(
+            f"{self.base_url}/api/chat",
+            json={"model": self.model, "messages": messages},
+        )
+        response.raise_for_status()
+        return response.json().get("message", {}).get("content", "")
 
     async def embeddings(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
-        client = self._client or httpx.AsyncClient(timeout=120)
-        try:
-            response = await client.post(
-                f"{self.base_url}/api/embed",
-                json={"model": self.model, "input": texts, **kwargs},
-            )
-            response.raise_for_status()
-            data = response.json()
-            embeddings = data.get("embeddings")
-            if embeddings:
-                return [list(item) for item in embeddings]
-            # 兼容旧版 /api/embeddings 单条响应
-            legacy = data.get("embedding")
-            return [list(legacy)] if legacy else []
-        finally:
-            if self._client is None:
-                await client.aclose()
+        client = self._client or _get_shared_client(120, self._config_key())
+        response = await client.post(
+            f"{self.base_url}/api/embed",
+            json={"model": self.model, "input": texts, **kwargs},
+        )
+        response.raise_for_status()
+        data = response.json()
+        embeddings = data.get("embeddings")
+        if embeddings:
+            return [list(item) for item in embeddings]
+        legacy = data.get("embedding")
+        return [list(legacy)] if legacy else []
 
 
 class AnthropicProvider(AIProvider):
@@ -259,29 +276,27 @@ class AnthropicProvider(AIProvider):
         self.base_url = base_url.rstrip("/")
         self._client = client
 
+    def _config_key(self) -> str:
+        return f"anthropic|{self.base_url}|{self.api_key}|{self.model}"
+
     async def chat(self, messages: list[dict[str, str]], **kwargs: Any) -> str:
         system = "\n".join(m.get("content", "") for m in messages if m.get("role") == "system")
         user_messages = [m for m in messages if m.get("role") != "system"]
-        client = self._client or httpx.AsyncClient(timeout=60)
-        try:
-            response = await client.post(
-                f"{self.base_url}/v1/messages",
-                headers={
-                    "x-api-key": self.api_key,
-                    "anthropic-version": "2023-06-01",
-                },
-                json={
-                    "model": self.model,
-                    "system": system,
-                    "messages": user_messages,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            return "".join(block.get("text", "") for block in data.get("content", []))
-        finally:
-            if self._client is None:
-                await client.aclose()
+        client = self._client or _get_shared_client(60, self._config_key())
+        response = await client.post(
+            f"{self.base_url}/v1/messages",
+            headers={
+                "x-api-key": self.api_key,
+                "anthropic-version": "2023-06-01",
+            },
+            json={
+                "model": self.model,
+                "system": system,
+                "messages": user_messages,
+            },
+        )
+        response.raise_for_status()
+        return _response_text(response.json(), "anthropic")
 
 
 class GeminiProvider(AIProvider):
@@ -300,27 +315,31 @@ class GeminiProvider(AIProvider):
         self.base_url = base_url.rstrip("/")
         self._client = client
 
+    def _config_key(self) -> str:
+        return f"gemini|{self.base_url}|{self.api_key}|{self.model}"
+
     async def chat(self, messages: list[dict[str, str]], **kwargs: Any) -> str:
-        contents = [
-            {"role": "user" if m.get("role") == "user" else "model", "parts": [{"text": m.get("content", "")}]}
-            for m in messages
-        ]
-        client = self._client or httpx.AsyncClient(timeout=60)
-        try:
-            response = await client.post(
-                f"{self.base_url}/v1beta/models/{self.model}:generateContent",
-                params={"key": self.api_key},
-                json={"contents": contents},
-            )
-            response.raise_for_status()
-            data = response.json()
-            try:
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-            except (KeyError, IndexError):
-                return ""
-        finally:
-            if self._client is None:
-                await client.aclose()
+        contents = []
+        system_instruction = None
+        for m in messages:
+            role = m.get("role", "user")
+            content = m.get("content", "")
+            if role == "system":
+                system_instruction = {"parts": [{"text": content}]}
+            else:
+                gemini_role = "user" if role == "user" else "model"
+                contents.append({"role": gemini_role, "parts": [{"text": content}]})
+        client = self._client or _get_shared_client(60, self._config_key())
+        body: dict[str, Any] = {"contents": contents}
+        if system_instruction:
+            body["systemInstruction"] = system_instruction
+        response = await client.post(
+            f"{self.base_url}/v1beta/models/{self.model}:generateContent",
+            headers={"x-goog-api-key": self.api_key},
+            json=body,
+        )
+        response.raise_for_status()
+        return _response_text(response.json(), "gemini")
 
 
 class MockAIProvider(AIProvider):
@@ -462,6 +481,9 @@ class AgentRunner:
     - 运行日志：每轮工具调用/结果/耗时，供 Web「会话运行日志」展示。
     """
 
+    _MAX_SESSIONS = 200
+    _MAX_MEMORY_PER_SESSION = 20
+
     def __init__(self, ai: AIService, *, max_memory_turns: int = 10) -> None:
         self.ai = ai
         self.tools: dict[str, AgentTool] = {}
@@ -524,7 +546,9 @@ class AgentRunner:
 
     def _memory(self, session_id: str) -> deque[dict[str, str]]:
         if session_id not in self.memories:
-            self.memories[session_id] = deque(maxlen=self.max_memory_turns * 2)
+            if len(self.memories) >= self._MAX_SESSIONS:
+                self.memories.pop(next(iter(self.memories)))
+            self.memories[session_id] = deque(maxlen=self._MAX_MEMORY_PER_SESSION)
         return self.memories[session_id]
 
     async def _authorized(
@@ -543,9 +567,17 @@ class AgentRunner:
         tool_timeout: float,
     ) -> tuple[str, float]:
         started = time.monotonic()
-        result = tool.func(**arguments)
-        if inspect.isawaitable(result):
-            result = await asyncio.wait_for(result, timeout=tool_timeout)
+        if inspect.iscoroutinefunction(tool.func):
+            result = await asyncio.wait_for(
+                tool.func(**arguments), timeout=tool_timeout
+            )
+        else:
+            result = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None, lambda: tool.func(**arguments)
+                ),
+                timeout=tool_timeout,
+            )
         elapsed = round((time.monotonic() - started) * 1000, 1)
         if result is None:
             return "（无返回）", elapsed

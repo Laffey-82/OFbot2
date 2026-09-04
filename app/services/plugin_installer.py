@@ -378,11 +378,15 @@ class PluginInstaller:
                 raise ValueError(f"plugin already exists: {plugin_name}")
             target.mkdir()
             try:
-                root_dir = manifest_name.split("/")[0]
+                if "/" in manifest_name:
+                    root_dir = manifest_name.split("/")[0]
+                else:
+                    root_dir = None
                 for name in names:
                     relative = name
-                    if name == root_dir or name.startswith(f"{root_dir}/"):
-                        relative = name[len(root_dir) :].lstrip("/")
+                    if root_dir is not None:
+                        if name == root_dir or name.startswith(f"{root_dir}/"):
+                            relative = name[len(root_dir) :].lstrip("/")
                     if not relative:
                         continue
                     resolved = (target / relative).resolve()

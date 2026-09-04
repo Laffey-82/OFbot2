@@ -34,6 +34,9 @@ class OneBotV12Adapter(BaseAdapter):
         self.settings = settings
         self.bot_id = bot_id
         self.self_id = ""
+        configured_self_id = getattr(settings, "self_id", None)
+        if configured_self_id:
+            self.self_id = str(configured_self_id)
         self._ws: Any = None
         self._reverse_connections: list[Any] = []
         self._http: httpx.AsyncClient | None = None
@@ -147,8 +150,10 @@ class OneBotV12Adapter(BaseAdapter):
             while True:
                 raw = await websocket.receive_text()
                 await self._handle_raw(raw)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "onebot v12 反向 WS 连接断开（bot=%s）：%s", self.bot_id, exc
+            )
         finally:
             self._ws = None
             if websocket in self._reverse_connections:
@@ -170,11 +175,24 @@ class OneBotV12Adapter(BaseAdapter):
         await self._handle_payload(data)
 
     async def _handle_payload(self, data: dict[str, Any]) -> None:
+        self._sync_self_id(data)
         event_type = data.get("type", "")
         if event_type == "message":
             await self._handle_message(data)
         elif event_type == "notice":
             self._dispatch_notice(data)
+
+    def _sync_self_id(self, data: dict[str, Any]) -> None:
+        """从事件数据回填 self_id（幂等；@机器人识别依赖该值）。"""
+        raw_self_id = data.get("self_id")
+        if raw_self_id is None or raw_self_id == "":
+            return
+        value = str(raw_self_id)
+        if self.self_id == value:
+            return
+        self.self_id = value
+        if self.bot_id in self.bot_client.details:
+            self.bot_client.details[self.bot_id]["self_id"] = value
 
     def _dispatch_notice(self, data: dict[str, Any]) -> None:
         from app.core.bus import get_bus
@@ -451,7 +469,7 @@ class OneBotV12Adapter(BaseAdapter):
                 sent = True
             except Exception:
                 logger.exception("onebot v12 send action failed: %s", action)
-        if self._ws is not None:
+        if self._ws is not None and self._ws not in self._reverse_connections:
             try:
                 if hasattr(self._ws, "send_text"):
                     await self._ws.send_text(payload)

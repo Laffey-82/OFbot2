@@ -50,6 +50,9 @@ class ConnectionManager:
         )
         if adapter is None:
             return None
+        old_task = self.tasks.get(bot_id)
+        if old_task is not None and not old_task.done():
+            old_task.cancel()
         task = asyncio.create_task(
             adapter.start(), name=f"adapter-{bot_id}"
         )

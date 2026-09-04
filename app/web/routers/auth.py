@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from fastapi import (
@@ -36,6 +36,7 @@ logger = get_logger(__name__)
 class _LoginState:
     failures: int = 0
     locked_until: float = 0.0
+    last_seen: float = field(default_factory=time.time)
 
 
 # 进程内登录失败状态（单进程 Web 部署）；锁定策略由 security.* 配置驱动
@@ -79,10 +80,15 @@ def build_router(*, app: FastAPI, settings: Settings, templates: Any) -> APIRout
         delay = min(
             5.0, max(0.0, float(settings.security.login_failure_delay_seconds))
         )
-        state = _login_states.setdefault(username, _LoginState())
-        if len(_login_states) > 10000:
-            _login_states.pop(next(iter(_login_states)), None)
         now = time.time()
+        state = _login_states.setdefault(username, _LoginState())
+        state.last_seen = now
+        if len(_login_states) > 10000:
+            # 按 last_seen 淘汰最旧条目，避免随机 pop 掉仍处于锁定状态的有效记录
+            oldest = min(
+                _login_states, key=lambda name: _login_states[name].last_seen
+            )
+            _login_states.pop(oldest, None)
         if state.locked_until and now < state.locked_until:
             audit_logger.record(
                 "web.login_locked",
