@@ -213,6 +213,7 @@ async def test_ipc_stop_sends_shutdown_before_terminating() -> None:
         mock_proc.stdin = AsyncMock()
         mock_proc.stdout = AsyncMock()
         mock_proc.wait = AsyncMock(return_value=0)
+        mock_proc.terminate = MagicMock(return_value=None)
         bridge._proc = mock_proc
         bridge._writer = mock_proc.stdin
 

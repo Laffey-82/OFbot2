@@ -1155,6 +1155,15 @@ class PluginManager:
                 for event_type, entry in old_loaded.context._subscriptions:
                     entry.active = True
                 self.loaded[name].features = self._register_declarative(old_loaded)
+                old_loaded.background_tasks = []
+                for factory in old_loaded.context._background_tasks:
+                    try:
+                        task = asyncio.create_task(factory())
+                        old_loaded.background_tasks.append(task)
+                    except Exception as exc:
+                        logger.warning(
+                            "background task restart failed for %s: %s", name, exc
+                        )
                 self._resolution = None
                 module_name = f"plugins.{name}"
                 sys.modules[module_name] = old_loaded.module

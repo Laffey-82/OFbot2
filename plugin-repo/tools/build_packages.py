@@ -48,7 +48,7 @@ def _expected_entries(plugin_dir: Path) -> dict[str, bytes]:
         if file_path.is_dir():
             continue
         if any(
-            part in {"__pycache__", ".pytest_cache", ".git"}
+            part in {"__pycache__", ".pytest_cache", ".git", "tests"}
             for part in file_path.parts
         ):
             continue
@@ -107,7 +107,7 @@ def build_zip(category: str, plugin_dir: Path, owner: str, repo: str, branch: st
             if file_path.is_dir():
                 continue
             if any(
-                part in {"__pycache__", ".pytest_cache", ".git"}
+                part in {"__pycache__", ".pytest_cache", ".git", "tests"}
                 for part in file_path.parts
             ):
                 continue

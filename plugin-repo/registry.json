@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "updated_at": "2026-08-31",
+  "updated_at": "2026-09-11",
   "plugins": [
     {
       "id": "backup",
@@ -95,7 +95,7 @@
         "general"
       ],
       "released_at": "",
-      "checksum": "4ba9b993dc31c3ad74a27644921b14c90523f2dd9b2cc3d4f3f1a9cb0f013283",
+      "checksum": "3f72fffc620a10952a348db41bba992c4a2d21abc29241507230442412c405e4",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/calc.zip"
     },
     {
@@ -191,7 +191,7 @@
         "general"
       ],
       "released_at": "",
-      "checksum": "7dbdfa4715867efbea91bc83a1b293b27e89839a5a1b9075a7a94c7b7c2f4028",
+      "checksum": "8610450ff73e0e3bd386b273aee52853f113aad83a00d8bf6bb733cd05bf7f24",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/order.zip"
     },
     {
@@ -207,7 +207,7 @@
         "general"
       ],
       "released_at": "",
-      "checksum": "8c11e1f070ffc9258d7d1f3965344d35560c12da071dea3748a2fb98a76f8418",
+      "checksum": "cc7e83a4158cbd8b79bd1dbf1efedc681bf0cbf777e461e9ea6ee2d60adb5120",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/order_ledger.zip"
     },
     {
@@ -287,7 +287,7 @@
         "general"
       ],
       "released_at": "",
-      "checksum": "4d3cca7f16a519f3e2eb3b8ae8cc2d33fdef5a1203e54acaf94110ad4f561ce7",
+      "checksum": "6917795e0c0b240e65e4983ce808e88b5736ffb63695a5895f05c3f311409238",
       "zip_url": "https://raw.githubusercontent.com/Laffey-82/OFbot2/main/plugin-repo/packages/reminder.zip"
     },
     {

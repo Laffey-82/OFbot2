@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.5.0（2026-09）— 发布闭环与质量修复
+
+- **版本一致性门禁**：新增版本一致性测试，语义提交含 `vX.Y.Z` 时校验
+  `app.__version__`、CHANGELOG 标题与本地 tag 三者同步，防止「代码已发但版本未发」。
+- **AI 共享 client 超时修复**：共享 HTTP client 的缓存键纳入超时，避免 60s 会话 client
+  被 120s 的图像/语音/TTS 调用复用导致长任务提前超时；无事件循环时也能正确关闭旧 client。
+- **Agent 记忆语义恢复**：`AgentRunner.max_memory_turns` 重新生效（此前固定为 20），
+  移除失效的 `_MAX_MEMORY_PER_SESSION` 常量。
+- **插件重载回滚修复**：新插件加载失败回滚到旧实例时，重启旧插件的后台任务，
+  保证回滚后插件功能完整。
+- **进程沙箱协程治理**：跟踪插件子进程能力调用任务，`stop()` 时统一取消与回收，
+  消除未跟踪协程泄漏。
+- **市场插件测试 lint 统一**：修复 calc/order/reminder 插件测试的导入排序与未使用导入，
+  `ruff check plugin-repo/plugins` 全绿。
+- **市场制品排除测试**：`build_packages.py` 打包时排除 `tests/` 目录，发行包更精简
+  （`order_ledger.zip` 体积下降，内容仅保留运行时文件）。
+- 重新构建全部市场插件包并刷新 `registry.json`，`--check` 校验通过。
+
 ## v1.4.0（2026-09）— 复杂插件开发体验（OFbot 重写问题修复）
 
 - **指令冲突检测与解决**：`plugin conflicts` 全量扫描；加载期不再因冲突失败——

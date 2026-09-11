@@ -160,6 +160,7 @@ class PluginProcessBridge:
         self._proc: asyncio.subprocess.Process | None = None
         self._writer: Any = None
         self._reader_task: asyncio.Task[Any] | None = None
+        self._capability_tasks: set[asyncio.Task[Any]] = set()
         self._pending: dict[int, asyncio.Future[Any]] = {}
         self._counter = 0
         self._closed = False
@@ -224,7 +225,9 @@ class PluginProcessBridge:
                         else:
                             future.set_result(msg.get("result"))
                 elif msg.get("method") == "capability":
-                    asyncio.create_task(self._serve_capability(msg))
+                    task = asyncio.create_task(self._serve_capability(msg))
+                    self._capability_tasks.add(task)
+                    task.add_done_callback(self._capability_tasks.discard)
                 elif msg.get("method") == "worker_error":
                     logger.warning(
                         "sandbox 插件 %s worker 报错: %s",
@@ -287,6 +290,12 @@ class PluginProcessBridge:
                 except Exception:
                     pass
         self._closed = True
+        for task in list(self._capability_tasks):
+            task.cancel()
+        if self._capability_tasks:
+            await asyncio.gather(
+                *self._capability_tasks, return_exceptions=True
+            )
         if self._reader_task is not None:
             self._reader_task.cancel()
             try:

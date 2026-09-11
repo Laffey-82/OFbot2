@@ -163,7 +163,7 @@ async def test_gemini_system_role_mapped_to_system_instruction():
 
 @pytest.mark.asyncio
 async def test_agent_memory_per_session_capped():
-    """单个 session 记忆不超过 _MAX_MEMORY_PER_SESSION 条。"""
+    """单个 session 记忆不超过 max_memory_turns 条。"""
     provider = MockAIProvider()
     service = AIService()
     service.register(provider)
@@ -173,7 +173,7 @@ async def test_agent_memory_per_session_capped():
     mem = runner._memory("s1")
     for i in range(25):
         mem.append({"role": "user", "content": str(i)})
-    assert len(mem) <= AgentRunner._MAX_MEMORY_PER_SESSION
+    assert len(mem) <= runner.max_memory_turns
 
 
 @pytest.mark.asyncio

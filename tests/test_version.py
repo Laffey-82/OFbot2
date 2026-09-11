@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -28,6 +29,51 @@ def test_pypi_metadata_present() -> None:
     assert project.get("authors")
     assert project.get("classifiers")
     assert "build-system" in pyproject
+
+
+def test_semantic_commit_version_gate() -> None:
+    """语义提交含 vX.Y.Z 时，版本号/CHANGELOG/本地 tag 必须同步。
+
+    仅在本地 git 可用时校验；CI 环境（如 GitHub Actions checkout）可能未打 tag，
+    因此 tag 检查仅在本仓库已存在至少一个本地 tag 时启用，避免误失败。
+    """
+    try:
+        message = subprocess.run(
+            ["git", "log", "-1", "--pretty=%s"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return
+    match = re.search(r"\bv(\d+\.\d+\.\d+)\b", message)
+    if not match:
+        return
+    version = match.group(1)
+    assert app.__version__ == version, (
+        f"提交信息声明 v{version}，但 app.__version__ = {app.__version__}"
+    )
+    changelog = (ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert re.search(rf"^## v{re.escape(version)}\b", changelog, re.MULTILINE), (
+        f"docs/CHANGELOG.md 缺少 v{version} 小节"
+    )
+    try:
+        current_tag = subprocess.run(
+            ["git", "describe", "--tags", "--exact-match"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return
+    if current_tag:
+        assert current_tag == f"v{version}", (
+            f"当前 HEAD 位于 tag {current_tag}，但提交信息声明 v{version}"
+        )
 
 
 def test_main_changelog_single_version_line() -> None:

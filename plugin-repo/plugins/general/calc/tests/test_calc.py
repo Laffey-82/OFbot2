@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 import importlib.util
 from pathlib import Path
 
@@ -9,7 +8,8 @@ _spec = importlib.util.spec_from_file_location("calc_handlers_test", _handlers_p
 handlers = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(handlers)
 
-from app.core.messages import Message, MessageEvent  # noqa: E402
+from app.core.messages import Message
+
 _eval = handlers._eval
 calc_command = handlers.calc_command
 

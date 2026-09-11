@@ -23,16 +23,17 @@ _shared_client_config: str = ""
 
 def _get_shared_client(timeout: float = 60, config_key: str = "") -> httpx.AsyncClient:
     global _shared_client, _shared_client_config
-    if _shared_client is not None and _shared_client_config == config_key:
+    resolved_key = f"{config_key}|{timeout}"
+    if _shared_client is not None and _shared_client_config == resolved_key:
         return _shared_client
     if _shared_client is not None:
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(_shared_client.aclose())
         except RuntimeError:
-            pass
+            asyncio.run(_shared_client.aclose())
     _shared_client = httpx.AsyncClient(timeout=timeout)
-    _shared_client_config = config_key
+    _shared_client_config = resolved_key
     return _shared_client
 
 
@@ -482,7 +483,6 @@ class AgentRunner:
     """
 
     _MAX_SESSIONS = 200
-    _MAX_MEMORY_PER_SESSION = 20
 
     def __init__(self, ai: AIService, *, max_memory_turns: int = 10) -> None:
         self.ai = ai
@@ -548,7 +548,7 @@ class AgentRunner:
         if session_id not in self.memories:
             if len(self.memories) >= self._MAX_SESSIONS:
                 self.memories.pop(next(iter(self.memories)))
-            self.memories[session_id] = deque(maxlen=self._MAX_MEMORY_PER_SESSION)
+            self.memories[session_id] = deque(maxlen=self.max_memory_turns)
         return self.memories[session_id]
 
     async def _authorized(
