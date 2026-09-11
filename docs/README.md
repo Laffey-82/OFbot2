@@ -31,6 +31,7 @@
 | 文档 | 说明 |
 | --- | --- |
 | [MAINTENANCE.md](MAINTENANCE.md) | 发布节奏、门禁清单、分支与数据备份 |
+| [RELEASING.md](RELEASING.md) | 发版闭环、版本一致性门禁、市场与 wiki 同步 |
 | [FAQ.md](FAQ.md) | 连接、备份、告警、公网部署等排查 |
 | [CHRONOCAT.md](CHRONOCAT.md) | Chronocat/Red 旧接入指南（兼容保留） |
 

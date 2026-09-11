@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.6.0（2026-09）— 发布自动化与插件市场审计
+
+- **一键发版**：新增 `scripts/release.py`（`--dry-run` 预览 / `--bump` 升版 / commit+tag+push+
+  GitHub Release），并新增 `scripts/check_release.py` 作为版本一致性门禁（CI 每次 push 运行）。
+- **插件市场审计**：新增 `scripts/audit_plugin_repo.py`，检查市场制品是否含缓存/编译产物/
+  超大文件，并校验内置插件与市场同名插件的元数据同步；支持 `--check`/`--strict` 门禁。
+- **市场打包规范**：`build_packages.py` 默认排除 `tests/`、缓存与隐藏目录。
+- **维护者文档**：新增 `docs/RELEASING.md`（发版闭环）与 `docs/PLUGIN_REPO.md`（市场规范），
+  并登记进文档中枢；`docs/README.md` 增加发版指南入口。
+- **测试**：新增 `tests/test_release_automation.py`、`tests/test_plugin_repo_audit.py`、
+  `tests/test_version.py` 版本门禁（共 17 项）。
+- CI 增加 `Release consistency` 步骤（`python scripts/check_release.py`）。
+
 ## v1.5.0（2026-09）— 发布闭环与质量修复
 
 - **版本一致性门禁**：新增版本一致性测试，语义提交含 `vX.Y.Z` 时校验

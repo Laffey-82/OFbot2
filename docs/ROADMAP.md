@@ -1,8 +1,17 @@
-# 修复路线图（v1.0.8 → v1.5.0）
+# 修复路线图（v1.0.8 → v1.6.0）
 
 依据 2026-08 项目审查结论（第 1/2/4/5/6/7 项；第 3 项 Agent 长期记忆为远期目标），
 按「先稳后进」分多个批次推进。每批都通过全部门禁：
 `compileall` + `ruff check` + `pytest` + `scripts/e2e_smoke.py`。
+
+## 批次 7（v1.6.0）— 发布自动化与插件市场审计
+
+- [x] 一键发版 `scripts/release.py`（`--dry-run`/`--bump`/commit+tag+push+Release）。
+- [x] 版本一致性门禁 `scripts/check_release.py`，CI 每次 push 运行。
+- [x] 插件市场审计 `scripts/audit_plugin_repo.py`（制品健康 + 内置/市场同步）。
+- [x] 市场打包排除 `tests/`、缓存与隐藏目录。
+- [x] 新增 `docs/RELEASING.md`、重写 `docs/PLUGIN_REPO.md` 并登记文档中枢。
+- [x] 门禁：全量测试 + `build_packages.py --check` + `audit_plugin_repo.py --check` + ruff/compileall 通过。
 
 ## 批次 6（v1.5.0）— 发布闭环与质量修复
 
@@ -80,3 +89,4 @@
 - 批次 4：✅ 完成（v1.3.0）
 - 批次 5：✅ 完成（v1.4.0）
 - 批次 6：✅ 完成（v1.5.0）
+- 批次 7：✅ 完成（v1.6.0）
