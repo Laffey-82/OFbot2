@@ -1,21 +1,28 @@
 adapters:
-  - app/adapters/**
+  - any:
+      - "app/adapters/**"
 web:
-  - app/web/**
+  - any:
+      - "app/web/**"
 core:
-  - app/core/**
+  - any:
+      - "app/core/**"
 plugins:
-  - plugins/**
-  - plugin-repo/**
-  - examples/**
+  - any:
+      - "plugins/**"
+      - "plugin-repo/**"
+      - "examples/**"
 docs:
-  - docs/**
-  - readme.md
-  - CONTRIBUTING.md
-  - SECURITY.md
-  - CODE_OF_CONDUCT.md
+  - any:
+      - "docs/**"
+      - "readme.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "CODE_OF_CONDUCT.md"
 ci:
-  - .github/**
+  - any:
+      - ".github/**"
 tests:
-  - tests/**
-  - scripts/**
+  - any:
+      - "tests/**"
+      - "scripts/**"
