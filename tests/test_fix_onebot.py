@@ -144,6 +144,138 @@ async def test_v11_self_id_backfill_idempotent_and_stable() -> None:
     assert adapter.self_id == "10001"
 
 
+async def test_v11_at_self_detected_from_qq_segment() -> None:
+    """OneBot v11 的 at 消息段用 qq 字段，需归一为 user_id 才能识别 @机器人。"""
+    client = RecordingClient()
+    adapter = OneBotAdapter(
+        OneBotSettings(mode="reverse_ws"), "bot11", client
+    )
+    client.details["bot11"] = {"self_id": "", "connected_at": 0.0}
+    payload = json.dumps(
+        {
+            "post_type": "message",
+            "message_type": "group",
+            "group_id": 200,
+            "user_id": 100,
+            "message_id": 1,
+            "self_id": 10001,
+            "raw_message": "[CQ:at,qq=10001] /hello",
+            "message": [
+                {"type": "at", "data": {"qq": "10001"}},
+                {"type": "text", "data": {"text": " /hello"}},
+            ],
+            "sender": {"nickname": "tester"},
+        }
+    )
+
+    await adapter._handle_raw(payload)
+
+    assert client.events
+    event = client.events[0]
+    assert event.at_self is True
+    at_segment = next(
+        segment for segment in event.message.segments if segment.type == "at"
+    )
+    assert at_segment.data["user_id"] == "10001"
+
+
+async def test_v11_at_self_detected_from_cq_code() -> None:
+    """CQ 码形式（message 为字符串）的 @机器人同样要能识别。"""
+    client = RecordingClient()
+    adapter = OneBotAdapter(
+        OneBotSettings(mode="reverse_ws"), "bot11", client
+    )
+    client.details["bot11"] = {"self_id": "", "connected_at": 0.0}
+    payload = json.dumps(
+        {
+            "post_type": "message",
+            "message_type": "group",
+            "group_id": 200,
+            "user_id": 100,
+            "message_id": 1,
+            "self_id": 10001,
+            "raw_message": "[CQ:at,qq=10001] /hello",
+            "message": "[CQ:at,qq=10001] /hello",
+            "sender": {"nickname": "tester"},
+        }
+    )
+
+    await adapter._handle_raw(payload)
+
+    assert client.events
+    event = client.events[0]
+    assert event.at_self is True
+    at_segment = next(
+        segment for segment in event.message.segments if segment.type == "at"
+    )
+    assert at_segment.data["user_id"] == "10001"
+
+
+async def test_v11_at_self_false_when_mentioning_other_user() -> None:
+    """@ 其他人时不应误判为 @机器人。"""
+    client = RecordingClient()
+    adapter = OneBotAdapter(
+        OneBotSettings(mode="reverse_ws"), "bot11", client
+    )
+    client.details["bot11"] = {"self_id": "", "connected_at": 0.0}
+    payload = json.dumps(
+        {
+            "post_type": "message",
+            "message_type": "group",
+            "group_id": 200,
+            "user_id": 100,
+            "message_id": 1,
+            "self_id": 10001,
+            "raw_message": "[CQ:at,qq=999] /hello",
+            "message": [
+                {"type": "at", "data": {"qq": "999"}},
+                {"type": "text", "data": {"text": " /hello"}},
+            ],
+            "sender": {"nickname": "tester"},
+        }
+    )
+
+    await adapter._handle_raw(payload)
+
+    assert client.events
+    assert client.events[0].at_self is False
+
+
+async def test_v11_to_me_rule_passes_for_at_bot() -> None:
+    """to_me 规则（私聊或 @机器人）在 OneBot v11 群聊 @机器人时应通过。"""
+    from app.core.rules import RuleSpec, rule_registry
+
+    client = RecordingClient()
+    adapter = OneBotAdapter(
+        OneBotSettings(mode="reverse_ws"), "bot11", client
+    )
+    client.details["bot11"] = {"self_id": "", "connected_at": 0.0}
+    payload = json.dumps(
+        {
+            "post_type": "message",
+            "message_type": "group",
+            "group_id": 200,
+            "user_id": 100,
+            "message_id": 1,
+            "self_id": 10001,
+            "raw_message": "[CQ:at,qq=10001] /hello",
+            "message": [
+                {"type": "at", "data": {"qq": "10001"}},
+                {"type": "text", "data": {"text": " /hello"}},
+            ],
+            "sender": {"nickname": "tester"},
+        }
+    )
+
+    await adapter._handle_raw(payload)
+
+    assert client.events
+    passed, reason = await rule_registry.check(
+        [RuleSpec(name="to_me")], client.events[0]
+    )
+    assert passed is True, reason
+
+
 async def test_v12_self_id_backfilled_from_event_and_at_self() -> None:
     client = RecordingClient()
     adapter = OneBotV12Adapter(_v12_conn(), "bot12", client)

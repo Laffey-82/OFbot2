@@ -26,6 +26,20 @@ from app.core.messages import (
 logger = get_logger(__name__)
 
 
+def _normalize_segment(segment: MessageSegment) -> MessageSegment:
+    """把 v11 协议字段归一为框架内部表示。
+
+    v11 的 at 段用 qq 标识被 @ 的账号，而框架内部统一用 user_id
+    （见 MessageSegment.at 与 v12 适配器）；不归一时 at_self 判定恒为
+    False，群里 @机器人 无法被识别。
+    """
+    if segment.type != "at":
+        return segment
+    data = dict(segment.data)
+    data["user_id"] = str(data.get("user_id") or data.get("qq") or "")
+    return MessageSegment("at", data)
+
+
 class OneBotAdapter(BaseAdapter):
     def __init__(
         self,
@@ -326,7 +340,9 @@ class OneBotAdapter(BaseAdapter):
                     continue
                 item_type = item.get("type", "")
                 item_data = item.get("data", {})
-                segments.append(MessageSegment(item_type, item_data))
+                segments.append(
+                    _normalize_segment(MessageSegment(item_type, item_data))
+                )
             return Message.from_segments(segments)
         return Message(raw_message)
 
@@ -355,7 +371,9 @@ class OneBotAdapter(BaseAdapter):
                 if "=" in part:
                     key, value = part.split("=", 1)
                     data[key.strip()] = unescape(value.strip())
-            segments.append(MessageSegment(cq_type, data))
+            segments.append(
+                _normalize_segment(MessageSegment(cq_type, data))
+            )
             pos = match.end()
         if pos < len(text):
             segments.append(
