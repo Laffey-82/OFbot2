@@ -1,28 +1,31 @@
 adapters:
-  - any:
-      - "app/adapters/**"
+  - changed-files:
+      - any-glob-to-any-file: "app/adapters/**"
 web:
-  - any:
-      - "app/web/**"
+  - changed-files:
+      - any-glob-to-any-file: "app/web/**"
 core:
-  - any:
-      - "app/core/**"
+  - changed-files:
+      - any-glob-to-any-file: "app/core/**"
 plugins:
-  - any:
-      - "plugins/**"
-      - "plugin-repo/**"
-      - "examples/**"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "plugins/**"
+          - "plugin-repo/**"
+          - "examples/**"
 docs:
-  - any:
-      - "docs/**"
-      - "readme.md"
-      - "CONTRIBUTING.md"
-      - "SECURITY.md"
-      - "CODE_OF_CONDUCT.md"
-ci:
-  - any:
-      - ".github/**"
-tests:
-  - any:
-      - "tests/**"
-      - "scripts/**"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "readme.md"
+          - "CONTRIBUTING.md"
+          - "SECURITY.md"
+          - "CODE_OF_CONDUCT.md"
+github_actions:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+python:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tests/**"
+          - "scripts/**"
